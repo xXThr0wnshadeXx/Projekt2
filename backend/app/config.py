@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # Enables GET /api/stats when set; sent as the X-Stats-Token header.
     stats_token: SecretStr | None = None
 
+    # JSON price table per model ID, used only for cost logging. See .env.example.
+    model_prices: str = ""
+
     @property
     def allowed_origins(self) -> list[str]:
         origins = [o.strip().rstrip("/") for o in self.allowed_origin.split(",")]

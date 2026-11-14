@@ -12,8 +12,12 @@ import re
 from collections.abc import Awaitable, Callable
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .config import Settings
+
+if TYPE_CHECKING:
+    from openai import AsyncOpenAI
 
 log = logging.getLogger("glance.explain")
 
@@ -46,16 +50,23 @@ def acceptable(text: str) -> bool:
     return not _FORBIDDEN.search(text)
 
 
-def model_explainer(settings: Settings, timeout_s: float = 2.0) -> Explainer | None:
+def model_explainer(
+    settings: Settings, timeout_s: float = 2.0, client: "AsyncOpenAI | None" = None
+) -> Explainer | None:
     """An explainer backed by MODEL_TEXT, or None when models aren't configured."""
     if not settings.models_configured:
         return None
     from openai import AsyncOpenAI, OpenAIError
 
-    client = AsyncOpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        timeout=timeout_s,
-        max_retries=0,
+    from .observability import instrument_openai
+
+    client = instrument_openai(
+        client
+        or AsyncOpenAI(
+            api_key=settings.openai_api_key.get_secret_value(),
+            timeout=timeout_s,
+            max_retries=0,
+        )
     )
 
     async def explain(a_latex: str, b_latex: str) -> str | None:
