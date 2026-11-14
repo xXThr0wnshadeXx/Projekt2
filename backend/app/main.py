@@ -7,12 +7,14 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import hmac
+
+from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import observability, timeouts
 from .config import Settings, get_settings
-from . import timeouts
-from .errors import install_error_handlers
+from .errors import ApiError, install_error_handlers
 from .explain import Explainer, model_explainer
 from .routes.diff import diff_router
 
@@ -46,12 +48,22 @@ def create_app(
         max_age=600,
     )
     install_error_handlers(app)
+    # Outermost, so CORS preflights and error responses are timed and logged too.
+    app.add_middleware(observability.RequestLogMiddleware)
 
     app.include_router(diff_router(explainer))
 
     @app.get("/api/health")
     async def health() -> dict:
         return {"ok": True}
+
+    @app.get("/api/stats")
+    async def stats(x_stats_token: str | None = Header(default=None)) -> dict:
+        """Live latency, error and cost summary. Contains no student content."""
+        expected = settings.stats_token.get_secret_value() if settings.stats_token else ""
+        if not expected or not hmac.compare_digest(x_stats_token or "", expected):
+            raise ApiError("NOT_FOUND", "That address doesn't exist.", 404)
+        return observability.summary()
 
     return app
 

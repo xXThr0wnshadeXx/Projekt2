@@ -41,6 +41,9 @@ def error_body(code: ErrorCode, message: str) -> dict:
 
 
 def error_response(code: ErrorCode, message: str, status: int) -> JSONResponse:
+    from .observability import note_error
+
+    note_error(code)
     return JSONResponse(status_code=status, content=error_body(code, message))
 
 

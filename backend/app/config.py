@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     max_audio_seconds: int = 30
     cas_timeout_seconds: float = 2.0
 
+    # Enables GET /api/stats when set; sent as the X-Stats-Token header.
+    stats_token: SecretStr | None = None
+
     @property
     def allowed_origins(self) -> list[str]:
         origins = [o.strip().rstrip("/") for o in self.allowed_origin.split(",")]
