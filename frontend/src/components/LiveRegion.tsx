@@ -1,2 +1,77 @@
-// LiveRegion — issue #13. See DESIGN.md 12.
-export {};
+// LiveRegion — issue #13.
+//
+// Screen readers are how this app talks. Two regions, because they behave
+// differently: `polite` waits for a pause (progress, confirmations), `assertive`
+// interrupts (errors, anything the student must hear now).
+//
+// The app's own text-to-speech stays off by default. A screen reader already
+// reads these regions, and two voices at once is unusable (DESIGN.md 13).
+
+import { useEffect, useRef, useState } from 'react';
+
+type Urgency = 'polite' | 'assertive';
+
+let announceImpl: (message: string, urgency?: Urgency) => void = () => {};
+
+/** Announce a message to screen readers. Safe to call before mount. */
+export function announce(message: string, urgency: Urgency = 'polite'): void {
+  announceImpl(message, urgency);
+}
+
+/** Move focus to the first match, so the student lands on the new result. */
+export function focusFirst(selector: string): boolean {
+  const el = document.querySelector<HTMLElement>(selector);
+  if (!el) return false;
+  if (!el.hasAttribute('tabindex') && !isNativelyFocusable(el)) {
+    el.setAttribute('tabindex', '-1');
+  }
+  el.focus();
+  return true;
+}
+
+function isNativelyFocusable(el: HTMLElement): boolean {
+  return ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName);
+}
+
+export function LiveRegion() {
+  const [polite, setPolite] = useState('');
+  const [assertive, setAssertive] = useState('');
+  const timers = useRef<number[]>([]);
+
+  useEffect(() => {
+    announceImpl = (message, urgency = 'polite') => {
+      const set = urgency === 'assertive' ? setAssertive : setPolite;
+      // Clearing first guarantees the same message announces twice if repeated;
+      // without this, an identical string is silently ignored.
+      set('');
+      const t = window.setTimeout(() => set(message), 50);
+      timers.current.push(t);
+    };
+    return () => {
+      announceImpl = () => {};
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
+  }, []);
+
+  return (
+    <>
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        data-testid="live-polite"
+      >
+        {polite}
+      </div>
+      <div
+        aria-live="assertive"
+        aria-atomic="true"
+        className="sr-only"
+        data-testid="live-assertive"
+      >
+        {assertive}
+      </div>
+    </>
+  );
+}

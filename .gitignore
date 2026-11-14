@@ -41,6 +41,9 @@ Thumbs.db
 !eval/photos/.gitkeep
 !docs/evidence/.gitkeep
 
+# Front-end build output and local env
+frontend/dist/
+frontend/.env.local
 # Local editor and tooling folders
 .claude/
 .vscode/
