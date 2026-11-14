@@ -43,11 +43,19 @@ One command, once per machine, from inside the repository:
 bash scripts/setup.sh
 ```
 
-It installs the git hooks, writes the project rules into the files your editor
-and command-line tooling look for, checks you have the prerequisites, and lists
-your open tickets. Everything it writes is excluded from version control in your
-clone only — nothing new is committed, and the repository stays identical for
-everyone. Re-run it after this file or `DESIGN.md` changes.
+It installs the git hooks, checks you have the prerequisites, and lists your open
+tickets. It writes nothing else into your working copy.
+
+If your editor or command-line tooling reads a project rules file, create one
+yourself with the filename it expects:
+
+```bash
+bash scripts/local-rules.sh <FILENAME>
+```
+
+That fills the file from this page and excludes it from version control in your
+clone only, so it never reaches the repository. Re-run it after this file or
+`DESIGN.md` changes.
 
 Then read issue #57 and start your lowest-numbered `blocker`.
 
