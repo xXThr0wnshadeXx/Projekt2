@@ -8,6 +8,11 @@
 
 set -euo pipefail
 
+# Git Bash on Windows rewrites a leading "/" into a Windows path, which turns
+# a title like "/api/capture" into "C:/Program Files/Git/api/capture".
+export MSYS_NO_PATHCONV=1
+export MSYS2_ARG_CONV_EXCL="*"
+
 REPO="${REPO:-xXThr0wnshadeXx/Projekt2}"
 OWNER="${PROJECT_OWNER:-${REPO%%/*}}"
 PROJECT_TITLE="${PROJECT_TITLE:-Glance}"
