@@ -22,3 +22,5 @@ services:
         sync: false
       - key: ALLOWED_ORIGIN
         sync: false
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
