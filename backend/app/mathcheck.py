@@ -114,11 +114,14 @@ def steps_equivalent(a_latex: str, b_latex: str) -> tuple[bool, str]:
     """
     from sympy import Eq, simplify
     from sympy.core.relational import Relational
+    from sympy.logic.boolalg import BooleanAtom
 
     try:
         a, b = parse(a_latex), parse(b_latex)
     except Unparseable:
         return (False, "unparseable")
+    if isinstance(a, BooleanAtom) or isinstance(b, BooleanAtom):
+        return (False, "degenerate")  # SymPy already evaluated e.g. "0 = 0" to True
 
     a_rel, b_rel = isinstance(a, Relational), isinstance(b, Relational)
     if (a_rel and not isinstance(a, Eq)) or (b_rel and not isinstance(b, Eq)):
