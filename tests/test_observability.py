@@ -52,12 +52,12 @@ def test_one_structured_line_per_request(client, caplog):
 
 def test_no_student_content_is_logged(client, caplog):
     caplog.set_level(logging.INFO)
-    secret_line = "17y + 42 = 99"
+    secret_line = "17y + 42 = 987654321"
     client.post("/api/diff", json={"from_latex": secret_line, "to_latex": "y = 3", "mode": "study"})
     client.get("/api/health?student=alice")
     # httpx is the test client's own log, not the server's.
     text = "\n".join(r.getMessage() for r in caplog.records if r.name != "httpx")
-    assert "17y" not in text and "99" not in text
+    assert "17y" not in text and "987654321" not in text
     assert "alice" not in text
 
 
