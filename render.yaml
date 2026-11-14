@@ -1,0 +1,24 @@
+# Render Blueprint for the back end. New > Blueprint > pick this repo.
+# Secrets are entered in the Render dashboard, never here.
+services:
+  - type: web
+    name: glance-api
+    runtime: python
+    rootDir: backend
+    plan: starter            # a sleeping free tier adds cold starts during judging
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MODEL_VISION
+        sync: false
+      - key: MODEL_TEXT
+        sync: false
+      - key: MODEL_STT
+        sync: false
+      - key: ALLOWED_ORIGIN
+        sync: false
