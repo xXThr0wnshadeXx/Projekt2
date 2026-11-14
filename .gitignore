@@ -36,3 +36,7 @@ eval/photos/
 Thumbs.db
 .idea/
 .vscode/
+
+# Keep the folders, not their contents
+!eval/photos/.gitkeep
+!docs/evidence/.gitkeep

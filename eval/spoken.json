@@ -1,0 +1,5 @@
+{
+  "_comment": "50 spoken phrases for the spoken eval (issue #30): 35 unambiguous with expected LaTeX, 15 ambiguous that must be asked about rather than guessed.",
+  "unambiguous": [],
+  "ambiguous": []
+}

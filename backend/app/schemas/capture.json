@@ -1,0 +1,3 @@
+{
+  "_comment": "Strict JSON schema for the capture call. See DESIGN.md 10. additionalProperties must be false and every field required."
+}

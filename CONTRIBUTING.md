@@ -42,11 +42,11 @@ bash scripts/install-hooks.sh
 ```
 
 Everyone runs this on every machine they commit from. It points `core.hooksPath`
-at `.githooks`, which checks each commit message locally before it lands.
+at `.githooks`, which checks each commit message before it lands.
 
 Commit messages, branch names and pull request text describe **the change** —
-what it does and why it matters to the user. They do not name editors, tools or
-assistants, and they carry no attribution trailers; the `Commit hygiene`
-workflow fails the pull request if any slip through. If a commit is already
-wrong, fix it with `git commit --amend` (last commit) or `git rebase -i`
-(earlier ones) before opening the pull request.
+what it does, and why it matters to the user. No footers, no trailers, nothing
+about how the work got done. A `Co-Authored-By` line is for a teammate who
+actually worked on the commit with you. The `Commit hygiene` workflow is the
+backstop; if it flags something, fix it with `git commit --amend` for the last
+commit or `git rebase -i` for earlier ones before opening the pull request.
