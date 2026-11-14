@@ -125,6 +125,8 @@ Glance is built on open-source work by people who have been making math accessib
 | [Uvicorn](https://www.uvicorn.org/) | BSD-3-Clause |
 | [Pydantic](https://docs.pydantic.dev/) | MIT |
 | [openai-python](https://github.com/openai/openai-python) | Apache-2.0 |
+| [PyAV](https://github.com/PyAV-Org/PyAV) | BSD-3-Clause |
+| [FFmpeg](https://ffmpeg.org/legal.html) (bundled by PyAV) | LGPL/GPL, depending on build |
 | [React](https://react.dev/) | MIT |
 | [Vite](https://vite.dev/) | MIT |
 | [Tailwind CSS](https://tailwindcss.com/) | MIT |
