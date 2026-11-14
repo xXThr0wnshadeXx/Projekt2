@@ -69,6 +69,14 @@ Accessibility is the product, not a feature of it.
 
 ## Running it locally
 
+Once per machine, from inside the repository:
+
+```bash
+bash scripts/setup.sh
+```
+
+Then:
+
 ```bash
 # Back end
 cd backend

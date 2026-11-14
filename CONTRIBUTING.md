@@ -37,19 +37,19 @@ Accessibility app for blind, low-vision, and motor-impaired students: bring in m
 
 ## First thing after cloning
 
-Two commands, once per machine.
+One command, once per machine, from inside the repository:
 
 ```bash
-bash scripts/install-hooks.sh
-bash scripts/local-rules.sh <FILENAME>
+bash scripts/setup.sh
 ```
 
-The second one writes the rules on this page into a local file that whatever
-editor or tooling you use reads automatically, so it works to this project's
-rules rather than generic defaults. Pass the filename your own setup looks for —
-check its documentation. The file it writes is excluded from version control in
-your clone only, so your setup stays yours and the repository stays the same for
-everyone. Re-run it whenever this file or `DESIGN.md` changes.
+It installs the git hooks, writes the project rules into the files your editor
+and command-line tooling look for, checks you have the prerequisites, and lists
+your open tickets. Everything it writes is excluded from version control in your
+clone only — nothing new is committed, and the repository stays identical for
+everyone. Re-run it after this file or `DESIGN.md` changes.
+
+Then read issue #57 and start your lowest-numbered `blocker`.
 
 ### What the hooks do
 

@@ -119,6 +119,49 @@ Back end: Python 3.11, FastAPI, SymPy (`backend/`).
 Models come from the `MODEL_VISION`, `MODEL_TEXT` and `MODEL_STT` environment
 variables — never hardcode a model name.
 
+## How to start working
+
+If you have just been told to start, do this and nothing else first:
+
+```bash
+gh issue list --assignee @me --state open --milestone "M0 Setup"
+```
+
+Pick the lowest-numbered one carrying the `blocker` label; if none is a
+blocker, take the lowest-numbered one. Read the whole issue body — the
+acceptance criteria are the specification, and `DESIGN.md` has the detail behind
+them. If the issue is not clear, ask the person it is assigned to rather than
+guessing at scope.
+
+Then:
+
+```bash
+git checkout main && git pull
+git checkout -b feat/<issue#>-short-name
+```
+
+Work only on that one issue. Do not touch files belonging to another open issue
+— placeholder modules name the issue that owns them, and `docs/owners.md` names
+the person. Two people editing the same file this weekend costs more time than
+the feature is worth.
+
+Before opening a pull request:
+
+```bash
+cd backend && python -m pytest ../tests -q
+cd ../frontend && npx tsc --noEmit
+npx playwright test
+```
+
+Then open it against `main` with `Closes #<issue>` in the body, and move the
+card on the board to In Review. The board is at
+https://github.com/users/shreev2703/projects/3
+
+Scope discipline matters more than usual here: the build window closes Sunday at
+12:00 and the cut order is in `docs/owners.md`. Finish one issue completely —
+acceptance criteria met, keyboard and screen-reader operable, tests passing —
+rather than starting three.
+
 ## Working in this repository
 
 - One branch per ticket: `feat/<issue#>-short-name`.
