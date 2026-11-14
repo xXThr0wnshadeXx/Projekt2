@@ -34,3 +34,19 @@ Accessibility app for blind, low-vision, and motor-impaired students: bring in m
 - Small functions; add/update pytest for every `mathcheck.py` change.
 - Run `pytest` and `npx playwright test` before opening a PR.
 - Keep responses within the performance budget in `DESIGN.md` §16.
+
+## First thing after cloning
+
+```bash
+bash scripts/install-hooks.sh
+```
+
+Everyone runs this on every machine they commit from. It points `core.hooksPath`
+at `.githooks`, which checks each commit message locally before it lands.
+
+Commit messages, branch names and pull request text describe **the change** —
+what it does and why it matters to the user. They do not name editors, tools or
+assistants, and they carry no attribution trailers; the `Commit hygiene`
+workflow fails the pull request if any slip through. If a commit is already
+wrong, fix it with `git commit --amend` (last commit) or `git rebase -i`
+(earlier ones) before opening the pull request.

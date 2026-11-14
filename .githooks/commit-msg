@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Keeps commit messages free of assistant/tool attribution.
+# Known trailers are stripped automatically; anything else is reported and blocks
+# the commit so you can reword it.
+#
+# Install once per clone:  bash scripts/install-hooks.sh
+set -u
+
+MSG_FILE="$1"
+[ -f "$MSG_FILE" ] || exit 0
+
+TMP="$(mktemp)"
+trap 'rm -f "$TMP"' EXIT
+
+# 1. Drop whole lines that are pure attribution trailers or footers.
+grep -viE \
+  -e '^[[:space:]]*co-authored-by:.*(claude|anthropic|codex|copilot|cursor|chatgpt|gemini|bot@|noreply@(anthropic|openai)\.com)' \
+  -e '^[[:space:]]*(generated|written|authored|created)[[:space:]]+(with|by)[[:space:]]' \
+  -e '^[[:space:]]*assisted[- ]by:' \
+  -e '^[[:space:]]*(ai|llm)[- ](generated|assisted|authored)' \
+  -e '^[[:space:]]*🤖' \
+  "$MSG_FILE" > "$TMP"
+
+# 2. Collapse trailing blank lines left behind by the strip.
+awk 'BEGIN{n=0} {lines[NR]=$0} END{last=NR; while(last>0 && lines[last] ~ /^[[:space:]]*$/) last--; for(i=1;i<=last;i++) print lines[i]}' "$TMP" > "$MSG_FILE"
+
+# 3. Anything left that still names a tool blocks the commit.
+LEFT="$(grep -inE 'claude|anthropic|\bcodex\b|copilot|\bcursor\b|chatgpt|noreply@anthropic\.com' "$MSG_FILE" || true)"
+if [ -n "$LEFT" ]; then
+  echo "commit-msg: the message still names a tool:" >&2
+  echo "$LEFT" >&2
+  echo >&2
+  echo "Reword it to describe the change itself, then commit again." >&2
+  exit 1
+fi
+
+# 4. Refuse an empty message.
+if ! grep -qE '[^[:space:]#]' "$MSG_FILE"; then
+  echo "commit-msg: the message is empty after stripping attribution lines." >&2
+  exit 1
+fi
+
+exit 0
