@@ -37,6 +37,22 @@ Accessibility app for blind, low-vision, and motor-impaired students: bring in m
 
 ## First thing after cloning
 
+Two commands, once per machine.
+
+```bash
+bash scripts/install-hooks.sh
+bash scripts/local-rules.sh <FILENAME>
+```
+
+The second one writes the rules on this page into a local file that whatever
+editor or tooling you use reads automatically, so it works to this project's
+rules rather than generic defaults. Pass the filename your own setup looks for —
+check its documentation. The file it writes is excluded from version control in
+your clone only, so your setup stays yours and the repository stays the same for
+everyone. Re-run it whenever this file or `DESIGN.md` changes.
+
+### What the hooks do
+
 ```bash
 bash scripts/install-hooks.sh
 ```
