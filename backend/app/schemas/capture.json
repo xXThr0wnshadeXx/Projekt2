@@ -1,3 +1,59 @@
 {
-  "_comment": "Strict JSON schema for the capture call. See DESIGN.md 10. additionalProperties must be false and every field required."
+  "type": "object",
+  "properties": {
+    "instructions": {
+      "type": "string"
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "latex": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "intent_notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "latex",
+          "confidence",
+          "intent_notes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "diagrams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "instructions",
+    "lines",
+    "diagrams",
+    "warnings"
+  ],
+  "additionalProperties": false
 }

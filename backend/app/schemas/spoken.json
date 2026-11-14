@@ -1,3 +1,53 @@
 {
-  "_comment": "Strict JSON schema for the spoken call. See DESIGN.md 10. additionalProperties must be false and every field required."
+  "type": "object",
+  "properties": {
+    "latex": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ambiguous": {
+      "type": "boolean"
+    },
+    "clarifying_question": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "latex": {
+            "type": "string"
+          },
+          "readback": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "latex",
+          "readback"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "readback": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "latex",
+    "ambiguous",
+    "clarifying_question",
+    "alternatives",
+    "readback"
+  ],
+  "additionalProperties": false
 }
