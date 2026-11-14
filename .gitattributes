@@ -1,0 +1,21 @@
+# Normalise text in the repository
+* text=auto eol=lf
+
+# Shell scripts and git hooks MUST stay LF, or bash fails on Windows clones
+*.sh         text eol=lf
+.githooks/*  text eol=lf
+
+# Windows-only files
+*.bat        text eol=crlf
+*.cmd        text eol=crlf
+
+# Never touch binaries
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.pdf binary
+*.webm binary
+*.mp4 binary
+*.woff binary
+*.woff2 binary
