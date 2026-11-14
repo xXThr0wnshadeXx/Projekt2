@@ -42,7 +42,8 @@ bash scripts/install-hooks.sh
 ```
 
 Everyone runs this on every machine they commit from. It points `core.hooksPath`
-at `.githooks`, which checks each commit message before it lands.
+at `.githooks`. Two checks run locally: `pre-commit` refuses a staged
+credential or env file, and `commit-msg` checks the message shape.
 
 Commit messages, branch names and pull request text describe **the change** —
 what it does, and why it matters to the user. No footers, no trailers, nothing

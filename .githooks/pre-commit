@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Blocks credentials and env files from entering a commit.
+# Install once per clone:  bash scripts/install-hooks.sh
+set -u
+
+STAGED="$(git diff --cached --name-only --diff-filter=ACM)"
+[ -z "$STAGED" ] && exit 0
+
+FAIL=0
+
+# 1. Env files must never be staged, even if someone used `git add -f`.
+while IFS= read -r f; do
+  case "$(basename "$f")" in
+    .env|.env.*)
+      [ "$(basename "$f")" = ".env.example" ] && continue
+      echo "pre-commit: refusing to commit an env file: $f" >&2
+      FAIL=1
+      ;;
+  esac
+done <<< "$STAGED"
+
+# 2. Key-shaped strings in the staged content.
+#    Patterns are generic so this keeps working as providers change prefixes.
+PATTERNS='
+sk-[A-Za-z0-9_-]{20,}
+AKIA[0-9A-Z]{16}
+ghp_[A-Za-z0-9]{36}
+gho_[A-Za-z0-9]{36}
+github_pat_[A-Za-z0-9_]{50,}
+-----BEGIN[A-Z ]*PRIVATE KEY-----
+(api[_-]?key|secret|token|password)[[:space:]]*[:=][[:space:]]*["'"'"'][A-Za-z0-9_\-]{16,}["'"'"']
+'
+
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  [ -f "$f" ] || continue
+  case "$f" in
+    *.lock|*.min.js|*.map) continue ;;
+    .githooks/*|.github/workflows/*) continue ;;   # these files describe the patterns
+  esac
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    HIT="$(git show ":$f" 2>/dev/null | grep -nEo -e "$p" | head -3 || true)"
+    if [ -n "$HIT" ]; then
+      echo "pre-commit: possible credential in $f" >&2
+      echo "$HIT" | sed 's/^/    /' >&2
+      FAIL=1
+    fi
+  done <<< "$PATTERNS"
+done <<< "$STAGED"
+
+if [ "$FAIL" -eq 1 ]; then
+  cat >&2 <<'MSG'
+
+Nothing was committed. Move the value into backend/.env (which is ignored) and
+reference it through config, or add a placeholder to backend/.env.example.
+
+If this is a false positive, commit with --no-verify and say so in the PR.
+MSG
+  exit 1
+fi
+
+exit 0
