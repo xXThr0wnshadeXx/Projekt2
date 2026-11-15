@@ -35,6 +35,7 @@ MODEL_PATHS = frozenset({
     "/api/diff",
     "/api/pdf/pages",
     "/api/pdf/page",
+    "/api/feedback",
 })
 UNLIMITED_PATHS = frozenset({"/api/health"})
 

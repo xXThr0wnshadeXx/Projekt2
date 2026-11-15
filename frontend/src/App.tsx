@@ -395,7 +395,7 @@ export function App() {
         )}
 
         {screen === 'export' && problem && (
-          <Export problem={problem} onBack={goBack} />
+          <Export problem={problem} mode={settings.mode} onBack={goBack} />
         )}
 
         {screen === 'settings' && (
