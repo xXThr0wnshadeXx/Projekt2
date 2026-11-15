@@ -279,10 +279,15 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       </p>
 
       <div className="mt-6 flex flex-wrap gap-3">
+        {/* The "Upload a file" button below opens this. It has its own name for
+            anything that still reaches it, but stays out of the tab order so
+            keyboard users don't meet a second, unexplained stop (axe, #31). */}
         <input
           ref={fileInput}
           type="file"
           accept={[...CAPTURE_TYPES, 'application/pdf'].join(',')}
+          aria-label="Choose an image or PDF file"
+          tabIndex={-1}
           className="sr-only"
           onChange={(e) => {
             acceptFile(e.target.files?.[0], 'upload');
