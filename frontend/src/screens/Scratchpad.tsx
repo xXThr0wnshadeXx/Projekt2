@@ -29,7 +29,7 @@ import {
 } from '../api';
 import { readTyped } from '../math/typed';
 import { speechFor } from '../math/sre';
-import { applyEdit, lineNumber, looksLikeCommand } from '../commands';
+import { applyEdit, asksForCorrection, EDIT_REFUSAL, lineNumber, looksLikeCommand } from '../commands';
 import { SAYS, stripFiller, understandTalk, type Talk } from '../talk';
 import { describePart } from '../math/parts';
 import { helpText, useShortcuts } from '../shortcuts';
@@ -386,6 +386,13 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     }
     // "Uh, okay, two x equals eight" is the line "two x equals eight".
     const text = stripFiller(heard);
+    if (asksForCorrection(text)) {
+      lastAction.current = 'talk';
+      setError('');
+      setReply(EDIT_REFUSAL);
+      announce(EDIT_REFUSAL);
+      return;
+    }
     if (looksLikeCommand(text)) await runCommand(text);
     else await interpret(text);
   }
@@ -480,6 +487,11 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       setBusy(false);
     }
 
+    if (result.message) {
+      setReply(result.message);
+      announce(result.message);
+      return;
+    }
     const n = lineNumber(result.target_line);
     const target = n !== null ? lines[n - 1] : undefined;
     const needsLine = ['navigate', 'delete', 'edit', 'check', 'what_changed'].includes(result.intent)
@@ -633,7 +645,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Your work
       </h2>
