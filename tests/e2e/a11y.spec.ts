@@ -42,7 +42,6 @@ async function seed(page: Page) {
     },
     [PROBLEM, WORK] as const,
   );
-  await page.route('**/api/diff', (r) => r.abort());
 }
 
 /** Fail with the rule ids and the first offending element of each. */
@@ -114,8 +113,11 @@ for (const scheme of ['dark', 'light'] as const) {
 
     test('low-vision mode', async ({ page }) => {
       await openProblem(page);
-      await page.keyboard.press('l');
-      await page.waitForTimeout(300);
+      await page.getByRole('button', { name: 'Low-vision mode' }).click();
+      const region = page.getByRole('region', { name: 'Low-vision mode' });
+      const equation = region.getByRole('group', { name: 'Line 1' });
+      await expect(equation.locator('mjx-container')).toBeVisible({ timeout: 15000 });
+      await expect(equation).toHaveCSS('background-color', 'rgb(0, 0, 0)');
       await expectNoSeriousViolations(page, 'low-vision');
     });
 
