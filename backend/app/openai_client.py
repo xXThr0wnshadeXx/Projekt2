@@ -2,11 +2,18 @@
 
 import asyncio
 import json
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from openai import AsyncOpenAI, OpenAIError
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    OpenAIError,
+)
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import SecretStr, StringConstraints
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,6 +24,39 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = Path(__file__).with_name("schemas")
 ModelId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 StructuredTask = Literal["capture", "spoken", "command"]
+log = logging.getLogger("glance.models")
+_SAFE_ERROR_CODES = {
+    "credit_balance_exhausted",
+    "insufficient_quota",
+    "organization_spend_limit_exceeded",
+    "organization_usage_limit_exceeded",
+    "project_spend_limit_exceeded",
+    "rate_limit_exceeded",
+    "slow_down",
+    "invalid_api_key",
+    "model_not_found",
+}
+
+
+def _log_provider_failure(task: str, error: Exception) -> None:
+    if isinstance(error, APIStatusError):
+        code = error.code
+        if not isinstance(code, str) or code not in _SAFE_ERROR_CODES:
+            code = "unknown"
+        log.warning("model request failed task=%s status=%d code=%s", task, error.status_code, code)
+    else:
+        # APITimeoutError does NOT subclass the built-in TimeoutError — it
+        # subclasses APIConnectionError — so testing TimeoutError alone files
+        # every real SDK timeout under "client_error". On venue Wi-Fi a dropped
+        # connection is the likeliest failure of all, and these three categories
+        # are what tell us whether to blame the network, the provider or us.
+        if isinstance(error, (TimeoutError, APITimeoutError)):
+            category = "timeout"
+        elif isinstance(error, APIConnectionError):
+            category = "connection"
+        else:
+            category = "client_error"
+        log.warning("model request failed task=%s category=%s", task, category)
 
 
 class ModelError(RuntimeError):
@@ -100,7 +140,10 @@ class ModelClient:
                     "json_schema": {"name": task, "strict": True, "schema": load_schema(task)},
                 },
             ))
-        except (OpenAIError, TimeoutError):
+        except (OpenAIError, TimeoutError) as error:
+            # Keeps the per-task budgets from #90 (settings, not hardcoded)
+            # and adds the upstream failure code from #4.
+            _log_provider_failure(task, error)
             raise ModelError("The interpretation service is unavailable.") from None
         if not result.choices:
             raise ModelError("The model returned no result.")
@@ -127,6 +170,7 @@ class ModelClient:
                     response_format="json",
                 ),
             )
-        except (OpenAIError, TimeoutError):
+        except (OpenAIError, TimeoutError) as error:
+            _log_provider_failure("transcribe", error)
             raise ModelError("The transcription service is unavailable.") from None
         return result.text
