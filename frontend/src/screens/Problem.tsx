@@ -140,7 +140,7 @@ export function Problem({
   const unsure = lines.filter((l) => !l.valid).length;
 
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2 className="text-2xl font-semibold tracking-tight">Your problem</h2>
 
       {problem.instructions && (

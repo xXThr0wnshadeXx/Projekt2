@@ -9,6 +9,11 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
     trace: 'on-first-retry',
+    // A service worker controlling the page hides its requests from
+    // page.route on WebKit, so every stubbed API call in the suite would go to
+    // the real network instead. Only the test that checks the worker itself
+    // turns it back on (a11y.spec.ts, "progressive web app shell").
+    serviceWorkers: 'block',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
