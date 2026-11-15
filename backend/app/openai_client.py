@@ -18,6 +18,8 @@ from openai.types.chat import ChatCompletionMessageParam
 from pydantic import SecretStr, StringConstraints
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .model_quota import ModelQuota
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = Path(__file__).with_name("schemas")
 ModelId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -95,8 +97,9 @@ def load_schema(task: StructuredTask) -> dict:
 
 
 class ModelClient:
-    def __init__(self, settings: ModelSettings):
+    def __init__(self, settings: ModelSettings, quota: ModelQuota | None = None):
         self.settings = settings
+        self.quota = quota
         self.client = AsyncOpenAI(
             api_key=settings.openai_api_key.get_secret_value(),
             timeout=settings.model_timeout_seconds,
@@ -126,6 +129,8 @@ class ModelClient:
             if task == "capture"
             else self.settings.model_fast_timeout_seconds
         )
+        if self.quota is not None:
+            self.quota.acquire()
         try:
             result = await self._bounded(budget, self.client.chat.completions.create(
                 model=model,
@@ -154,6 +159,8 @@ class ModelClient:
         return payload
 
     async def transcribe(self, filename: str, audio: bytes, content_type: str) -> str:
+        if self.quota is not None:
+            self.quota.acquire()
         try:
             result = await self._bounded(
                 self.settings.model_fast_timeout_seconds,

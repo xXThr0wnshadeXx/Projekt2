@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .config import Settings
+from .errors import ApiError
+from .model_quota import ModelQuota
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
@@ -45,23 +47,64 @@ _STATES_A_RESULT = re.compile(
     re.IGNORECASE,
 )
 
+# Passive descriptions of an already-verified operation only. A verb appearing
+# somewhere in free prose is not enough: "divide by 2 to isolate x" is advice.
+_NUMBER_WORDS = dict(zip(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty".split(),
+    map(str, range(21)),
+))
+_ATOM = r"(?:\d+(?:\.\d+)?|[a-z]|" + "|".join(_NUMBER_WORDS) + r")"
+_OPERATIONS = re.compile(
+    rf"(?:({_ATOM}) was (?:added to|subtracted from) both sides|"
+    rf"Both sides were (?:multiplied|divided) by ({_ATOM})|"
+    r"The (?:left|right) side was (?:factored|expanded|simplified)|"
+    r"Like terms were combined(?: on the (?:left|right) side)?)\.?",
+    re.IGNORECASE,
+)
+
+
+def _source_atoms(*lines: str) -> set[str]:
+    # Command names and prose are not variable names. Explanations involving
+    # richer expressions are conservatively refused, not interpreted here.
+    source = " ".join(lines)
+    source = re.sub(r"\\(?:text|operatorname|mathrm)\s*\{[^{}]*\}", " ", source)
+    source = re.sub(r"\\[A-Za-z]+", " ", source)
+    return set(re.findall(r"\d+(?:\.\d+)?|(?<![A-Za-z])[A-Za-z](?![A-Za-z])", source))
+
 
 @lru_cache
 def _schema() -> dict:
     return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
-def acceptable(text: str) -> bool:
+def acceptable(text: str, a_latex: str | None = None, b_latex: str | None = None) -> bool:
+    """Check fixed operation wording and, when supplied, its source atoms.
+
+    The model boundary always supplies both lines. The one-argument form is
+    retained for callers testing only the wording contract.
+    """
+    if not isinstance(text, str):
+        return False
     text = text.strip()
     if not text or len(text) > _MAX_CHARS:
         return False
-    if text.count(".") > 1 or "\n" in text:
-        return False  # more than one sentence
-    return not _FORBIDDEN.search(text) and not _STATES_A_RESULT.search(text)
+    if "\n" in text or _FORBIDDEN.search(text) or _STATES_A_RESULT.search(text):
+        return False
+    operation = _OPERATIONS.fullmatch(text)
+    if operation is None:
+        return False
+    if a_latex is None and b_latex is None:
+        return True
+    if a_latex is None or b_latex is None:
+        return False
+    atoms = _source_atoms(a_latex, b_latex)
+    return all(_NUMBER_WORDS.get(atom.lower(), atom) in atoms
+               for atom in operation.groups() if atom is not None)
 
 
 def model_explainer(
-    settings: Settings, timeout_s: float = 2.0, client: "AsyncOpenAI | None" = None
+    settings: Settings, timeout_s: float = 2.0, client: "AsyncOpenAI | None" = None,
+    *, quota: ModelQuota | None = None,
 ) -> Explainer | None:
     """An explainer backed by MODEL_TEXT, or None when models aren't configured."""
     if not settings.models_configured:
@@ -80,6 +123,16 @@ def model_explainer(
     )
 
     async def explain(a_latex: str, b_latex: str) -> str | None:
+        if quota is not None:
+            try:
+                quota.acquire()
+            except ApiError:
+                # The explanation is optional by design (#20). SymPy has
+                # already verified the step by the time we get here, so
+                # running out of shared model budget must not turn a verified
+                # step into a 429 — the caller falls back to the plain
+                # "This step checks out."
+                return None
         try:
             result = await client.chat.completions.create(
                 model=settings.model_text,
@@ -100,6 +153,6 @@ def model_explainer(
         except (OpenAIError, ValueError, IndexError, AttributeError) as exc:
             log.warning("explain failed: %s", type(exc).__name__)
             return None
-        return text.strip() if acceptable(text) else None
+        return text.strip() if acceptable(text, a_latex, b_latex) else None
 
     return explain
