@@ -5,7 +5,10 @@ services:
     name: glance-api
     runtime: python
     rootDir: backend
-    plan: starter            # a sleeping free tier adds cold starts during judging
+    # Free, so the project costs nothing to run. A free service sleeps after
+    # fifteen minutes without a request and takes about a minute to wake, so
+    # open /api/health a few minutes before a demo. `starter` never sleeps.
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --no-access-log
     healthCheckPath: /api/health
@@ -20,7 +23,8 @@ services:
         sync: false
       - key: MODEL_STT
         sync: false
+      # Not a secret: the address of the front end, which must match exactly.
       - key: ALLOWED_ORIGIN
-        sync: false
+        value: https://glance-shreev2703.vercel.app
       - key: TRUSTED_PROXY_HOPS
         value: "1"

@@ -8,7 +8,7 @@ and the CAS-only endpoints stay up while keys are being configured.
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     # Per-IP request budgets. Model-backed endpoints share the tighter one.
     rate_limit_model_per_minute: int = 20
     rate_limit_per_minute: int = 120
+    model_call_limit: int = Field(default=0, ge=0)
+    model_call_window_seconds: int = Field(default=3600, gt=0)
     # Proxies in front of the app that append to X-Forwarded-For (1 on Render).
     trusted_proxy_hops: int = 0
 

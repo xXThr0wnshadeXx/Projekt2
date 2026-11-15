@@ -165,7 +165,8 @@ def test_pdf_page_flows_into_capture_unchanged(monkeypatch):
         "instructions": "Solve for x.", "diagrams": [], "warnings": [],
         "lines": [{"latex": "2x + 3 = 11", "confidence": 0.95, "intent_notes": ""}],
     }
-    monkeypatch.setattr(main, "ModelClient", lambda settings: models)
+    # **kwargs so the stub keeps working as ModelClient gains arguments (quota, #81).
+    monkeypatch.setattr(main, "ModelClient", lambda settings, **kwargs: models)
     settings = Settings(_env_file=None, openai_api_key="test-value",
                         model_vision="v", model_text="t", model_stt="s")
     with TestClient(main.create_app(settings, warm_cas=False)) as c:
