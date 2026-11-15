@@ -63,7 +63,7 @@ async function openScratchpad(page: Page) {
   await page.getByRole('button', { name: 'Try a sample problem' }).click();
   await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
   await page.getByRole('button', { name: 'Start working' }).click();
-  await expect(page.getByRole('heading', { name: 'Your work' })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
 }
 
 test.describe('@smoke scratchpad', () => {
@@ -78,7 +78,7 @@ test.describe('@smoke scratchpad', () => {
     await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
 
     await page.keyboard.press('s');
-    await expect(page.getByRole('heading', { name: 'Your work' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeVisible();
   });
 
   test('a typed line is read back and only saved once confirmed', async ({ page }) => {

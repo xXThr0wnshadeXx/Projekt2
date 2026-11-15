@@ -279,17 +279,15 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       </p>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        {/* The real control is the button below, which this input backs. On
-            its own it is an unnamed tab stop — a screen reader announces it as
-            just "button" — so it is taken out of the tab order and out of the
-            accessibility tree. Both are needed: aria-hidden on something still
-            focusable is its own violation. `sr-only` alone does neither. */}
+        {/* The "Upload a file" button below opens this. It has its own name for
+            anything that still reaches it, but stays out of the tab order so
+            keyboard users don't meet a second, unexplained stop (axe, #31). */}
         <input
           ref={fileInput}
           type="file"
-          tabIndex={-1}
-          aria-hidden="true"
           accept={[...CAPTURE_TYPES, 'application/pdf'].join(',')}
+          aria-label="Choose an image or PDF file"
+          tabIndex={-1}
           className="sr-only"
           onChange={(e) => {
             acceptFile(e.target.files?.[0], 'upload');
