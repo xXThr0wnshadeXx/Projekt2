@@ -79,14 +79,14 @@ export function Home({
       </ol>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button type="button" className="btn-primary" onClick={onCapture}>
+        <button data-voice-essential type="button" className="btn-primary" onClick={onCapture}>
           Capture a problem
         </button>
-        <button type="button" className="btn" onClick={onSample}>
+        <button data-voice-essential type="button" className="btn" onClick={onSample}>
           Try a sample problem
         </button>
         {onResume && (
-          <button type="button" className="btn" onClick={onResume}>
+          <button data-voice-essential type="button" className="btn" onClick={onResume}>
             Back to your problem
           </button>
         )}

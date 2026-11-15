@@ -14,6 +14,7 @@ import { KeyboardHelp } from './components/KeyboardHelp';
 import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
 import { InstallApp } from './components/InstallApp';
+import { ControlNavigator } from './components/ControlNavigator';
 import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
@@ -205,6 +206,7 @@ export function App() {
   return (
     <>
       <LiveRegion />
+      <ControlNavigator screen={screen} />
       {lowVision}
       <div className="min-h-dvh bg-[--bg] text-[--fg]" hidden={Boolean(lowVision)}>
       {/* A skip link is the first thing a keyboard user needs. */}

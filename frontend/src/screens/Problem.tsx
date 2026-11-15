@@ -254,6 +254,7 @@ export function Problem({
       <div className="mt-8">
         {lines.length > 0 && <>
         <button
+          data-voice-essential
           type="button"
           className="btn-primary"
           onClick={() => onStartWorking(index)}
@@ -266,13 +267,13 @@ export function Problem({
             Ways to read this
           </h3>
           <div className="mt-3 flex flex-wrap gap-3">
-            <button type="button" className="btn" onClick={glance}>
+            <button data-voice-essential type="button" className="btn" onClick={glance}>
               Glance
             </button>
-            <button type="button" className="btn" onClick={readAll}>
+            <button data-voice-essential type="button" className="btn" onClick={readAll}>
               Read all
             </button>
-            <button type="button" className="btn" onClick={() => onLowVision(index)}>
+            <button data-voice-essential type="button" className="btn" onClick={() => onLowVision(index)}>
               Low-vision mode
             </button>
             {stepChecksAllowed(mode) && lines.length > 1 && (

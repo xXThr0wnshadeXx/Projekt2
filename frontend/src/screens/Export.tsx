@@ -112,10 +112,10 @@ export function Export({ problem, onBack }: ExportProps) {
       </div>
 
       <div className="no-print mt-6 flex flex-wrap gap-3">
-        <button type="button" className="btn" disabled={busy} onClick={() => void downloadHtml()}>
+        <button data-voice-essential type="button" className="btn" disabled={busy} onClick={() => void downloadHtml()}>
           Download accessible HTML
         </button>
-        <button type="button" className="btn" onClick={print}>
+        <button data-voice-essential type="button" className="btn" onClick={print}>
           Print or save as PDF
         </button>
         <button type="button" className="btn" onClick={onBack}>

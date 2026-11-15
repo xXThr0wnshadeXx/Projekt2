@@ -315,6 +315,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
             also asks a blind user to aim it, which is the hardest thing on
             this screen, so it should not read as the obvious first choice. */}
         <button
+          data-voice-essential
           type="button"
           className="btn-primary"
           disabled={working}
@@ -322,7 +323,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
         >
           Upload a file
         </button>
-        <button type="button" className="btn" disabled={working || cameraStarting} onClick={startCamera}>
+        <button data-voice-essential type="button" className="btn" disabled={working || cameraStarting} onClick={startCamera}>
           {cameraOn ? 'Restart camera' : 'Take a photo'}
         </button>
         <button
