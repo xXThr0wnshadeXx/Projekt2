@@ -14,6 +14,7 @@ import { KeyboardHelp } from './components/KeyboardHelp';
 import { speak, setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
 import { Settings } from './screens/Settings';
+import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { health, apiBase, ApiFailure } from './api';
@@ -32,7 +33,14 @@ import {
   type Settings as SettingsData,
 } from './state';
 
-type Screen = 'home' | 'capture' | 'problem' | 'lowvision' | 'scratchpad' | 'settings';
+type Screen =
+  | 'home'
+  | 'capture'
+  | 'problem'
+  | 'lowvision'
+  | 'scratchpad'
+  | 'settings'
+  | 'export';
 type BackEnd = 'checking' | 'up' | 'down';
 
 export function App() {
@@ -55,6 +63,12 @@ export function App() {
   function updateSettings(next: SettingsData) {
     setSettings(next);
     saveSettings(next);
+  }
+
+  const [exportFrom, setExportFrom] = useState<Screen>('scratchpad');
+  function openExport(from: Screen) {
+    setExportFrom(from);
+    setScreen('export');
   }
 
   function openSettings() {
@@ -222,6 +236,7 @@ export function App() {
             setWorkingFrom(index);
             setScreen('scratchpad');
           }}
+          onExport={() => openExport('problem')}
         />
       )}
 
@@ -231,7 +246,12 @@ export function App() {
           mode={settings.mode}
           startLine={workingFrom}
           onBack={() => setScreen('problem')}
+          onExport={() => openExport('scratchpad')}
         />
+      )}
+
+      {screen === 'export' && problem && (
+        <Export problem={problem} onBack={() => setScreen(exportFrom)} />
       )}
 
       {screen === 'settings' && (
@@ -243,7 +263,7 @@ export function App() {
       )}
 
       {/* Only reachable if storage returned something unusable. */}
-      {(screen === 'problem' || screen === 'scratchpad') && !problem && (
+      {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
         <main id="main" className="mx-auto max-w-3xl px-6 py-8">
           <h2 className="text-2xl font-semibold">No problem loaded</h2>
           <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
