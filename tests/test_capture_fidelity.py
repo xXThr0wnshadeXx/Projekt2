@@ -100,7 +100,7 @@ def test_the_route_no_longer_tells_the_model_to_transcribe_as_if_it_were_an_inst
 
 def test_the_prompt_says_to_leave_instructions_empty_and_keep_words_out_of_lines():
     assert "empty string" in CAPTURE_PROMPT
-    assert "never in lines" in CAPTURE_PROMPT
+    assert "Keep prose headings and task instructions out of lines" in CAPTURE_PROMPT
     assert "Never correct, simplify, complete, solve" in CAPTURE_PROMPT
 
 

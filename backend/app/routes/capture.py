@@ -89,7 +89,14 @@ def capture_router(
             result = await models.interpret("capture", [
                 {"role": "system", "content": CAPTURE_PROMPT},
                 {"role": "user", "content": [
-                    {"type": "text", "text": context or "Image attached."},
+                    {"type": "text", "text": (
+                        # No wording that reads like a task: the model used to
+                        # report "Transcribe the uploaded image." back as the
+                        # worksheet's instructions (#176).
+                        "Image attached."
+                        + ("\nNotation context (not printed worksheet instructions):\n" + context
+                           if context else "")
+                    )},
                     {"type": "image_url", "image_url": {
                         "url": f"data:{kind};base64,{encoded}",
                     }},
