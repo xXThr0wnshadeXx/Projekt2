@@ -94,6 +94,18 @@ def transcribe_router(models: ModelClient, max_audio_seconds: int = 30) -> APIRo
             text = await models.transcribe(f"recording.{extension}", data, content_type)
         except ModelError:
             return audio_error(502, "MODEL_ERROR", "I couldn't transcribe that recording. Try again.")
+
+        # A recording that produced no words is not a success. Returning
+        # 200 with an empty string sent the blank on to /spoken-to-latex,
+        # which rejected it as a missing field — so a student who had just
+        # held Space and spoken was told to "enter a spoken math line",
+        # which does not describe what happened or what to do about it.
+        if not text.strip():
+            return audio_error(
+                422,
+                "UNPARSEABLE",
+                "I didn't hear anything. Try again, a little closer to the microphone.",
+            )
         return {"text": text}
 
     return router

@@ -82,3 +82,28 @@ async def test_transcribe_uses_configured_model_and_json(model_client, monkeypat
         )
     finally:
         await model_client.close()
+
+
+def test_model_calls_are_bounded(model_client):
+    """Issue #79.5.
+
+    The SDK defaults are a 600 s read timeout and two retries, so one stalled
+    upstream call could hold a capture for ten minutes while the student hears
+    nothing — against a 12 s hard limit in DESIGN.md 16.
+    """
+    assert model_client.client.timeout == 10.0
+    assert model_client.client.max_retries == 1
+
+
+def test_the_budget_can_be_widened_without_a_deploy(monkeypatch):
+    """Settings, not constants, so it is tunable from the deploy dashboard."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test-value")
+    monkeypatch.setenv("MODEL_VISION", "test-vision")
+    monkeypatch.setenv("MODEL_TEXT", "test-text")
+    monkeypatch.setenv("MODEL_STT", "test-stt")
+    monkeypatch.setenv("MODEL_TIMEOUT_SECONDS", "25")
+    monkeypatch.setenv("MODEL_MAX_RETRIES", "0")
+
+    client = ModelClient(ModelSettings(_env_file=None))
+    assert client.client.timeout == 25.0
+    assert client.client.max_retries == 0

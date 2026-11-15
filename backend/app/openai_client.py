@@ -30,6 +30,14 @@ class ModelSettings(BaseSettings):
     model_text: ModelId
     model_stt: ModelId
 
+    # The SDK defaults are a 600 s read timeout and 2 retries. One stalled
+    # upstream call would then hold a capture for ten minutes while the student
+    # hears nothing, against a 12 s hard limit (DESIGN.md 16). These are
+    # settings rather than constants so the budget can be widened from the
+    # deploy dashboard during judging without shipping a change.
+    model_timeout_seconds: float = 10.0
+    model_max_retries: int = 1
+
 
 @lru_cache
 def load_schema(task: StructuredTask) -> dict:
@@ -39,7 +47,11 @@ def load_schema(task: StructuredTask) -> dict:
 class ModelClient:
     def __init__(self, settings: ModelSettings):
         self.settings = settings
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
+        self.client = AsyncOpenAI(
+            api_key=settings.openai_api_key.get_secret_value(),
+            timeout=settings.model_timeout_seconds,
+            max_retries=settings.model_max_retries,
+        )
 
     async def close(self) -> None:
         await self.client.close()

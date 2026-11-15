@@ -23,11 +23,20 @@ const AMBIGUOUS = {
   ambiguous: true,
   clarifying_question: 'Did you mean x plus one, all over two, or x plus one half?',
   alternatives: [
-    { latex: '\\frac{x+1}{2}', readback: 'x plus one, all over two' },
-    { latex: 'x + \\frac{1}{2}', readback: 'x plus one half' },
+    { latex: '\\frac{x+1}{2}', readback: 'x plus one, all over two', valid: true },
+    { latex: 'x + \\frac{1}{2}', readback: 'x plus one half', valid: true },
   ],
   readback: null,
   valid: false,
+};
+
+/** The case from #79: one option is offered but SymPy could not read it. */
+const AMBIGUOUS_ONE_UNCHECKED = {
+  ...AMBIGUOUS,
+  alternatives: [
+    { latex: '\\frac{x+1}{2}', readback: 'x plus one, all over two', valid: true },
+    { latex: 'x \\to 2', readback: 'x goes to two', valid: false },
+  ],
 };
 
 async function stubSpoken(page: Page, body: unknown) {
@@ -143,6 +152,32 @@ test.describe('@smoke scratchpad', () => {
     const readback = page.getByRole('region', { name: 'Confirm your line' });
     await expect(readback).toBeVisible();
     await expect(readback).toContainText('x plus one half');
+  });
+
+  test('an option the parser could not read is still offered, and flagged', async ({ page }) => {
+    // #79: requiring every alternative to parse used to throw the whole
+    // question away. The student knows what they said, so the option stays —
+    // but it says plainly that it was not checked, and saving it keeps that.
+    await stubSpoken(page, AMBIGUOUS_ONE_UNCHECKED);
+    await openScratchpad(page);
+
+    await page.getByLabel('Or type your line').fill('x plus one over two');
+    await page.getByRole('button', { name: 'Add line' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('x goes to two');
+    await expect(dialog).toContainText('I could not check this one');
+
+    await page.keyboard.press('2');
+    const readback = page.getByRole('region', { name: 'Confirm your line' });
+    await expect(readback).toContainText('x goes to two');
+    await expect(readback).toContainText('I could not check this line');
+
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('live-polite')).toHaveText(
+      'Saved as line 1. I could not check it.',
+    );
   });
 
   test('Escape cancels the question without saving', async ({ page }) => {
