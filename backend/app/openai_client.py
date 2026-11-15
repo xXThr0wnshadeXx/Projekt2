@@ -8,8 +8,10 @@ from typing import Annotated, Literal
 
 from openai import AsyncOpenAI, OpenAIError
 from openai.types.chat import ChatCompletionMessageParam
-from pydantic import SecretStr, StringConstraints
+from pydantic import SecretStr, StringConstraints, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .model_responses import RESPONSE_TYPES
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = Path(__file__).with_name("schemas")
@@ -106,9 +108,10 @@ class ModelClient:
             payload = json.loads(choice.message.content)
         except ValueError:
             raise ModelError("The model returned an unreadable result.") from None
-        if not isinstance(payload, dict):
-            raise ModelError("The model returned an unreadable result.")
-        return payload
+        try:
+            return RESPONSE_TYPES[task].model_validate(payload).model_dump()
+        except ValidationError:
+            raise ModelError("The model returned an unreadable result.") from None
 
     async def transcribe(self, filename: str, audio: bytes, content_type: str) -> str:
         try:
