@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from ..openai_client import ModelClient, ModelError
 from ..spoken_ambiguity import fraction_ambiguity
+from ..spoken_guard import adds_to_what_was_said
 
 SPOKEN_PROMPT = """Transcribe only the student's spoken math into LaTeX.
 Never simplify, fix, solve, or complete their work. Give no hints or next steps.
@@ -31,6 +32,13 @@ settle grouping. Ask only about grouping that is still unclear.
 For the square root of x plus one all over two equals five, ask about the
 square root of the quantity x plus one, end root, versus the square root of x,
 then plus one. Both choices are all over two and equal five.
+The student may think aloud. Ignore filler such as uh, um, okay, so, I think.
+If they correct themselves, keep only the final version of the line.
+Write down a line only when the student states the whole line themselves.
+If they only describe an operation, such as "divide both sides by two", or ask
+a question, or ask for something to be read, there is no line: return null
+LaTeX and null readback. Never carry out an operation they describe, and never
+return a prior line as though they had said it.
 """
 
 # Spoken aloud to a student, so the wording matters. "I couldn't confirm this
@@ -40,6 +48,8 @@ then plus one. Both choices are all over two and equal five.
 NO_MATH_HEARD = "I didn't catch any math in that. Try again."
 UNUSABLE_QUESTION = "I couldn't work out that line. Try saying it again."
 WRITTEN_GROUPING_PUNCTUATION = frozenset("()\"'“”‘’„‟‚‛«»‹›")
+# The model returned something the student did not say (spoken_guard.py).
+NOT_WHAT_WAS_SAID = "I only write down a line you say in full. Say the whole line."
 
 Line = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4096)]
 
@@ -98,6 +108,8 @@ def spoken_router(
                 and len(spoken_choices) == len(readbacks)
                 and all(WRITTEN_GROUPING_PUNCTUATION.isdisjoint(text) for text in [question, *readbacks])
             ):
+                if any(adds_to_what_was_said(choice, payload.text) for choice in choices):
+                    return spoken_error(422, "UNPARSEABLE", NOT_WHAT_WAS_SAID)
                 validity = await asyncio.gather(
                     *(validate_latex(choice) for choice in choices)
                 )
@@ -121,6 +133,10 @@ def spoken_router(
         latex, readback = result["latex"], result["readback"]
         if not latex or not latex.strip() or not readback or not readback.strip():
             return spoken_error(422, "UNPARSEABLE", NO_MATH_HEARD)
+        # Held to the transcript, not only told: a line that brings in a number
+        # or a variable the student never spoke is the model doing their work.
+        if adds_to_what_was_said(latex, payload.text):
+            return spoken_error(422, "UNPARSEABLE", NOT_WHAT_WAS_SAID)
         return {
             "latex": latex,
             "ambiguous": False,
