@@ -42,6 +42,10 @@ export class ApiFailure extends Error {
 // leave a student waiting indefinitely. Do not retry model calls automatically.
 const REQUEST_MS = 6_000;
 const CAPTURE_MS = 12_000;
+// Transcription uploads up to 30 s of audio before its 4 s model budget even
+// starts, and a study-mode step check is up to 2 s of CAS plus a 4 s model
+// explanation. 6 s would cut both off just as the server was about to answer.
+const SLOW_MS = 10_000;
 
 /** Keep the deadline active until the response body has been read as well. */
 async function withinDeadline<T>(
@@ -209,7 +213,7 @@ export function transcribe(audio: Blob, contentType: string): Promise<Transcribe
   // is chosen wrongly and the file is rejected as invalid.
   const extension = contentType === 'audio/mp4' ? 'mp4' : 'webm';
   form.append('audio', new File([audio], `recording.${extension}`, { type: contentType }));
-  return request<TranscribeResponse>('/api/transcribe', { method: 'POST', body: form });
+  return request<TranscribeResponse>('/api/transcribe', { method: 'POST', body: form }, SLOW_MS);
 }
 
 export interface SpokenAlternative {
@@ -290,7 +294,7 @@ export function diff(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ from_latex: fromLatex, to_latex: toLatex, mode }),
     signal,
-  });
+  }, SLOW_MS);
 }
 
 /** Voice/typed command — DESIGN.md 9, issue #24. `target_line` is "W" plus a
