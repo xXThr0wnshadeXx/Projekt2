@@ -1,6 +1,6 @@
 # Glance
 
-**Math for students who are blind or have low vision.** Glance reads a math problem aloud, lets a student explore it piece by piece, and writes down their own working as they say it or type it. **It never solves the problem**: no answers, no hints, no next steps, so it can be used in class and in exams.
+Glance lets blind and low-vision students understand any page of maths by voice, on their own. It reads the page, helps them grasp its shape and parts, and writes down their work. It never does the work for them.
 
 Try it: **https://glance-shreev2703.vercel.app**
 
@@ -23,7 +23,7 @@ Math assumes you can see it and write it.
 
 A screen reader reads an equation one token at a time, left to right. A sighted reader glances at it and immediately knows its shape — "a fraction with a root on top." A blind reader has to hold the whole expression in working memory. The barrier is access and cognitive load, not ability.
 
-Most real course math is a picture: slide screenshots, scanned PDFs, whiteboard photos, photographed worksheets. The excellent open-source engines that make math accessible — MathJax, Speech Rule Engine, MathCAT — all need *structured* math (MathML or LaTeX) to work. Converted and braille materials take days to weeks to produce, and historically cost thousands of dollars per textbook.
+Slide screenshots, scanned PDFs, whiteboard photos and photographed worksheets often arrive as images. MathJax, Speech Rule Engine and MathCAT need structured maths (MathML or LaTeX). Conversion can take days to weeks, and historical reports put the cost of a braille maths textbook in the thousands. [Sources in the business playbook](docs/BUSINESS.md#2-what-the-market-already-tells-us-real-cited-data)
 
 Doing the work is its own barrier: no pencil, no scratch paper, and work written in braille isn't readable by most instructors.
 
@@ -67,6 +67,8 @@ Deterministic code measures and verifies; the model interprets and explains; the
 There is no database and no server-side storage of images, audio or student work. API keys live only in back-end environment variables.
 
 See [`DESIGN.md`](DESIGN.md) for the full system design, [`CONTRIBUTING.md`](CONTRIBUTING.md) for the rules every change follows, and [`docs/BUSINESS.md`](docs/BUSINESS.md) for the validation plan.
+
+For judges and disability-services teams, see the [one-page overview](docs/leave-behind.md).
 
 ## Accessibility
 
