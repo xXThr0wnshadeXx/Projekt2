@@ -45,6 +45,5 @@ Thumbs.db
 frontend/dist/
 frontend/.env.local
 # Local editor and tooling folders
-.claude/
 .vscode/
 .idea/
