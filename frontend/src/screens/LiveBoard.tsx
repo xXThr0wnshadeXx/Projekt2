@@ -159,6 +159,19 @@ export function LiveBoard({ onBack }: { onBack: () => void }) {
     }
   }
 
+  function discardLine(line: CaptureLine, index: number) {
+    // Deliberately do not remove this key from `seen`: if the camera keeps
+    // seeing the same bad transcription, discarding it must not make it speak
+    // again on the next ten-second pass.
+    const next = lines[index + 1] ?? lines[index - 1];
+    setLines((previous) => previous.filter((item) => item.id !== line.id));
+    announce(`Discarded board line ${index + 1}. It will not be read again.`);
+    window.setTimeout(() => {
+      if (next) document.getElementById(next.id)?.focus();
+      else heading.current?.focus();
+    }, 80);
+  }
+
   return (
     <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2 ref={heading} tabIndex={-1} className="text-2xl font-semibold focus-visible:outline">
@@ -185,9 +198,19 @@ export function LiveBoard({ onBack }: { onBack: () => void }) {
         <h3 className="font-semibold">Board lines</h3>
         <ol className="mt-3 space-y-3">
           {lines.map((line, i) => (
-            <li key={line.id}>
-              <MathLine id={line.id} latex={line.latex} label={'Board line ' + (i + 1)}
-                unsure={!line.valid} />
+            <li key={line.id} className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <MathLine id={line.id} latex={line.latex} label={'Board line ' + (i + 1)}
+                  unsure={!line.valid} />
+              </div>
+              <button
+                type="button"
+                className="btn mt-1"
+                onClick={() => discardLine(line, i)}
+                aria-label={'Discard board line ' + (i + 1)}
+              >
+                Discard
+              </button>
             </li>
           ))}
         </ol>
