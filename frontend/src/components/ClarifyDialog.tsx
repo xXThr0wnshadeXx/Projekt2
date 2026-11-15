@@ -56,19 +56,22 @@ export function ClarifyDialog({
 
     // Focus trap. Without it, Tab walks out of the dialog into the page behind
     // and a screen-reader user has no idea the dialog is still open.
-    const focusables = dialog.current?.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    if (!focusables || focusables.length === 0) return;
-    const firstEl = focusables[0];
-    const lastEl = focusables[focusables.length - 1];
-    if (e.shiftKey && document.activeElement === firstEl) {
-      e.preventDefault();
-      lastEl.focus();
-    } else if (!e.shiftKey && document.activeElement === lastEl) {
-      e.preventDefault();
-      firstEl.focus();
-    }
+    //
+    // Every Tab is handled here rather than only at the first and last
+    // control: Safari's default Tab skips buttons and jumps to the next text
+    // field, which would be the typing box *behind* this dialog.
+    const focusables = Array.from(
+      dialog.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    ).filter((el) => !el.hasAttribute('disabled'));
+    if (focusables.length === 0) return;
+    e.preventDefault();
+    const at = focusables.indexOf(document.activeElement as HTMLElement);
+    const next = e.shiftKey
+      ? at <= 0 ? focusables.length - 1 : at - 1
+      : at === -1 || at === focusables.length - 1 ? 0 : at + 1;
+    focusables[next].focus();
   }
 
   return (

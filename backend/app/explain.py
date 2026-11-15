@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .config import Settings
+from .errors import ApiError
+from .model_quota import ModelQuota
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
@@ -35,6 +37,16 @@ _FORBIDDEN = re.compile(
     re.IGNORECASE,
 )
 
+# An explanation names an operation. It never states a result: "3 was
+# subtracted from both sides, giving x = 4" has no forbidden word in it and
+# hands over a value all the same. The student's own line already says what
+# they got, so a sentence that restates or extends it adds only risk.
+_STATES_A_RESULT = re.compile(
+    r"=|\b(equals?|equal to|gives?|giving|yields?|yielding|leaving|leaves|to get|"
+    r"results? in|resulting in|so [a-z] is|which is|becomes?)\b",
+    re.IGNORECASE,
+)
+
 
 @lru_cache
 def _schema() -> dict:
@@ -47,11 +59,12 @@ def acceptable(text: str) -> bool:
         return False
     if text.count(".") > 1 or "\n" in text:
         return False  # more than one sentence
-    return not _FORBIDDEN.search(text)
+    return not _FORBIDDEN.search(text) and not _STATES_A_RESULT.search(text)
 
 
 def model_explainer(
-    settings: Settings, timeout_s: float = 2.0, client: "AsyncOpenAI | None" = None
+    settings: Settings, timeout_s: float = 2.0, client: "AsyncOpenAI | None" = None,
+    *, quota: ModelQuota | None = None,
 ) -> Explainer | None:
     """An explainer backed by MODEL_TEXT, or None when models aren't configured."""
     if not settings.models_configured:
@@ -70,6 +83,16 @@ def model_explainer(
     )
 
     async def explain(a_latex: str, b_latex: str) -> str | None:
+        if quota is not None:
+            try:
+                quota.acquire()
+            except ApiError:
+                # The explanation is optional by design (#20). SymPy has
+                # already verified the step by the time we get here, so
+                # running out of shared model budget must not turn a verified
+                # step into a 429 — the caller falls back to the plain
+                # "This step checks out."
+                return None
         try:
             result = await client.chat.completions.create(
                 model=settings.model_text,

@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
+import { LiveBoard } from './LiveBoard';
 import { capture, pdfPageCount, pdfPage, ApiFailure, CAPTURE_TYPES } from '../api';
 import { downscale, sharpestFrame } from '../image';
 import { useShortcuts } from '../shortcuts';
@@ -47,6 +48,8 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [cameraOn, setCameraOn] = useState(false);
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const [liveBoard, setLiveBoard] = useState(false);
   const [pdf, setPdf] = useState<PendingPdf | null>(null);
   const [pageWanted, setPageWanted] = useState('1');
 
@@ -200,7 +203,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   // drop zone first.
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
-      if (busy !== 'idle') return;
+      if (busy !== 'idle' || liveBoard) return;
       const item = Array.from(e.clipboardData?.items ?? []).find((i) =>
         i.type.startsWith('image/'),
       );
@@ -210,10 +213,11 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
     }
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [busy]);
+  }, [busy, liveBoard]);
 
   async function startCamera() {
     setError('');
+    setCameraStarting(true);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         // The back camera is the one pointed at a page or a board.
@@ -233,6 +237,8 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       const message = 'I could not open the camera. Check the permission, or upload a photo instead.';
       setError(message);
       announce(message, 'assertive');
+    } finally {
+      setCameraStarting(false);
     }
   }
 
@@ -260,11 +266,19 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       u: () => fileInput.current?.click(),
       c: () => void startCamera(),
     },
-    !working,
+    !working && !liveBoard && !cameraStarting,
   );
 
+  if (liveBoard) {
+    return <LiveBoard onBack={() => {
+      setLiveBoard(false);
+      announce('Back to capture.');
+      window.setTimeout(() => heading.current?.focus(), 0);
+    }} />;
+  }
+
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}
@@ -279,10 +293,15 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       </p>
 
       <div className="mt-6 flex flex-wrap gap-3">
+        {/* The "Upload a file" button below opens this. It has its own name for
+            anything that still reaches it, but stays out of the tab order so
+            keyboard users don't meet a second, unexplained stop (axe, #31). */}
         <input
           ref={fileInput}
           type="file"
           accept={[...CAPTURE_TYPES, 'application/pdf'].join(',')}
+          aria-label="Choose an image or PDF file"
+          tabIndex={-1}
           className="sr-only"
           onChange={(e) => {
             acceptFile(e.target.files?.[0], 'upload');
@@ -290,19 +309,35 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
             e.target.value = '';
           }}
         />
+        {/* Upload leads. It is the path that works on every machine, needs no
+            permission prompt, and is how a student actually receives course
+            material — a PDF or a screenshot, not a photo they took. A camera
+            also asks a blind user to aim it, which is the hardest thing on
+            this screen, so it should not read as the obvious first choice. */}
         <button
           type="button"
-          className="btn"
+          className="btn-primary"
           disabled={working}
           onClick={() => fileInput.current?.click()}
         >
           Upload a file
         </button>
-        <button type="button" className="btn" disabled={working} onClick={startCamera}>
+        <button type="button" className="btn" disabled={working || cameraStarting} onClick={startCamera}>
           {cameraOn ? 'Restart camera' : 'Take a photo'}
         </button>
-        <button type="button" className="btn" disabled={working} onClick={onBack}>
-          Back
+        <button
+          type="button"
+          className="btn"
+          disabled={working || cameraOn || cameraStarting || Boolean(pdf)}
+          onClick={() => setLiveBoard(true)}
+        >
+          Live board
+        </button>
+      </div>
+
+      <div className="mt-6">
+        <button type="button" className="btn-quiet" disabled={working} onClick={onBack}>
+          Back to the start
         </button>
       </div>
 

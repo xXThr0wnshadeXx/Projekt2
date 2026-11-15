@@ -42,7 +42,7 @@ def test_spoken_ambiguity_keeps_the_question_whatever_sympy_makes_of_it(valid):
     validate = AsyncMock(return_value=valid)
 
     with spoken_client(models, validate) as client:
-        response = client.post("/api/spoken-to-latex", json={"text": "x plus one over two"})
+        response = client.post("/api/spoken-to-latex", json={"text": "x one two, said with unclear grouping"})
 
     assert response.status_code == 200
     assert validate.await_count == 2
@@ -66,7 +66,7 @@ def test_spoken_ambiguity_marks_only_the_unreadable_option():
     validate = AsyncMock(side_effect=[True, False])
 
     with spoken_client(models, validate) as client:
-        response = client.post("/api/spoken-to-latex", json={"text": "x plus one over two"})
+        response = client.post("/api/spoken-to-latex", json={"text": "x one two, said with unclear grouping"})
 
     assert response.status_code == 200
     assert [option["valid"] for option in response.json()["alternatives"]] == [True, False]
@@ -94,7 +94,7 @@ def test_spoken_rejects_a_question_it_cannot_ask(alternatives):
     models.interpret.return_value = ambiguous_payload(alternatives)
 
     with spoken_client(models, AsyncMock(return_value=True)) as client:
-        response = client.post("/api/spoken-to-latex", json={"text": "x plus one over two"})
+        response = client.post("/api/spoken-to-latex", json={"text": "x one two, said with unclear grouping"})
 
     assert response.status_code == 422
     # Never the step-check wording: the student submitted no step (#79.2).

@@ -17,8 +17,26 @@ const MATHJAX_SRC =
 
 let loading: Promise<void> | null = null;
 
+/** Keep MathJax's speech worker alive on Safari.
+ *
+ *  MathJax 4.1.3 starts its speech worker from a blob address and revokes that
+ *  address on the very next line. Chromium and Firefox have already taken the
+ *  script by then. WebKit has not: the worker fails to load, speech never
+ *  arrives, and every MathJax promise that waits on it hangs, so on an iPhone
+ *  no line was ever read aloud and a typed line was never read back. Revoking
+ *  a little later costs a few bytes for a few seconds and lets the worker
+ *  start. Remove this when MathJax no longer revokes before the worker loads.
+ */
+function deferBlobRevocation(): void {
+  const revoke = URL.revokeObjectURL.bind(URL);
+  URL.revokeObjectURL = (url: string) => {
+    window.setTimeout(() => revoke(url), 30_000);
+  };
+}
+
 export function configureMathJax(): void {
   if (window.MathJax) return;
+  deferBlobRevocation();
   window.MathJax = {
     tex: {
       // String.raw, or the backslashes become escape sequences and the
