@@ -37,6 +37,26 @@ KNOWN_PATHS = {
 }
 
 
+_ERROR_BODY_LIMIT = 4096
+
+
+def error_code_from_body(body: bytes) -> str | None:
+    """The §9 error code from an error response, for routes that build their own.
+
+    Only a known code is returned, never any other part of the body, so nothing
+    a student sent can reach the log this way.
+    """
+    from typing import get_args
+
+    from .errors import ErrorCode
+
+    try:
+        code = json.loads(body)["error"]["code"]
+    except (ValueError, TypeError, KeyError):
+        return None
+    return code if code in get_args(ErrorCode) else None
+
+
 def current() -> dict[str, Any] | None:
     """The mutable record for the request being handled, if any."""
     return _current.get()
@@ -73,9 +93,21 @@ class RequestLogMiddleware:
         token = _current.set(rec)
         start = time.perf_counter()
 
+        body = bytearray()
+        sniff_error = False
+
         async def send_wrapper(message: Message) -> None:
+            nonlocal sniff_error
             if message["type"] == "http.response.start":
                 rec["status"] = message["status"]
+                headers = dict(message.get("headers") or [])
+                sniff_error = message["status"] >= 400 and headers.get(
+                    b"content-type", b""
+                ).startswith(b"application/json")
+            elif message["type"] == "http.response.body" and sniff_error and rec["error"] is None:
+                body.extend(message.get("body", b"")[: _ERROR_BODY_LIMIT - len(body)])
+                if not message.get("more_body", False):
+                    rec["error"] = error_code_from_body(bytes(body))
             await send(message)
 
         try:
