@@ -24,12 +24,7 @@ def test_every_glossary_entry_is_inspected():
     assert len(MEANINGS) == len(re.findall(r"^\s*\[/", BLOCK, re.MULTILINE))
 
 
-@pytest.mark.parametrize("term,meaning", [
-    pytest.param(term, meaning, marks=pytest.mark.xfail(strict=True,
-        reason="#188: solve definition contains 'to find'; frontend source is outside this PR"))
-    if term == "solve" else (term, meaning)
-    for term, meaning in MEANINGS
-], ids=[term for term, _ in MEANINGS])
+@pytest.mark.parametrize("term,meaning", MEANINGS, ids=[term for term, _ in MEANINGS])
 def test_glossary_defines_a_word_without_teaching_a_method(term, meaning):
     assert not TEACHES.search(meaning), f"{term}: {meaning}"
 
