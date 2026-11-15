@@ -143,14 +143,23 @@ export function Problem({
         </p>
       )}
 
+      {/* Five shortcuts spelled out here were read aloud in full on every
+          visit, before the student reached the maths. The two that matter on
+          arrival are how to look inside a line and how to begin; the rest live
+          behind "?" where they can be asked for. The full list stays on screen
+          for a sighted keyboard user, but is hidden from screen readers so it
+          is not recited — "?" announces it properly. */}
       <p className="mt-2 text-sm text-[--muted]">
         {lines.length} {lines.length === 1 ? 'line' : 'lines'}
         {unsure > 0 && `, ${unsure} unsure`}. Press{' '}
-        <kbd className="kbd">G</kbd> for the structure of a line,{' '}
-        <kbd className="kbd">Enter</kbd> to explore inside it,{' '}
-        <kbd className="kbd">N</kbd> and <kbd className="kbd">P</kbd> to move
-        between lines, <kbd className="kbd">L</kbd> for low-vision mode,{' '}
+        <kbd className="kbd">Enter</kbd> on a line to explore it,{' '}
         <kbd className="kbd">S</kbd> to start working.
+        <span aria-hidden="true">
+          {' '}
+          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">N</kbd>{' '}
+          and <kbd className="kbd">P</kbd> to move, <kbd className="kbd">L</kbd>{' '}
+          large print, <kbd className="kbd">?</kbd> for all shortcuts.
+        </span>
       </p>
 
       {problem.warnings.length > 0 && (
@@ -192,27 +201,49 @@ export function Problem({
         </section>
       )}
 
-      <div className="mt-8 flex flex-wrap gap-3">
-        <button type="button" className="btn" onClick={glance}>
-          Glance
-        </button>
-        <button type="button" className="btn" onClick={readAll}>
-          Read all
-        </button>
-        <button type="button" className="btn" onClick={() => onStartWorking(index)}>
+      {/* Six equal buttons in a row is six decisions before doing anything,
+          and nothing says which one matters. There is one thing a student
+          came here to do — start working — so that is the only primary
+          control. Everything else is a way of reading this problem, grouped
+          and named so a screen reader announces the group before its
+          contents, and "Capture another" is left out of that group because it
+          leaves the problem rather than reading it. */}
+      <div className="mt-8">
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => onStartWorking(index)}
+        >
           Start working
         </button>
-        {stepChecksAllowed(mode) && lines.length > 1 && (
-          <button type="button" className="btn" onClick={() => void whatChanged()}>
-            What changed?
+
+        <section aria-label="Ways to read this problem" className="mt-6">
+          <h3 className="text-sm font-medium uppercase tracking-wide text-[--muted]">
+            Ways to read this
+          </h3>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button type="button" className="btn" onClick={glance}>
+              Glance
+            </button>
+            <button type="button" className="btn" onClick={readAll}>
+              Read all
+            </button>
+            <button type="button" className="btn" onClick={() => onLowVision(index)}>
+              Low-vision mode
+            </button>
+            {stepChecksAllowed(mode) && lines.length > 1 && (
+              <button type="button" className="btn" onClick={() => void whatChanged()}>
+                What changed?
+              </button>
+            )}
+          </div>
+        </section>
+
+        <div className="mt-6 border-t border-[--line] pt-4">
+          <button type="button" className="btn-quiet" onClick={onNewCapture}>
+            Capture another problem
           </button>
-        )}
-        <button type="button" className="btn" onClick={() => onLowVision(index)}>
-          Low-vision mode
-        </button>
-        <button type="button" className="btn" onClick={onNewCapture}>
-          Capture another
-        </button>
+        </div>
       </div>
     </main>
   );
