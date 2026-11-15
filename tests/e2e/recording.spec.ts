@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { HOLD_MS } from '../../frontend/src/components/RecordButton';
 
 type MicrophoneWindow = Window & {
   testMicrophone: { requests: number; starts: number; releases: number; grant: () => void };
@@ -73,7 +74,11 @@ test.describe('@smoke voice recording lifecycle', () => {
       await page.clock.install();
       const byButton = capped || isMobile;
       if (byButton) await page.getByRole('button', { name: 'Record a line' }).click();
-      else await page.keyboard.down('Space');
+      else {
+        await page.keyboard.down('Space');
+        // Space has to be held, not tapped, before recording starts.
+        await page.clock.fastForward(HOLD_MS + 50);
+      }
       const stop = page.getByRole('button', { name: 'Stop recording' });
       await expect(stop).toBeVisible();
       await page.clock.fastForward(capped ? 28_100 : 400);
@@ -81,6 +86,8 @@ test.describe('@smoke voice recording lifecycle', () => {
         if (byButton) await stop.click();
         else await page.keyboard.up('Space');
       }
+      // Let the upload's own deadline timers run in real time again.
+      await page.clock.resume();
 
       await expect(page.getByRole('region', { name: 'Confirm your line' })).toContainText('2 x equals 8');
       expect(uploads).toBe(1);
@@ -109,7 +116,7 @@ test.describe('@smoke voice recording lifecycle', () => {
 
     await page.getByRole('button', { name: 'Record a line' }).click();
     await expect.poll(() => page.evaluate(() => (window as MicrophoneWindow).testMicrophone.requests)).toBe(1);
-    await page.getByRole('button', { name: 'Back to the problem' }).click();
+    await page.getByRole('button', { name: 'Leave and read the problem again' }).click();
     await expect(page.getByRole('heading', { name: 'Your problem' })).toBeVisible();
     await page.evaluate(() => (window as MicrophoneWindow).testMicrophone.grant());
 
