@@ -30,12 +30,23 @@ export function MathLine({ id, latex, label, unsure = false }: MathLineProps) {
     // of the accessibility tree until it is real math; the line's own
     // aria-label still names it, so nothing is lost to a screen reader.
     el.setAttribute('aria-hidden', 'true');
-    el.style.visibility = 'hidden';
+    // Opacity, not visibility: WebKit does not finish typesetting an element
+    // that is visibility:hidden, so on an iPhone the math never appeared.
+    el.style.opacity = '0';
     let cancelled = false;
     const reveal = () => {
-      el.style.visibility = '';
+      watcher.disconnect();
+      el.style.opacity = '';
       el.removeAttribute('aria-hidden');
     };
+    // Shown the moment the math is in the page, not when MathJax reports it
+    // is finished. The container it inserts can take focus, and it attaches
+    // speech for a while afterwards; waiting for all of that left a focusable
+    // element inside something hidden from screen readers.
+    const watcher = new MutationObserver(() => {
+      if (el.querySelector('mjx-container')) reveal();
+    });
+    watcher.observe(el, { childList: true });
     typeset(el)
       .then(() => {
         if (cancelled) return;
@@ -55,6 +66,7 @@ export function MathLine({ id, latex, label, unsure = false }: MathLineProps) {
       });
     return () => {
       cancelled = true;
+      watcher.disconnect();
     };
   }, [latex]);
 
