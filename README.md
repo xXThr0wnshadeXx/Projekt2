@@ -104,7 +104,7 @@ Python is [`uv`](https://docs.astral.sh/uv/):
 cd backend
 uv python install 3.11
 uv venv --python 3.11 .venv
-uv pip install --python .venv -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 Run this from the repository root. It is an alternative to the Python/venv
