@@ -12,7 +12,7 @@ FRONT_END = "https://glance.example"
 
 @pytest.fixture
 def client():
-    app = create_app(Settings(_env_file=None, allowed_origin=FRONT_END))
+    app = create_app(Settings(_env_file=None, allowed_origin=FRONT_END), warm_cas=False)
 
     @app.get("/api/_boom")
     async def boom():
