@@ -13,6 +13,7 @@ import { announce, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
 import { spokenMath, structureSummary } from '../math/sre';
 import { useShortcuts } from '../shortcuts';
+import { readAloud, useLineKeys } from '../lineKeys';
 import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
 import type { Mode, Problem as ProblemData } from '../state';
 
@@ -144,6 +145,17 @@ export function Problem({
     );
   }
 
+  // Arrows and Space (#236): the easiest keys to find without looking.
+  useLineKeys({
+    previous: () => goTo(index - 1, 'previous'),
+    next: () => goTo(index + 1, 'next'),
+    read: () => {
+      if (!current) return;
+      const spoken = spokenMath(document.getElementById(current.id));
+      readAloud(spoken ? `Line ${index + 1}. ${spoken}` : `Line ${index + 1} is not ready to read yet.`);
+    },
+  });
+
   useShortcuts({
     g: glance,
     r: readLine,
@@ -178,13 +190,14 @@ export function Problem({
           is not recited — "?" announces it properly. */}
       <p className="mt-2 text-sm text-[--muted]">
         {lines.length} {lines.length === 1 ? 'line' : 'lines'}
-        {unsure > 0 && `, ${unsure} unsure`}. Press{' '}
+        {unsure > 0 && `, ${unsure} unsure`}. Use the{' '}
+        <kbd className="kbd">arrow keys</kbd> to move between lines and{' '}
+        <kbd className="kbd">Space</kbd> to hear one. Press{' '}
         <kbd className="kbd">Enter</kbd> on a line to explore it,{' '}
         <kbd className="kbd">S</kbd> to start working.
         <span aria-hidden="true">
           {' '}
-          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">N</kbd>{' '}
-          and <kbd className="kbd">P</kbd> to move, <kbd className="kbd">L</kbd>{' '}
+          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">L</kbd>{' '}
           large print, <kbd className="kbd">?</kbd> for all shortcuts.
         </span>
       </p>
@@ -198,22 +211,22 @@ export function Problem({
       {lines.length ? (
         <ul className="mt-6 space-y-4" aria-label="Problem lines">
           {lines.map((l, i) => (
-            <li key={l.id} className="flex items-start gap-3" onFocus={() => setIndex(i)}>
-              <div className="min-w-0 flex-1">
-                <MathLine
-                  id={l.id}
-                  latex={l.latex}
-                  label={`Line ${i + 1}`}
-                  unsure={!l.valid}
-                />
-              </div>
+            <li key={l.id} className="relative" onFocus={() => setIndex(i)}>
+              <MathLine
+                id={l.id}
+                latex={l.latex}
+                label={`Line ${i + 1}`}
+                unsure={!l.valid}
+              />
               <button
                 type="button"
-                className="btn mt-1"
+                className="btn absolute right-3 top-3 min-w-[48px] justify-center px-0 text-2xl leading-none"
                 onClick={() => discardLine(i)}
                 aria-label={`Discard problem line ${i + 1}`}
+                title="Discard this line"
               >
-                Discard
+                <span aria-hidden="true">×</span>
+                <span className="sr-only">Discard</span>
               </button>
             </li>
           ))}
