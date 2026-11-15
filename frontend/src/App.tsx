@@ -49,6 +49,10 @@ type Screen =
   | 'export';
 type BackEnd = 'checking' | 'up' | 'down';
 
+/** How soon an unanswered health check is asked again, doubling up to the cap. */
+const HEALTH_RETRY_FIRST_MS = 2_000;
+const HEALTH_RETRY_MAX_MS = 30_000;
+
 export function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
@@ -63,6 +67,8 @@ export function App() {
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
   const [backEndNote, setBackEndNote] = useState('');
+  // Whether the server said it can read images and speech (#127).
+  const [models, setModels] = useState(true);
   const [settings, setSettings] = useState<SettingsData>(() => loadSettings());
   // Where to go back to from Settings, and which problem line the student was
   // on when they started working (their first step is checked against it).
@@ -127,33 +133,70 @@ export function App() {
     });
   }, []);
 
-  useEffect(() => {
+  // Health is asked again, not trusted from one request at load (#127). A
+  // cold start can make the first request fail, and a student told "capture
+  // is unavailable" should not have to reload to find out it came back.
+  const healthRun = useRef(0);
+  const healthRetry = useRef<number | undefined>(undefined);
+  const retryDelay = useRef(HEALTH_RETRY_FIRST_MS);
+  const checkHealth = useCallback(async () => {
     // A deployed build with no server address has nothing to ask (#135).
     if (!apiConnected) {
       setBackEnd('down');
       setBackEndNote(UNCONNECTED_MESSAGE);
       return;
     }
-    health()
-      .then(() => {
-        setBackEnd('up');
-        setBackEndNote('');
-      })
-      .catch(async (e: unknown) => {
-        setBackEnd('down');
-        // A server that is up but refusing this origin looks identical to one
-        // that is down, so find out which before telling anyone anything.
-        if (e instanceof ApiFailure && e.code === 'NETWORK') {
-          setBackEndNote(
-            (await diagnoseUnreachable()) === 'blocked'
-              ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
-              : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
-          );
-          return;
-        }
-        setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
-      });
+    const run = ++healthRun.current;
+    window.clearTimeout(healthRetry.current);
+    try {
+      const h = await health();
+      if (run !== healthRun.current) return;
+      retryDelay.current = HEALTH_RETRY_FIRST_MS;
+      setBackEnd('up');
+      setBackEndNote('');
+      setModels(h.models !== false);
+    } catch (e: unknown) {
+      if (run !== healthRun.current) return;
+      setBackEnd('down');
+      // Try again on its own, further apart each time, until it answers.
+      healthRetry.current = window.setTimeout(() => void checkHealth(), retryDelay.current);
+      retryDelay.current = Math.min(retryDelay.current * 2, HEALTH_RETRY_MAX_MS);
+      // A server that is up but refusing this origin looks identical to one
+      // that is down, so find out which before telling anyone anything.
+      if (e instanceof ApiFailure && e.code === 'NETWORK') {
+        const why = await diagnoseUnreachable();
+        if (run !== healthRun.current) return;
+        setBackEndNote(
+          why === 'blocked'
+            ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
+            : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
+        );
+        return;
+      }
+      setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
+    }
   }, []);
+
+  useEffect(() => () => window.clearTimeout(healthRetry.current), []);
+
+  // Asked on load, and again each time Home or the scratchpad is shown: the
+  // two screens whose controls depend on the answer.
+  const healthAsked = useRef(false);
+  useEffect(() => {
+    if (!healthAsked.current || screen === 'home' || screen === 'scratchpad') {
+      healthAsked.current = true;
+      void checkHealth();
+    }
+  }, [screen, checkHealth]);
+
+  // Recording and capture need the server's model. They are hidden only when
+  // a server that answered says it has none, or when this build has no
+  // server at all. An unanswered request proves nothing: it may be a cold
+  // start, and a failed upload explains itself.
+  const modelsUsable = apiConnected && models;
+  const modelsUnavailableWhy = apiConnected
+    ? 'The server cannot read images or speech right now.'
+    : UNCONNECTED_MESSAGE;
 
   function openProblem(next: ProblemData) {
     setProblem(next);
@@ -283,6 +326,7 @@ export function App() {
         {lowVision}
         {screen === 'home' && (
           <Home
+            captureUnavailable={modelsUsable ? undefined : modelsUnavailableWhy}
             onCapture={() => setScreen('capture')}
             onSample={() => openProblem(sampleProblem())}
             onResume={problem ? resumeProblem : undefined}
@@ -319,6 +363,7 @@ export function App() {
             problem={problem}
             mode={settings.mode}
             startLine={workingFrom}
+            speechAvailable={modelsUsable}
             onBack={() => setScreen('problem')}
             onExport={() => openExport('scratchpad')}
           />

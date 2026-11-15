@@ -137,7 +137,9 @@ test.describe('@smoke reading controls', () => {
     await page.route('**/api/**', (route) => route.abort());
     await page.goto('/');
     await expect(page.getByTestId('backend-status')).toBeVisible();
-    await expect(page.getByText(/unavailable/i)).toHaveCount(1);
+    // Said once as a notice. The Capture button also names itself
+    // "unavailable right now" (#127); that is a control's name, not a notice.
+    await expect(page.getByText(/unavailable/i).and(page.locator(':not(button)'))).toHaveCount(1);
     await expect(page.getByText(/not reachable/i)).toHaveCount(0);
   });
 
