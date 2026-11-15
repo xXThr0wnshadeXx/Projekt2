@@ -11,14 +11,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import Settings, get_settings
-from .errors import install_error_handlers
 from . import timeouts
+from .errors import install_error_handlers
+from .explain import Explainer, model_explainer
+from .routes.diff import diff_router
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-def create_app(settings: Settings | None = None, warm_cas: bool = True) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    warm_cas: bool = True,
+    explainer: Explainer | None = None,
+) -> FastAPI:
     settings = settings or get_settings()
+    explainer = explainer or model_explainer(settings)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -39,6 +46,8 @@ def create_app(settings: Settings | None = None, warm_cas: bool = True) -> FastA
         max_age=600,
     )
     install_error_handlers(app)
+
+    app.include_router(diff_router(explainer))
 
     @app.get("/api/health")
     async def health() -> dict:
