@@ -86,31 +86,138 @@ Accessibility is the product, not a feature of it.
 
 ## Running it locally
 
-Once per machine, from inside the repository:
+Works on macOS and Windows. The app itself is a web app, so once it is running
+you can open it from either, and from a phone on the same network.
+
+### Before anything else: Python 3.11
+
+Use **Python 3.11**, the version pinned in `backend/.python-version`, used in
+CI, and deployed with the back end. Newer versions may work but are not the
+tested project baseline.
+
+Check first:
+
+```bash
+python --version
+```
+
+If it is not 3.11, the quickest way to get one without touching your system
+Python is [`uv`](https://docs.astral.sh/uv/):
+
+```bash
+cd backend
+uv python install 3.11
+uv venv --python 3.11 .venv
+uv pip install -r requirements.txt
+```
+
+Run this from the repository root. It is an alternative to the Python/venv
+creation and dependency installation below; it creates the environment inside
+`backend/`, where the server commands and `.env` belong.
+
+### macOS
 
 ```bash
 bash scripts/setup.sh
 ```
 
-Then:
-
 ```bash
-# Back end
 cd backend
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # then add your own API key and model IDs
+[ -f .env ] || cp .env.example .env
+# Add model credentials to backend/.env only if you need capture or speech.
 uvicorn app.main:app --reload
 ```
 
+In a second terminal, starting from the repository root:
+
 ```bash
-# Front end
+cd frontend && npm install && npm run dev
+```
+
+### Windows
+
+The shell scripts in `scripts/` are bash and need **Git Bash** — they will not
+run in PowerShell or cmd. Git Bash ships with [Git for Windows](https://git-scm.com/download/win).
+
+In Git Bash:
+
+```bash
+bash scripts/setup.sh
+```
+
+Back end, in **PowerShell**, starting from the repository root. Calling the
+environment's Python directly avoids needing to change script-execution policy:
+
+```powershell
+cd backend
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+# Add model credentials to backend/.env only if you need capture or speech.
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+If you use **Git Bash** instead, start from the repository root:
+
+```bash
+cd backend
+py -3.11 -m venv .venv
+source .venv/Scripts/activate
+python -m pip install -r requirements.txt
+[ -f .env ] || cp .env.example .env
+python -m uvicorn app.main:app --reload
+```
+
+Front end, in a second PowerShell terminal from the repository root:
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Required back-end environment variables are listed in `backend/.env.example`. Never commit a real `.env`.
+### Without an API key
+
+The back end starts fine without model credentials — it just does not register
+the capture, transcribe and spoken-to-latex routes. `/api/health`, `/api/diff`,
+`/api/validate`, rule-based `/api/command`, and `/api/pdf/*` still work. PDF
+page counting and rendering need no key; reading the resulting image into
+math still requires capture and model credentials.
+
+**Try a sample problem** supports glance, exploration, low-vision mode, typed
+work with readback/confirmation, and export. The typed fallback works without
+a model; server-side validation, step checks, commands and PDF processing
+still need a running back end. MathJax also needs to load, so keyless does not
+mean every feature works without a network connection.
+
+### Demoing from an iPhone
+
+Flow B is iPhone plus VoiceOver, so it is worth opening on a real phone at
+least once before the demo.
+
+1. Start the front end so it listens beyond localhost:
+
+   ```bash
+   cd frontend && npm run dev -- --host
+   ```
+
+2. Vite prints a **Network:** address — open that on the phone, on the same
+   Wi-Fi.
+3. The phone must also be able to reach the back end, so set
+   `VITE_API_BASE` to the machine's network address, not `localhost`, and add
+   that front-end origin to the back end's `ALLOWED_ORIGIN`. Start Uvicorn
+   with `--host 0.0.0.0 --port 8000` on your trusted local network, and restart
+   Vite after changing `VITE_API_BASE` in `frontend/.env.local`.
+
+Camera and microphone need a secure context: Safari allows them on
+`localhost`, but over the network it wants HTTPS. The simplest way around that
+for a demo is to point the phone at the **deployed** front end instead of a
+laptop dev server.
+
+Required back-end environment variables are listed in `backend/.env.example`.
+Never commit a real `.env`.
 
 ## Project board
 
