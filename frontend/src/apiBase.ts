@@ -20,6 +20,9 @@ export const DEV_API_BASE = 'http://localhost:8000';
  */
 export function resolveApiBase(env: { PROD: boolean; VITE_API_BASE?: string }): string | null {
   const configured = env.VITE_API_BASE?.trim();
+  // The multi-service Vercel deployment rewrites /api/* to FastAPI. An empty
+  // base keeps requests at this deployment's origin, regardless of its domain.
+  if (configured === '/') return '';
   if (configured) return configured.replace(/\/+$/, '');
   return env.PROD ? null : DEV_API_BASE;
 }
