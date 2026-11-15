@@ -1,5 +1,6 @@
 """Server-side access to the configured interpretation and transcription models."""
 
+import asyncio
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -35,7 +36,16 @@ class ModelSettings(BaseSettings):
     # hears nothing, against a 12 s hard limit (DESIGN.md 16). These are
     # settings rather than constants so the budget can be widened from the
     # deploy dashboard during judging without shipping a change.
+    #
+    # The budgets differ because the steps do. A capture is one big image and
+    # DESIGN.md 16 allows it 6 s at p50 and 12 s at worst. A spoken line has to
+    # come back in 3 s at p50 and 6 s at worst, and the model call is only part
+    # of that — transcription, CAS validation and the network all come out of
+    # the same budget — so giving it the capture's timeout would let a single
+    # slow call blow the step on its own. Retries are bounded by the same
+    # deadline, since it wraps the whole attempt sequence rather than one try.
     model_timeout_seconds: float = 10.0
+    model_fast_timeout_seconds: float = 4.0
     model_max_retries: int = 1
 
 
@@ -56,20 +66,36 @@ class ModelClient:
     async def close(self) -> None:
         await self.client.close()
 
+    @staticmethod
+    async def _bounded(seconds: float, call):
+        """Hold `call` to a deadline, retries and all.
+
+        The SDK's own `timeout` applies per attempt, so with retries enabled the
+        total can still run past the step's budget. This caps the whole thing.
+        """
+        return await asyncio.wait_for(call, timeout=seconds)
+
     async def interpret(
         self, task: StructuredTask, messages: list[ChatCompletionMessageParam]
     ) -> dict:
         model = self.settings.model_vision if task == "capture" else self.settings.model_text
+        # Vision gets the long budget; everything else is on the spoken-line
+        # path and gets the short one.
+        budget = (
+            self.settings.model_timeout_seconds
+            if task == "capture"
+            else self.settings.model_fast_timeout_seconds
+        )
         try:
-            result = await self.client.chat.completions.create(
+            result = await self._bounded(budget, self.client.chat.completions.create(
                 model=model,
                 messages=messages,
                 response_format={
                     "type": "json_schema",
                     "json_schema": {"name": task, "strict": True, "schema": load_schema(task)},
                 },
-            )
-        except OpenAIError:
+            ))
+        except (OpenAIError, TimeoutError):
             raise ModelError("The interpretation service is unavailable.") from None
         if not result.choices:
             raise ModelError("The model returned no result.")
@@ -86,11 +112,14 @@ class ModelClient:
 
     async def transcribe(self, filename: str, audio: bytes, content_type: str) -> str:
         try:
-            result = await self.client.audio.transcriptions.create(
-                model=self.settings.model_stt,
-                file=(filename, audio, content_type),
-                response_format="json",
+            result = await self._bounded(
+                self.settings.model_fast_timeout_seconds,
+                self.client.audio.transcriptions.create(
+                    model=self.settings.model_stt,
+                    file=(filename, audio, content_type),
+                    response_format="json",
+                ),
             )
-        except OpenAIError:
+        except (OpenAIError, TimeoutError):
             raise ModelError("The transcription service is unavailable.") from None
         return result.text
