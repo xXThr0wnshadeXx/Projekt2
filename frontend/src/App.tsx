@@ -258,6 +258,14 @@ export function App() {
     setCapturing(true);
   }
 
+  function goHome() {
+    setCapturing(false);
+    window.scrollTo({ top: 0 });
+    announce(problem ? 'Home. Your worksheet.' : 'Home.');
+    // With a worksheet, it lands on its first line as it always does.
+    if (!problem) window.setTimeout(() => focusFirst('#start-heading'), 60);
+  }
+
   function newWorksheet() {
     openCapturePage();
   }
@@ -331,8 +339,21 @@ export function App() {
 
           <header className="app-bar">
             <div className="app-bar-inner">
-              <h1 className="mono inline-flex min-h-[40px] items-center bg-[--accent] px-3 text-xl font-medium text-[--accent-fg]">
-                Glance
+              <h1 className="m-0">
+                {/* The logo goes home: off the capture page and back to the top,
+                    as on any site. A real link, so it also works by Enter. */}
+                <a
+                  href="/"
+                  className="mono inline-flex min-h-[40px] items-center bg-[--accent] px-3 text-xl font-medium text-[--accent-fg] no-underline"
+                  title="Go home"
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                    e.preventDefault();
+                    goHome();
+                  }}
+                >
+                  Glance
+                </a>
               </h1>
               <ModeBadge mode={settings.mode} />
               <div className="ml-auto flex flex-wrap items-center gap-2">
