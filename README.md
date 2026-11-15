@@ -130,11 +130,14 @@ No accounts and no database. Images and audio are sent to the OpenAI API for pro
 
 ## Team
 
-| Who | Built |
+| Who | Role |
 |---|---|
-| Nicolas Lam | Back end, step checking (SymPy), deploy, pitch |
-| Shaswath | AI pipeline (capture, spoken math), evals, user research |
-| Shreevatson Babu Sreegeetha | Front end, accessibility, export |
+| Shreevatson Babu Sreegeetha (`shreev2703`), lead | Front end, accessibility, product, export, user research, pitch, submission |
+| Nicolas Lam (`nicolashlam`) | Back end and math: FastAPI app and deploy, step checking (SymPy), timeouts, mode enforcement in the API, latency, CI, request guards |
+| Shaswath (`xXThr0wnshadeXx`) | Capture and interpretation: `/api/capture`, `/api/transcribe`, `/api/spoken-to-latex`, `/api/command`, prompts, JSON schemas, both eval sets |
+| `tuffling` | Board visibility; not assigned implementation work |
+
+Roles follow [`docs/owners.md`](docs/owners.md).
 
 ## Credits and licences
 
