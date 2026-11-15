@@ -58,7 +58,7 @@ export const TEXT_SCALES = [100, 125, 150, 175, 200];
 
 export const defaultSettings: Settings = {
   mode: 'homework',
-  selfVoicing: false,
+  selfVoicing: true,
   textScale: 125,
 };
 

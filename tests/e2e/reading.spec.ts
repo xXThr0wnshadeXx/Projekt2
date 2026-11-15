@@ -91,9 +91,12 @@ test.describe('@smoke reading controls', () => {
     await expect(larger).toBeFocused();
   });
 
-  test('nothing is spoken until reading aloud is switched on', async ({ page }) => {
+  test('nothing is spoken once reading aloud is switched off', async ({ page }) => {
     await recordSpeech(page);
     await page.goto('/');
+    await page.getByRole('button', { name: 'Read aloud: on' }).click();
+    await expect(page.getByRole('button', { name: 'Read aloud: off' })).toBeVisible();
+    await page.evaluate(() => (window as unknown as { __spoken?: string[] }).__spoken?.splice(0));
     await page.getByRole('button', { name: 'Try a sample problem' }).click();
     await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
     await page.keyboard.press('g');
@@ -101,13 +104,10 @@ test.describe('@smoke reading controls', () => {
     expect(await spoken(page)).toEqual([]);
   });
 
-  test('with reading aloud on, everything the app announces is spoken', async ({ page }) => {
+  test('reading aloud is on by default, so everything the app announces is spoken', async ({ page }) => {
     await recordSpeech(page);
     await page.goto('/');
 
-    const toggle = page.getByRole('button', { name: 'Read aloud: off' });
-    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    await toggle.click();
     await expect(page.getByRole('button', { name: 'Read aloud: on' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -125,7 +125,7 @@ test.describe('@smoke reading controls', () => {
     await expect(polite(page)).toContainText('Line 2. the fraction');
 
     const said = (await spoken(page)).join(' | ');
-    expect(said).toContain('Reading aloud is on.');
+    expect(said).toContain('Use the Down arrow to move through the page');
     expect(said).toContain('Sample problem. Solve for x. 2 lines.');
     expect(said).toContain('This is an equation, with a left side and a right side.');
     expect(said).toContain('the fraction with numerator the square root of x plus 1');
