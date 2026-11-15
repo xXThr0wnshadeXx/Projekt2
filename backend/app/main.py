@@ -22,6 +22,7 @@ from .openai_client import ModelClient, ModelSettings
 from .routes.capture import capture_router
 from .routes.command import command_router
 from .routes.diff import diff_router
+from .routes.feedback import feedback_router
 from .routes.pdf import pdf_router
 from .routes.spoken import spoken_router
 from .routes.transcribe import transcribe_router
@@ -109,6 +110,7 @@ def create_app(
         app.include_router(capture_router(models, validate_latex, settings.max_image_bytes))
         app.include_router(spoken_router(models, validate_latex))
         app.include_router(transcribe_router(models, min(settings.max_audio_seconds, 30)))
+        app.include_router(feedback_router(models))
 
     @app.get("/api/health")
     async def health() -> dict:
