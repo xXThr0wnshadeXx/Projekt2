@@ -42,7 +42,7 @@ export const EDIT_REFUSAL =
   'I can only change what you tell me to change. Say, for example, change the 3 to a 4.';
 
 const ASKS_FOR_CORRECTION =
-  /(?:fix|correct|repair|redo|rewrite)(?!\s+(?:the\s+)?(?:\w+\s+)?(?:to|with|into))|make (?:it|this|that|them) (?:right|correct|better|work)|what(?:'s| is) wrong|where(?:'s| is| did i go) (?:my |the )?(?:mistake|error|wrong)|my (?:mistake|error)|get it right|do (?:it|this) (?:right|correctly)/i;
+  /\b(?:fix|correct|repair|redo|rewrite)\b(?!\s+(?:the\s+)?(?:\w+\s+)?(?:to|with|into)\b)|\bmake (?:it|this|that|them) (?:right|correct|better|work)\b|\bwhat(?:'s| is) wrong\b|\bwhere(?:'s| is| did i go) (?:my |the )?(?:mistake|error|wrong)\b|\bmy (?:mistake|error)\b|\bget it right\b|\bdo (?:it|this) (?:right|correctly)\b/i;
 
 export function asksForCorrection(text: string): boolean {
   return ASKS_FOR_CORRECTION.test(text);

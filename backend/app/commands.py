@@ -72,10 +72,10 @@ EDIT_REFUSAL = "I can only change what you tell me to change. Say, for example, 
 # "fix my mistake", "make it right", "what's wrong with it": a request for a
 # correction. Glance changes only what the student names, so these are refused.
 _ASKS_FOR_CORRECTION = re.compile(
-    r"(?:fix|correct|repair|redo|rewrite)(?!\s+(?:the\s+)?(?:\w+\s+)?(?:to|with|into))"
-    r"|make (?:it|this|that|them) (?:right|correct|better|work)"
-    r"|what(?:'s| is) wrong|where(?:'s| is| did i go) (?:my |the )?(?:mistake|error|wrong)"
-    r"|my (?:mistake|error)|get it right|do (?:it|this) (?:right|correctly)",
+    r"\b(?:fix|correct|repair|redo|rewrite)\b(?!\s+(?:the\s+)?(?:\w+\s+)?(?:to|with|into)\b)"
+    r"|\bmake (?:it|this|that|them) (?:right|correct|better|work)\b"
+    r"|\bwhat(?:'s| is) wrong\b|\bwhere(?:'s| is| did i go) (?:my |the )?(?:mistake|error|wrong)\b"
+    r"|\bmy (?:mistake|error)\b|\bget it right\b|\bdo (?:it|this) (?:right|correctly)\b",
     re.IGNORECASE,
 )
 
