@@ -136,8 +136,15 @@ async function visibleTexts(page: Page): Promise<string[]> {
 
 /** Walk from the top of the page to the end, collecting what is said. */
 async function walkAll(page: Page): Promise<string> {
-  for (let i = 0; i < 80; i += 1) await page.keyboard.press('ArrowUp');
   const heardAll: string[] = [];
+  // Moving down from the top skips the first stop, so also collect the
+  // announcements from the walk up, including the first stop itself.
+  for (let i = 0; i < 80; i += 1) {
+    await page.keyboard.press('ArrowUp');
+    const t = await heard(page);
+    if (t === 'Top of the page.' && heardAll.length) break;
+    if (t !== 'Top of the page.') heardAll.push(t);
+  }
   for (let i = 0; i < 120; i += 1) {
     await page.keyboard.press('ArrowDown');
     const t = await heard(page);
