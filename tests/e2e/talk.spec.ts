@@ -9,6 +9,7 @@
 // exercises exactly what a transcript would.
 
 import { test, expect, type Page } from '@playwright/test';
+import { GLOSSARY, understandTalk } from '../../frontend/src/talk';
 
 const polite = (page: Page) => page.getByTestId('live-polite');
 const reply = (page: Page) => page.getByTestId('glance-reply');
@@ -87,8 +88,35 @@ test.describe('@smoke talking to Glance', () => {
     await expect(polite(page)).toContainText('A coefficient is the number multiplying a letter');
 
     await say(page, 'what does hypotenuse mean');
-    await expect(polite(page)).toContainText('I do not have a meaning for hypotenuse');
+    await expect(polite(page)).toContainText('The hypotenuse is the longest side of a right triangle.');
+
+    await say(page, 'what does eigenvalue mean');
+    await expect(polite(page)).toContainText('I do not have a meaning for eigenvalue');
     expect(sent).toEqual([]);
+  });
+
+  test('every glossary word has an audio-friendly meaning', async ({ page }) => {
+    const sent = await keyless(page);
+    await openScratchpad(page);
+
+    for (const [, term, meaning] of GLOSSARY) {
+      await say(page, `what does ${term} mean`);
+      await expect(polite(page)).toHaveText(meaning);
+      await expect(reply(page)).toHaveText(meaning);
+    }
+    expect(sent).toEqual([]);
+  });
+
+  test('every glossary word understands all three question phrasings', () => {
+    for (const [, term, meaning] of GLOSSARY) {
+      for (const question of [
+        `what does ${term} mean`,
+        `what is a ${term}`,
+        `define ${term}`,
+      ]) {
+        expect(understandTalk(question)).toEqual({ kind: 'define', term, meaning });
+      }
+    }
   });
 
   test('where am I, read the problem, and say that again', async ({ page }) => {
