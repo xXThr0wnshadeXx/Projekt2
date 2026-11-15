@@ -24,6 +24,10 @@ const CURRENT = 'glance-current';
 const SKIP = '[hidden], [aria-hidden="true"], .sr-only, .skip-link, [data-testid^="live-"], script, style, noscript';
 
 let current: Element | null = null;
+/** Set when the last move ran past the top or the end of the page. From the
+ *  top, Down is the first line; from the end, Up is the last. Without this
+ *  the first line stayed current, so Down after "Top of the page" skipped it. */
+let edge: 'top' | 'end' | null = null;
 
 function hasBox(el: Element): boolean {
   const r = el.getBoundingClientRect();
@@ -140,6 +144,7 @@ function lineOf(node: Element | null, list: Element[]): Element | null {
 
 function go(el: Element): void {
   if (!el.matches(CONTROL) && !el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+  edge = null;
   (el as HTMLElement).focus({ preventScroll: true });
   // The app scrolls, never the student.
   el.scrollIntoView({ block: 'center' });
@@ -152,13 +157,17 @@ export function move(delta: number): void {
   const list = lines();
   if (!list.length) return;
   const at = lineOf(current && document.contains(current) ? current : document.activeElement, list);
-  const from = at ? list.indexOf(at) : delta > 0 ? -1 : list.length;
+  let from = at ? list.indexOf(at) : delta > 0 ? -1 : list.length;
+  if (edge === 'top' && delta > 0) from = -1;
+  if (edge === 'end' && delta < 0) from = list.length;
   const to = from + delta;
   if (to < 0) {
+    edge = 'top';
     announceMove('Top of the page.');
     return;
   }
   if (to >= list.length) {
+    edge = 'end';
     announceMove('End of the page.');
     return;
   }
@@ -233,7 +242,10 @@ export function useTraversal(enabled = true): void {
     function onFocus(e: FocusEvent) {
       const target = e.target instanceof Element ? e.target : null;
       const line = lineOf(target, lines());
-      if (line) highlight(line);
+      if (line) {
+        edge = null;
+        highlight(line);
+      }
     }
 
     window.addEventListener('keydown', onKey);
