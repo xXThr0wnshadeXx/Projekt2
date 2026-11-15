@@ -89,10 +89,11 @@ case "$code" in
   *)   fail "commands returned $code" ;;
 esac
 
-# 5. Model-backed routes: registered only when keys are configured.
+# 5. A malformed request checks registration without contacting a model.
+# A configured key can still be out of credit or blocked by provider quota.
 read -r code _ <<< "$(req -X POST "$API/api/capture")"
 case "$code" in
-  400) pass "capture is switched on (model keys configured)" ;;
+  400) warn "capture route is registered — live model access and latency are unverified" ;;
   404) warn "capture is OFF — no model keys on the host; demo with the sample problem" ;;
   429) warn "capture rate-limited right now — wait a minute before demoing" ;;
   *)   fail "capture returned $code" ;;
@@ -125,4 +126,4 @@ if [ "$FAILS" -gt 0 ]; then
   echo "$FAILS failed, $WARNS warnings. Fix the FAILs, or switch to the backup video (docs/demo-day.md)."
   exit 1
 fi
-echo "Ready: $WARNS warnings."
+echo "Pre-flight complete: $WARNS warnings."
