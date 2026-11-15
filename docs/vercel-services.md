@@ -33,7 +33,6 @@ Use the same non-secret limits in Preview if preview API testing is wanted.
 | `MODEL_VISION` | Existing configured vision model ID | No |
 | `MODEL_TEXT` | Existing configured text model ID | No |
 | `MODEL_STT` | Existing configured transcription model ID | No |
-| `ALLOWED_ORIGIN` | `https://glance-shreev2703.vercel.app` | No |
 | `APP_ENV` | `production` | No |
 | `TRUSTED_PROXY_HOPS` | `1` | No |
 | `MODEL_CALL_LIMIT` | `2000` | No |
@@ -42,8 +41,10 @@ Use the same non-secret limits in Preview if preview API testing is wanted.
 | `STATS_TOKEN` | A newly generated, private random value | Yes, optional |
 | `MODEL_PRICES` | JSON for the selected model IDs | No, optional |
 
-Do not add `VITE_API_BASE` in the Vercel dashboard: `vercel.json` supplies its
-same-origin build value. Do not set a service binding variable yourself.
+The build command in `vercel.json` sets `VITE_API_BASE=/` for production.
+For `vercel dev -L`, set `VITE_API_BASE=/` in the shell before starting Vercel.
+Leave `ALLOWED_ORIGIN` unset for the single-domain deployment. The browser
+sends requests to the same origin as the frontend.
 
 The backend now selects Python 3.12 through `backend/.python-version`, because
 that is the supported Vercel Python runtime compatible with this dependency
