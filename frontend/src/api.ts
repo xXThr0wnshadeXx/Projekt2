@@ -66,8 +66,9 @@ export function health(): Promise<HealthResponse> {
 /** Capture response — DESIGN.md 9. `id` and `valid` are filled in server-side.
  *
  *  The back end checks the file signature, not the declared type, and allows
- *  JPEG, PNG and WebP. PDF pages are issue #26; until then the Capture screen
- *  says so rather than letting the upload fail at the server.
+ *  JPEG, PNG and WebP. A PDF is not sent here directly: the Capture screen
+ *  asks which page, renders it through /api/pdf/page, and captures the
+ *  resulting image like any other photo (issue #26).
  */
 export const CAPTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -99,6 +100,38 @@ export function capture(image: Blob, context = ''): Promise<CaptureResponse> {
   if (context) form.append('context', context);
   // No Content-Type header: the browser must set the multipart boundary.
   return request<CaptureResponse>('/api/capture', { method: 'POST', body: form });
+}
+
+/** How many pages a PDF has, so the student can be asked which one. */
+export function pdfPageCount(pdf: Blob): Promise<{ pages: number }> {
+  const form = new FormData();
+  form.append('pdf', pdf, 'worksheet.pdf');
+  return request<{ pages: number }>('/api/pdf/pages', { method: 'POST', body: form });
+}
+
+/** One page of a PDF, rendered to a PNG that `capture` can read.
+ *
+ *  This returns an image rather than JSON, so it cannot go through `request`.
+ *  The error shape is still the DESIGN.md 9 one, so failures are read the same
+ *  way and reach the student as a sentence.
+ */
+export async function pdfPage(pdf: Blob, page: number): Promise<Blob> {
+  const form = new FormData();
+  form.append('pdf', pdf, 'worksheet.pdf');
+  form.append('page', String(page));
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/api/pdf/page`, { method: 'POST', body: form });
+  } catch {
+    throw new ApiFailure('NETWORK', 'Could not reach the server. Check your connection.');
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const err = (body as { error?: ApiError } | null)?.error;
+    throw new ApiFailure(err?.code ?? 'MODEL_ERROR', err?.message ?? 'Could not read that page.');
+  }
+  return res.blob();
 }
 
 export interface TranscribeResponse {
