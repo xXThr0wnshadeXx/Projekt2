@@ -124,6 +124,24 @@ test.describe('@smoke critical path', () => {
     await expect(summary).not.toContainText('99');
   });
 
+  test('a line says its number once, then how to explore it', async ({ page }) => {
+    // #133: the number was in the group's label and again in hidden text, so
+    // a screen reader said "Line 1, group. Line 1. Press Enter to explore."
+    await openSample(page);
+    const line = page.getByRole('group', { name: 'Line 1', exact: true });
+    await expect(line).toHaveAccessibleName('Line 1');
+    await expect(line).toHaveAccessibleDescription('Press Enter to explore.');
+    await expect(page.locator('#L1 mjx-container')).toBeVisible();
+    // Nothing a reader would speak inside the line repeats the number.
+    const spokenInside = await line.evaluate((el) =>
+      Array.from(el.querySelectorAll('*'))
+        .filter((child) => !child.closest('[hidden]') && child.children.length === 0)
+        .map((child) => child.textContent ?? '')
+        .join(' '),
+    );
+    expect(spokenInside).not.toContain('Line 1');
+  });
+
   test('N and P move between lines and announce the position', async ({ page }) => {
     await openSample(page);
 
