@@ -1,6 +1,19 @@
 import httpx
+import pytest
 
-from eval.run_capture_eval import equivalent, evaluate
+from eval.run_capture_eval import SUITES, check_suite, equivalent, evaluate
+
+
+@pytest.mark.parametrize("suite", ["pilot", "full"])
+def test_capture_suite_enforces_category_counts(suite):
+    cases = [
+        (None, category, ["x"])
+        for category, count in SUITES[suite].items()
+        for _ in range(count)
+    ]
+    check_suite(cases, suite)
+    with pytest.raises(ValueError, match="manifest contains"):
+        check_suite(cases[:-1], suite)
 
 
 def test_sympy_equivalence_preserves_relation_type():
