@@ -32,9 +32,7 @@ in front of judges.
 
 ### 0:00–0:25 · Who and what
 
-> "Math assumes you can see it and write it. For a blind student that is the
-> barrier — not ability. This is Glance: bring in any math problem, hear its
-> shape, work it out loud, hand in typed work."
+> "Glance lets blind and low-vision students understand any page of maths by voice, on their own. It reads the page, helps them grasp its shape and parts, and writes down their work. It never does the work for them."
 
 Nothing on screen but the app's Home. Let VoiceOver read it: *"Glance. Math
 for students who are blind or have low vision. It reads a problem aloud and
@@ -44,12 +42,11 @@ choices is the promise the rest of the demo keeps.
 
 ### 0:25–0:45 · The cost of today
 
-> "Converting one STEM worksheet has historically cost thousands of dollars and
-> taken weeks. Even a top programme targets four to five business days. The
-> student falls behind while they wait."
+> "While an accessible copy is being made, the student is waiting to get
+> started. Stanford's in-house alternate-format team targets four to five
+> business days."
 
-Sources are in `BUSINESS.md` §2. **Say the K–12 qualifier** on the 75% figure if
-you use it.
+Source: [Stanford Office of Accessible Education](https://oae.stanford.edu/faculty-staff/alternate-format-production).
 
 ### 0:45–2:30 · The demo
 
@@ -142,7 +139,7 @@ and is not written yet — do not point at a document that does not exist.
 
 ### 3:45–4:00 · Close
 
-> "Same-day math access, without anyone solving it for them."
+> "Hear the shape of the worksheet, explore it, and hand in your own work."
 
 ---
 

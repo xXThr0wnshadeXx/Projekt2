@@ -1,5 +1,7 @@
 # Pitch
 
+Glance lets blind and low-vision students understand any page of maths by voice, on their own. It reads the page, helps them grasp its shape and parts, and writes down their work. It never does the work for them.
+
 Four-minute structure from `BUSINESS.md` §11. Issue #36.
 
 **Every number on a slide is either sourced or from our own ledger.** Blanks
@@ -10,11 +12,6 @@ four. `BUSINESS.md` §0 rule 6 is the one that matters most here: judges forgive
 small numbers and remember invented ones.
 
 ---
-
-## The one-liner
-
-> Bring in any math problem — a photo, a screenshot, a scan. Hear its shape,
-> work it out loud, hand in typed work. Glance never solves it for you.
 
 ## Opening (0:00–0:25)
 
@@ -32,13 +29,13 @@ sentence. One real sentence from a real student beats any framing we write.
 
 | Fact | Say it as |
 |---|---|
-| Up to **$12,000** for one braille math textbook | sourced, older article — say "historically" |
-| Up to **$15,000** for five chapters of a science book | Marketplace, 2017 — say the year |
-| **4–5 business days** at Stanford, a well-resourced programme | "even a top programme targets" |
-| **75%** of K–12 blind/low-vision students a grade behind in math | **always say "K–12"** |
+| Up to **$12,000** for one braille math textbook | Historical estimate from [The Chronicle of Higher Education](https://www.chronicle.com/article/purdue-makes-math-and-science-materials-for-the-blind-available-on-line/) |
+| Up to **$15,000** for five chapters of a science book | [Marketplace, 2017](https://marketplace.org/2017/10/12/braille-versions-textbooks-help-blind-college-students-succeed) |
+| **4–5 business days** at Stanford | In-house target from [Stanford's Office of Accessible Education](https://oae.stanford.edu/faculty-staff/alternate-format-production) |
+| **75%** of K–12 blind/low-vision students at least a grade behind in math | [Microsoft / NWEA](https://blogs.microsoft.com/accessibility/making-mathematics-accessible/), K–12 only |
 
-> "Converting one STEM worksheet has cost thousands and taken weeks. The
-> student falls behind while they wait."
+> "When maths arrives as a photo or a scan, the student may have to wait for
+> a converted copy before they can start."
 
 ## Demo (0:45–2:30)
 
@@ -82,7 +79,7 @@ hypothesis is more credible than one that reports six wins.
 
 ## Close (3:45–4:00)
 
-> "Same-day math access, without anyone solving it for them."
+> "Hear the shape of the worksheet, explore it, and hand in your own work."
 
 ---
 
