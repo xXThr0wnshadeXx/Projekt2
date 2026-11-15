@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     model_vision: str = ""
     model_text: str = ""
     model_stt: str = ""
+    # Signs instructor exam links (#189). Set it, so links survive a restart.
+    exam_link_secret: SecretStr | None = None
 
     # Comma-separated list of exact origins. Never a wildcard.
     allowed_origin: str = "http://localhost:5173"

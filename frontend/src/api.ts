@@ -2,6 +2,7 @@
 // The base URL comes from the environment so the deployed front end can point
 // at the deployed back end without a code change.
 
+import { activeLock } from './examLock';
 const BASE = (import.meta.env.VITE_API_BASE ?? 'http://localhost:8000').replace(
   /\/$/,
   '',
@@ -65,7 +66,12 @@ async function withinDeadline<T>(
     controller.abort();
   }, timeoutMs);
   try {
-    const res = await fetch(`${BASE}${path}`, { ...init, signal: controller.signal });
+    // An instructor's exam lock (#189) goes with every request, so the
+    // server enforces exam mode too, not only this page.
+    const headers = new Headers(init?.headers);
+    const lock = init?.mode === 'no-cors' ? null : activeLock();
+    if (lock) headers.set('X-Glance-Exam', lock.token);
+    const res = await fetch(`${BASE}${path}`, { ...init, headers, signal: controller.signal });
     return await consume(res);
   } catch (error: unknown) {
     if (timedOut) {
@@ -99,6 +105,24 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_
     }
     return body as T;
   }, timeoutMs);
+}
+
+/** Create an exam link's token (instructors, #189). */
+export function createExamLink(minutes: number): Promise<{ token: string; expires_at: number }> {
+  return request('/api/exam/link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ minutes }),
+  });
+}
+
+/** Ask the server whether an exam token is genuine and unexpired. */
+export function checkExamToken(token: string): Promise<{ valid: boolean; expires_at: number | null }> {
+  return request('/api/exam/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
 }
 
 export interface HealthResponse {

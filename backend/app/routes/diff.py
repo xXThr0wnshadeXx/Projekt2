@@ -10,10 +10,11 @@ Never says a step is wrong, never suggests what to do next.
 
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
 
 from ..errors import ApiError
+from ..exam_lock import ExamLock
 from ..explain import Explainer
 from ..mathcheck import check_step
 
@@ -34,12 +35,18 @@ class DiffResponse(BaseModel):
     message: str
 
 
-def diff_router(explain: Explainer | None = None) -> APIRouter:
+def diff_router(explain: Explainer | None = None, lock: ExamLock | None = None) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     @router.post("/diff", response_model=DiffResponse)
-    async def diff(req: DiffRequest) -> DiffResponse:
-        if req.mode == "exam":
+    async def diff(
+        req: DiffRequest,
+        x_glance_exam: str | None = Header(default=None),
+    ) -> DiffResponse:
+        # An instructor's exam lock (#189) wins over whatever mode the request
+        # claims: a forged `mode: "study"` from a locked session is refused.
+        locked = lock is not None and lock.expires_at(x_glance_exam) is not None
+        if req.mode == "exam" or locked:
             raise ApiError("MODE_DISABLED", "Step checking is off in exam mode.", 403)
 
         verified, method = await check_step(req.from_latex, req.to_latex)

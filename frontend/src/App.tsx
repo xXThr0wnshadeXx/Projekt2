@@ -13,13 +13,14 @@ import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { KeyboardHelp } from './components/KeyboardHelp';
 import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
+import { activeLock, clearLock, lockTime, storeLock, type ExamLockState } from './examLock';
 import { InstallApp } from './components/InstallApp';
 import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { spokenMath } from './math/sre';
-import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
+import { health, apiBase, ApiFailure, checkExamToken, diagnoseUnreachable } from './api';
 import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
@@ -57,6 +58,42 @@ export function App() {
   // on when they started working (their first step is checked against it).
   const [settingsFrom, setSettingsFrom] = useState<Screen>('home');
   const [workingFrom, setWorkingFrom] = useState(0);
+  // An instructor's exam lock (#189) overrides the student's own mode.
+  const [examLock, setExamLock] = useState<ExamLockState | null>(() => activeLock());
+  const mode = examLock ? 'exam' : settings.mode;
+
+  // Opening an exam link: check it with the server, then lock this browser.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get('exam');
+    if (!token) return;
+    url.searchParams.delete('exam');
+    window.history.replaceState(null, '', url.toString());
+    checkExamToken(token)
+      .then(({ valid, expires_at }) => {
+        if (!valid || !expires_at) {
+          announce('That exam link has expired or is not valid. Your own settings are in use.', 'assertive');
+          return;
+        }
+        const lock = { token, expiresAt: expires_at };
+        storeLock(lock);
+        setExamLock(lock);
+        announce(`Exam mode is on, set by your instructor, until ${lockTime(lock)}. Reading, exploring and writing all still work. Step checking and word meanings are off.`);
+      })
+      .catch(() => announce('I could not check that exam link, because the server did not answer. Try opening it again.', 'assertive'));
+  }, []);
+
+  // When the lock runs out, say so and give the student their settings back.
+  useEffect(() => {
+    if (!examLock) return;
+    const ms = examLock.expiresAt * 1000 - Date.now();
+    const timer = window.setTimeout(() => {
+      clearLock();
+      setExamLock(null);
+      announce('The exam set by your instructor has ended. Your own settings are back.');
+    }, Math.max(0, ms));
+    return () => window.clearTimeout(timer);
+  }, [examLock]);
 
   useEffect(() => {
     setSelfVoicing(settings.selfVoicing);
@@ -218,7 +255,7 @@ export function App() {
             <h1 className="text-2xl font-semibold tracking-tight">Glance</h1>
             <p className="mt-1 text-[--muted]">Math you can hear, explore and write without seeing the page.</p>
             <div className="mt-2">
-              <ModeBadge mode={settings.mode} />
+              <ModeBadge mode={mode} lockedUntil={examLock ? lockTime(examLock) : undefined} />
             </div>
           </div>
           <button
@@ -266,7 +303,7 @@ export function App() {
           problem={problem}
           startIndex={lineIndex}
           onLowVision={enterLowVision}
-          mode={settings.mode}
+          mode={mode}
           onNewCapture={() => setScreen('capture')}
           onDiscardLine={discardProblemLine}
           onStartWorking={(index) => {
@@ -281,7 +318,7 @@ export function App() {
       {screen === 'scratchpad' && problem && (
         <Scratchpad
           problem={problem}
-          mode={settings.mode}
+          mode={mode}
           startLine={workingFrom}
           onBack={() => setScreen('problem')}
           onExport={() => openExport('scratchpad')}
@@ -295,6 +332,7 @@ export function App() {
       {screen === 'settings' && (
         <Settings
           settings={settings}
+          lockedUntil={examLock ? lockTime(examLock) : undefined}
           onChange={updateSettings}
           onBack={() => setScreen(settingsFrom)}
         />

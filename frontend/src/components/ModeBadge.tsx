@@ -12,13 +12,14 @@ const LABEL: Record<Mode, string> = {
   exam: 'Exam mode',
 };
 
-export function ModeBadge({ mode }: { mode: Mode }) {
+export function ModeBadge({ mode, lockedUntil }: { mode: Mode; lockedUntil?: string }) {
   return (
     <p
       data-testid="mode-badge"
       className="inline-flex min-h-[32px] items-center rounded-full border border-[--line] px-3 text-sm font-medium"
     >
       {LABEL[mode]}
+      {lockedUntil && `, set by your instructor until ${lockedUntil}`}
     </p>
   );
 }
