@@ -285,7 +285,7 @@ export function App() {
 
       {/* Only reachable if storage returned something unusable. */}
       {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
-        <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+        <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
           <h2 className="text-2xl font-semibold">No problem loaded</h2>
           <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
             Back to start
