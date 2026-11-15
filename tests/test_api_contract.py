@@ -21,18 +21,26 @@ API_PATH = Path(__file__).resolve().parents[1] / "frontend" / "src" / "api.ts"
 API_SOURCE = re.sub(
     r"/\*.*?\*/|^[ \t]*//[^\n]*", "", API_PATH.read_text(encoding="utf-8"), flags=re.S | re.M
 )
-FIELD = re.compile(r"(?:^|;)\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\??\s*:", flags=re.M)
+FIELD = re.compile(r"(?:^|;)\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)(\??)\s*:", flags=re.M)
 
 
-def ts_fields(declaration: str, context: str) -> set[str]:
+class Fields(frozenset):
+    """Every field the frontend reads, remembering which ones are optional (`name?:`)."""
+
+    optional: frozenset[str]
+
+
+def ts_fields(declaration: str, context: str) -> Fields:
     match = re.search(declaration, API_SOURCE)
     assert match, f"{context}: could not find the frontend contract in api.ts"
-    fields = set(FIELD.findall(match.group(1)))
-    assert fields, f"{context}: could not read any frontend fields in api.ts"
+    found = FIELD.findall(match.group(1))
+    assert found, f"{context}: could not read any frontend fields in api.ts"
+    fields = Fields(name for name, _ in found)
+    fields.optional = frozenset(name for name, mark in found if mark)
     return fields
 
 
-def interface_fields(name: str, endpoint: str) -> set[str]:
+def interface_fields(name: str, endpoint: str) -> Fields:
     return ts_fields(
         rf"\bexport\s+interface\s+{re.escape(name)}\s*\{{([^{{}}]*)\}}",
         f"{endpoint} ({name})",
@@ -41,7 +49,9 @@ def interface_fields(name: str, endpoint: str) -> set[str]:
 
 def assert_fields(endpoint: str, payload: object, expected: set[str]) -> None:
     assert isinstance(payload, dict), f"{endpoint}: expected a JSON object, got {type(payload).__name__}"
-    missing, extra = expected - payload.keys(), payload.keys() - expected
+    # An optional field (`message?:`) may be left out; anything not declared may not appear.
+    required = expected - getattr(expected, "optional", frozenset())
+    missing, extra = required - payload.keys(), payload.keys() - expected
     assert not (missing or extra), (
         f"{endpoint}: missing fields {sorted(missing)}; extra fields {sorted(extra)}"
     )
