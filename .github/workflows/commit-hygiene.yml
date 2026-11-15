@@ -59,7 +59,11 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -u
-          FOOTER='((generated|written|authored|created|produced|assisted)[[:space:]]+(with|by|using)[[:space:]]|(assisted|generated)-by:)'
+          # Anchored like the commit scan: a real footer starts its own line,
+          # optionally behind a bullet or an emoji. Unanchored, this matched
+          # ordinary prose such as "written by default" or "authored by <name>".
+          LEAD='^[^[:alnum:]]*'
+          FOOTER="${LEAD}((generated|written|authored|created|produced|assisted)[[:space:]]+(with|by|using)[[:space:]]|(assisted|generated|co-authored)-by:)"
           if printf '%s\n%s' "$PR_TITLE" "$PR_BODY" | grep -inE "$FOOTER"; then
             echo "::error::The pull request text carries an attribution footer. Please edit it."
             exit 1
