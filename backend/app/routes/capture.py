@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 from fastapi import APIRouter, Request
@@ -13,6 +14,19 @@ from .. import guards
 from ..errors import ApiError, error_response
 from ..openai_client import ModelClient, ModelError
 from ..prompts import CAPTURE_PROMPT
+
+
+# A vision model occasionally returns a heading as `\\text{Algebra practice}`.
+# It is valid JSON and must not become a line a screen reader announces. Keep
+# this deliberately narrow: expressions containing text alongside real math
+# remain the model's responsibility and are preserved.
+_TEXT_ONLY_LATEX = re.compile(
+    r"^\\s*(?:\\\\(?:text|textrm|mathrm|operatorname)\\s*\\{[^{}]*\\}\\s*)+[.,;:!?]?\\s*$"
+)
+
+
+def _is_math_problem_line(latex: str) -> bool:
+    return not bool(_TEXT_ONLY_LATEX.fullmatch(latex))
 
 
 def capture_router(
@@ -100,7 +114,11 @@ def capture_router(
                 "message": "I couldn't read that image. Try again.",
             }})
 
-        lines = result["lines"]
+        # Prompting is the primary control, but do not let a pure heading leak
+        # through if the model ignores it. Filtering happens before validation
+        # so headings neither consume CAS work nor get a visible line id.
+        lines = [line for line in result["lines"] if _is_math_problem_line(line["latex"])]
+        result["lines"] = lines
         validity = await asyncio.gather(*(validate_latex(line["latex"]) for line in lines))
         for index, (line, valid) in enumerate(zip(lines, validity, strict=True), start=1):
             line.update(id=f"L{index}", valid=valid)
