@@ -96,7 +96,8 @@ test.describe('@smoke a first visit with no one helping', () => {
 
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Math for students who are blind or have low vision' })).toBeFocused();
-    await expect(polite(page)).toContainText('Welcome back.');
+    // The reload restores the problem, and that message carries the way back.
+    await expect(polite(page)).toContainText('I restored your work');
     await expect(polite(page)).toContainText('Press B to go back to your problem');
     await page.keyboard.press('b');
     await expect(page.getByRole('heading', { name: 'Your problem' })).toBeVisible();

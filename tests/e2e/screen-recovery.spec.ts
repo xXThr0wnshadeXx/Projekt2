@@ -69,7 +69,8 @@ test.describe('@smoke screen recovery', () => {
     await expect(polite(page)).toHaveText(restored(2));
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByRole('button', { name: 'Back to the start', exact: true }).click();
-    await expect(polite(page)).toContainText('Capture a problem');
+    // A first visit asks Y or N first, then names capture as "press C".
+    await expect(polite(page)).toContainText(/Capture a problem|press C to point your camera/);
     await expect(polite(page)).not.toContainText('I restored your work');
   });
 
@@ -81,7 +82,8 @@ test.describe('@smoke screen recovery', () => {
 
   test('does not announce restoration in a fresh session', async ({ page }) => {
     await page.goto('/');
-    await expect(polite(page)).toContainText('Capture a problem');
+    // A first visit asks Y or N first, then names capture as "press C".
+    await expect(polite(page)).toContainText(/Capture a problem|press C to point your camera/);
     await expect(polite(page)).not.toContainText('I restored your work');
   });
 });
