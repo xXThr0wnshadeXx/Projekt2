@@ -1,7 +1,9 @@
 # Demo day
 
-Keep-warm, pre-flight and fallbacks for the live demo (issue #34). Pair this
-with `docs/demo-script.md` (what to click) and `docs/ops.md` (logs and stats).
+Keep-warm, pre-flight and fallbacks for the live demo (issue #34). Use the
+[hero-flow run-sheet](demo-hero-flow.md) for the Screen Curtain take and the
+[Q&A sheet](demo-qa.md) for judging. The [keyboard demo](demo-script.md)
+and [operations guide](ops.md) cover the existing walkthrough and server checks.
 
 Set these once in the terminal you'll use:
 
