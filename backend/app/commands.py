@@ -67,6 +67,56 @@ def _normalise(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+EDIT_REFUSAL = "I can only change what you tell me to change. Say, for example, change the 3 to a 4."
+
+# "fix my mistake", "make it right", "what's wrong with it": a request for a
+# correction. Glance changes only what the student names, so these are refused.
+_ASKS_FOR_CORRECTION = re.compile(
+    r"(?:fix|correct|repair|redo|rewrite)(?!\s+(?:the\s+)?(?:\w+\s+)?(?:to|with|into))"
+    r"|make (?:it|this|that|them) (?:right|correct|better|work)"
+    r"|what(?:'s| is) wrong|where(?:'s| is| did i go) (?:my |the )?(?:mistake|error|wrong)"
+    r"|my (?:mistake|error)|get it right|do (?:it|this) (?:right|correctly)",
+    re.IGNORECASE,
+)
+
+
+def asks_for_correction(text: str) -> bool:
+    return bool(_ASKS_FOR_CORRECTION.search(text))
+
+
+_DIGIT_WORDS = {
+    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
+    "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
+    "plus": "+", "minus": "-", "times": "*", "equals": "=",
+}
+
+
+def _canon(token: str) -> str:
+    token = token.lower().strip()
+    return _DIGIT_WORDS.get(token, token)
+
+
+def _token(text: str) -> str | None:
+    """One number, letter or operator word: the only thing a student can name."""
+    text = re.sub(r"^(?:a|an|the)\s+", "", text.strip().lower())
+    if re.fullmatch(r"\d{1,6}|[a-z]|" + "|".join(_DIGIT_WORDS) + r"|[+\-*/=]", text):
+        return _canon(text)
+    return None
+
+
+def grounded_edit(instruction: str | None, transcript: str) -> bool:
+    """True only for "replace A with B" where A and B are single tokens the
+    student said. A model may not choose the new value."""
+    m = re.fullmatch(r"replace (.+) with (.+)", (instruction or "").strip(), re.IGNORECASE)
+    if not m:
+        return False
+    old, new = _token(m.group(1)), _token(m.group(2))
+    if old is None or new is None or old == new:
+        return False
+    said = {_canon(w) for w in re.findall(r"[a-z0-9+\-*/=]+", transcript.lower())}
+    return old in said and new in said
+
+
 def _cmd(intent: Intent, line: int | None = None, instruction: str | None = None) -> Command:
     return {
         "intent": intent,
@@ -124,7 +174,7 @@ def parse_command(text: str, current: int | None, line_count: int) -> Command | 
     if m:
         line = _number(next((g for g in m.groups()[2:] if g), None)) or here
         return _cmd("edit", line, f"replace {m.group(1)} with {m.group(2)}")
-    if re.fullmatch(r"(edit|fix|change|correct)( (it|this|that|this line|that line|the line|" + _LINE + r"))?", t):
+    if re.fullmatch(r"(edit|change)( (it|this|that|this line|that line|the line|" + _LINE + r"))?", t):
         return _cmd("edit", ref or here, None)
 
     return None
