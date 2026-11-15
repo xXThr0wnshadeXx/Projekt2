@@ -32,7 +32,8 @@ is over the denominator again. End fraction or spoken parentheses can also
 settle grouping. Ask only about grouping that is still unclear.
 For the square root of x plus one all over two equals five, ask about the
 square root of the quantity x plus one, end root, versus the square root of x,
-then plus one. Both choices are all over two and equal five.
+end root, plus one. Both choices are all over two and equal five. Never use
+"then" in a question or readback: it sounds like a next step.
 The student may think aloud. Ignore filler such as uh, um, okay, so, I think.
 If they correct themselves, keep only the final version of the line.
 Write down a line only when the student states the whole line themselves.
