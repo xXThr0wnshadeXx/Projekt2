@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from ..openai_client import ModelClient, ModelError
 from ..spoken_ambiguity import fraction_ambiguity
-from ..spoken_guard import adds_to_what_was_said
+from ..spoken_guard import adds_to_what_was_said, text_adds_to_what_was_said
 
 SPOKEN_PROMPT = """Transcribe only the student's spoken math into LaTeX.
 Never fix, solve, or complete their work. Prior lines supply variable names only.
@@ -98,6 +98,13 @@ def spoken_router(
             ):
                 if any(adds_to_what_was_said(choice, payload.text) for choice in choices):
                     return spoken_error(422, "UNPARSEABLE", NOT_WHAT_WAS_SAID)
+                # The question and the readbacks are spoken to the student and
+                # exported, so they are held to the transcript like the LaTeX.
+                spoken_text = [question, result.get("readback")] + [
+                    option["readback"] for option in alternatives
+                ]
+                if any(text_adds_to_what_was_said(t, payload.text) for t in spoken_text):
+                    return spoken_error(422, "UNPARSEABLE", NOT_WHAT_WAS_SAID)
                 validity = await asyncio.gather(
                     *(validate_latex(choice) for choice in choices)
                 )
@@ -124,7 +131,9 @@ def spoken_router(
             return spoken_error(422, "UNPARSEABLE", NO_MATH_HEARD)
         # Held to the transcript, not only told: a line that brings in a number
         # or a variable the student never spoke is the model doing their work.
-        if adds_to_what_was_said(latex, payload.text):
+        if adds_to_what_was_said(latex, payload.text) or text_adds_to_what_was_said(
+            readback, payload.text
+        ) or text_adds_to_what_was_said(result.get("clarifying_question"), payload.text):
             return spoken_error(422, "UNPARSEABLE", NOT_WHAT_WAS_SAID)
         return {
             "latex": latex,
