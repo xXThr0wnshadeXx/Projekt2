@@ -201,6 +201,34 @@ test.describe('@smoke scratchpad', () => {
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
   });
 
+  test('the question still answers its keys when focus is not inside it', async ({ page }) => {
+    // #153: WebKit sometimes leaves focus behind the dialog, and a screen
+    // reader's cursor can be elsewhere too. Escape and 1 to 3 must still work.
+    await stubSpoken(page, AMBIGUOUS);
+    await openScratchpad(page);
+
+    const typing = page.getByLabel('Or type your line');
+    await typing.fill('x plus one over two');
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
+
+    await typing.fill('x plus one over two');
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press('2');
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await expect(page.getByRole('region', { name: 'Confirm your line' })).toContainText(
+      'x plus one half',
+    );
+  });
+
   test('a line can be deleted and put back', async ({ page }) => {
     await stubSpoken(page, CLEAR);
     await openScratchpad(page);
@@ -214,9 +242,9 @@ test.describe('@smoke scratchpad', () => {
     await expect(page.getByTestId('live-polite')).toContainText('Deleted line 1');
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
 
-    // U undoes the delete, which is the one history step worth having.
+    // U undoes the delete.
     await page.keyboard.press('u');
-    await expect(page.getByTestId('live-polite')).toHaveText('Put the line back.');
+    await expect(page.getByTestId('live-polite')).toHaveText('Put line 1 back.');
     await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
   });
 
@@ -229,7 +257,7 @@ test.describe('@smoke scratchpad', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Back to the problem' }).click();
+    await page.getByRole('button', { name: 'Leave and read the problem again' }).click();
     await expect(page.getByRole('heading', { name: 'Your problem' })).toBeVisible();
     await page.getByRole('button', { name: 'Start working' }).click();
 
@@ -256,5 +284,32 @@ test.describe('@smoke scratchpad', () => {
         expect(name).not.toContain(banned);
       }
     }
+  });
+});
+
+test.describe('@smoke scratchpad context', () => {
+  test('the student is told which problem line their work follows', async ({ page }) => {
+    await stubSpoken(page, CLEAR);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Try a sample problem' }).click();
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+
+    // Move to line 2, then start working from there. Since #92 the first saved
+    // line is checked against the line S was pressed on, so a student who does
+    // not know which line that is gets "I couldn't confirm this step" for a
+    // correct step and no way to work out why.
+    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.keyboard.press('s');
+
+    await expect(page.getByRole('heading', { name: 'Your work' })).toBeFocused();
+    await expect(page.getByTestId('live-polite')).toContainText(
+      'Following line 2 of the problem',
+    );
+    // And on screen, for a low-vision student not running a screen reader.
+    // Scoped to main: the same sentence is also in the live region, which is
+    // visually hidden, so an unscoped match is ambiguous.
+    await expect(
+      page.getByRole('main').getByText('Following line 2 of the problem.'),
+    ).toBeVisible();
   });
 });

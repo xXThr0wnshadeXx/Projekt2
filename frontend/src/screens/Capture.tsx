@@ -11,10 +11,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
+import { LiveBoard } from './LiveBoard';
 import { capture, pdfPageCount, pdfPage, ApiFailure, CAPTURE_TYPES } from '../api';
 import { downscale, sharpestFrame } from '../image';
 import { useShortcuts } from '../shortcuts';
 import type { Problem } from '../state';
+import { analyseFrame } from '../camera/framing';
+import { FramingGuide, tick } from '../camera/guide';
 
 type Busy = 'idle' | 'preparing' | 'reading';
 
@@ -47,6 +50,9 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [cameraOn, setCameraOn] = useState(false);
+  const guideTimer = useRef<number | null>(null);
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const [liveBoard, setLiveBoard] = useState(false);
   const [pdf, setPdf] = useState<PendingPdf | null>(null);
   const [pageWanted, setPageWanted] = useState('1');
 
@@ -62,9 +68,39 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   }, []);
 
   function stopCamera() {
+    if (guideTimer.current) window.clearInterval(guideTimer.current);
+    guideTimer.current = null;
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
     setCameraOn(false);
+  }
+
+  /** Watch the preview and steer the phone onto the page (#198). Nothing is
+   *  uploaded while guiding; only the photo it finally takes is sent. */
+  function startGuiding() {
+    const frame = document.createElement('canvas');
+    const guide = new FramingGuide({
+      say: (text) => announce(text),
+      tone: tick,
+      onReady: () => {
+        if (guideTimer.current) window.clearInterval(guideTimer.current);
+        guideTimer.current = null;
+        announce('Got it. Taking the photo.');
+        void takePhoto();
+      },
+    });
+    guideTimer.current = window.setInterval(() => {
+      const v = video.current;
+      if (!v || v.readyState < 2 || !v.videoWidth) return;
+      const w = 160;
+      const h = Math.max(1, Math.round((v.videoHeight / v.videoWidth) * w));
+      frame.width = w;
+      frame.height = h;
+      const ctx = frame.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(v, 0, 0, w, h);
+      guide.frame(analyseFrame(ctx.getImageData(0, 0, w, h).data, w, h));
+    }, 300);
   }
 
   useEffect(() => stopCamera, []);
@@ -200,7 +236,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   // drop zone first.
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
-      if (busy !== 'idle') return;
+      if (busy !== 'idle' || liveBoard) return;
       const item = Array.from(e.clipboardData?.items ?? []).find((i) =>
         i.type.startsWith('image/'),
       );
@@ -210,10 +246,11 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
     }
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [busy]);
+  }, [busy, liveBoard]);
 
   async function startCamera() {
     setError('');
+    setCameraStarting(true);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         // The back camera is the one pointed at a page or a board.
@@ -221,23 +258,30 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       });
       stream.current = media;
       setCameraOn(true);
-      announce('Camera on. Hold the phone about 30 centimetres above the page, then press Take photo.');
+      announce(
+        'Camera on. Point it down at your worksheet. I will tell you how to move the phone, and take the photo when the whole page is in view.',
+      );
       // The element only exists once `cameraOn` has rendered it.
       window.setTimeout(() => {
         if (video.current) {
           video.current.srcObject = media;
           void video.current.play().catch(() => {});
+          startGuiding();
         }
       }, 0);
     } catch {
       const message = 'I could not open the camera. Check the permission, or upload a photo instead.';
       setError(message);
       announce(message, 'assertive');
+    } finally {
+      setCameraStarting(false);
     }
   }
 
   async function takePhoto() {
     if (!video.current) return;
+    if (guideTimer.current) window.clearInterval(guideTimer.current);
+    guideTimer.current = null;
     try {
       announce('Taking the photo. Hold still.');
       // Three frames, sharpest kept (DESIGN.md 5, Flow D) — a handheld shot of
@@ -260,11 +304,19 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       u: () => fileInput.current?.click(),
       c: () => void startCamera(),
     },
-    !working,
+    !working && !liveBoard && !cameraStarting,
   );
 
+  if (liveBoard) {
+    return <LiveBoard onBack={() => {
+      setLiveBoard(false);
+      announce('Back to capture.');
+      window.setTimeout(() => heading.current?.focus(), 0);
+    }} />;
+  }
+
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}
@@ -295,19 +347,35 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
             e.target.value = '';
           }}
         />
+        {/* Upload leads. It is the path that works on every machine, needs no
+            permission prompt, and is how a student actually receives course
+            material — a PDF or a screenshot, not a photo they took. A camera
+            also asks a blind user to aim it, which is the hardest thing on
+            this screen, so it should not read as the obvious first choice. */}
         <button
           type="button"
-          className="btn"
+          className="btn-primary"
           disabled={working}
           onClick={() => fileInput.current?.click()}
         >
           Upload a file
         </button>
-        <button type="button" className="btn" disabled={working} onClick={startCamera}>
+        <button type="button" className="btn" disabled={working || cameraStarting} onClick={startCamera}>
           {cameraOn ? 'Restart camera' : 'Take a photo'}
         </button>
-        <button type="button" className="btn" disabled={working} onClick={onBack}>
-          Back
+        <button
+          type="button"
+          className="btn"
+          disabled={working || cameraOn || cameraStarting || Boolean(pdf)}
+          onClick={() => setLiveBoard(true)}
+        >
+          Live board
+        </button>
+      </div>
+
+      <div className="mt-6">
+        <button type="button" className="btn-quiet" disabled={working} onClick={onBack}>
+          Back to the start
         </button>
       </div>
 
