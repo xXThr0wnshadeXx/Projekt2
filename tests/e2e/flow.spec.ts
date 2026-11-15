@@ -25,9 +25,14 @@ test.describe('@smoke critical path', () => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: 'Glance', level: 1 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Bring in your worksheet' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Upload a file' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Get started' })).toBeVisible();
+    const capture = page.getByRole('button', { name: 'Capture a problem' });
+    await expect(capture).toBeVisible();
+    await expect(capture).toHaveAttribute('aria-controls', 'capture-choices');
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
+    // The three ways in appear when the one button is pressed.
+    await capture.click();
+    await expect(page.getByRole('button', { name: 'Upload a file' })).toBeVisible();
   });
 
   test('an equation renders and is reachable by keyboard', async ({ page }) => {
@@ -216,12 +221,13 @@ test.describe('@smoke critical path', () => {
   test('the capture section offers every input from the start', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: 'Bring in your worksheet' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Upload a file' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Take a photo' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Live board' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Get started' })).toBeVisible();
+    await page.getByRole('button', { name: 'Capture a problem' }).click();
+    const choices = page.getByRole('group', { name: 'How to bring in your problem' });
+    await expect(choices.getByRole('button', { name: 'Upload a file' })).toBeVisible();
+    await expect(choices.getByRole('button', { name: 'Take a photo' })).toBeVisible();
+    await expect(choices.getByRole('button', { name: 'Live board' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Capture a problem' })).toHaveCount(0);
   });
 
   test('a problem survives a reload', async ({ page }) => {

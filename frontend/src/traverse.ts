@@ -132,10 +132,15 @@ function highlight(el: Element | null): void {
   el?.classList.add(CURRENT);
 }
 
-/** The line containing `node`, if any. */
+/** The line containing `node`, if any. Lines can nest (a label holds its radio
+ *  button and its description), and the list is in document order with the
+ *  container first, so the last match is the innermost. Taking the first would
+ *  send Down from a nested line back to the container's next line, forever. */
 function lineOf(node: Element | null, list: Element[]): Element | null {
   if (!node) return null;
-  return list.find((l) => l === node || l.contains(node)) ?? null;
+  let found: Element | null = null;
+  for (const l of list) if (l === node || l.contains(node)) found = l;
+  return found;
 }
 
 function go(el: Element): void {

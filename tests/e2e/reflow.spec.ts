@@ -75,7 +75,7 @@ test.describe('@smoke reflow at 400% zoom (320px)', () => {
   test('capture', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Bring in a different worksheet' }).click();
-    await expect(page.getByRole('heading', { name: 'Bring in your worksheet' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Get started' })).toBeVisible();
     await expectNoSidewaysScroll(page, 'capture');
   });
 

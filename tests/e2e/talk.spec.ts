@@ -215,16 +215,16 @@ test.describe('@smoke the first screen', () => {
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     const main = page.getByRole('main');
-    await expect(main).toContainText('It never solves it for you.');
+    await expect(main).toContainText('It never solves anything for you');
     await expect(main.getByRole('list', { name: 'Steps' }).getByRole('listitem')).toHaveCount(3);
-    await expect(main.getByRole('heading', { name: 'Bring in your worksheet' })).toBeVisible();
+    await expect(main.getByRole('heading', { name: 'Get started' })).toBeVisible();
     await expect(polite(page)).toContainText('It never solves it for you.');
     // The explanation costs no extra Tab stops: the way in is right after the
     // skip link and the Keys button.
-    const upload = page.getByRole('button', { name: 'Upload a file' });
-    for (let i = 0; i < 4 && !(await upload.evaluate((el) => el === document.activeElement)); i += 1) {
+    const capture = page.getByRole('button', { name: 'Capture a problem' });
+    for (let i = 0; i < 4 && !(await capture.evaluate((el) => el === document.activeElement)); i += 1) {
       await page.keyboard.press('Tab');
     }
-    await expect(upload).toBeFocused();
+    await expect(capture).toBeFocused();
   });
 });

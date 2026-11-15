@@ -46,6 +46,7 @@ test('live board adds only new lines and stops capturing on request', async ({ p
     });
   });
   await page.goto('/');
+  await page.getByRole('button', { name: 'Capture a problem' }).click();
   await page.getByRole('button', { name: 'Live board' }).click();
   await expect(page.getByRole('heading', { name: 'Live board' })).toBeFocused();
   await page.clock.install();
