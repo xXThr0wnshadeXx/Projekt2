@@ -77,8 +77,15 @@ export interface Shortcut {
 
 const HELP: Shortcut = { keys: 'Question mark', does: 'hear these shortcuts' };
 
+/** The page-wide keys (#236), on every screen but low-vision mode. */
+const MOVE: Shortcut[] = [
+  { keys: 'Up and Down arrows', does: 'move through the page one line at a time' },
+  { keys: 'Space', does: 'read the line aloud, or press it if it is a button' },
+];
+
 export const KEYMAP: Record<ScreenName, Shortcut[]> = {
   home: [
+    ...MOVE,
     { keys: 'U or C', does: 'capture a problem' },
     { keys: 'S', does: 'try a sample problem' },
     { keys: 'B', does: 'go back to your problem, when there is one' },
@@ -86,17 +93,18 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     HELP,
   ],
   capture: [
+    ...MOVE,
     { keys: 'U', does: 'upload a file' },
     { keys: 'C', does: 'take a photo' },
     { keys: 'Control or Command V', does: 'paste a screenshot' },
     HELP,
   ],
   problem: [
+    ...MOVE,
     { keys: 'G', does: 'hear the structure of the line' },
     { keys: 'R', does: 'read the line' },
     { keys: 'Shift R', does: 'read the whole problem' },
-    { keys: 'N', does: 'next line' },
-    { keys: 'P', does: 'previous line' },
+    { keys: 'N or P', does: 'next or previous maths line, skipping everything in between' },
     { keys: 'Enter', does: 'explore inside the line with the arrow keys; Escape to come out' },
     { keys: 'W', does: 'what changed from the line before (not in exam mode)' },
     { keys: 'L', does: 'low-vision mode' },
@@ -106,7 +114,9 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     HELP,
   ],
   scratchpad: [
+    ...MOVE,
     { keys: 'Space, held down', does: 'record a line while you speak' },
+    { keys: 'H', does: 'hands-free: just talk, and say stop listening to stop' },
     { keys: 'Enter', does: 'save the line you just heard' },
     { keys: 'E', does: 'edit it before saving' },
     { keys: 'Escape', does: 'discard it' },
@@ -117,18 +127,20 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'X', does: 'hand in your work' },
     {
       keys: 'Say or type a command',
-      does: 'for example next line, read line two, delete line two, undo, check this step, change the three to a four, hand in, help',
+      does: 'for example describe it, what is on top, what is under the root, how many terms, spell it out, next line, read line two, delete line two, undo, check this step, change the three to a four, hand in, help',
     },
     HELP,
   ],
   settings: [
+    ...MOVE,
     { keys: 'Arrow keys', does: 'choose a mode once you are on the mode list' },
     HELP,
   ],
-  export: [{ keys: 'D', does: 'download the accessible HTML file' }, HELP],
+  export: [...MOVE, { keys: 'D', does: 'download the accessible HTML file' }, HELP],
   lowvision: [
     { keys: 'Right or Down arrow', does: 'next line' },
     { keys: 'Left or Up arrow', does: 'previous line' },
+    { keys: 'Space', does: 'read the line aloud' },
     { keys: 'Plus', does: 'larger' },
     { keys: 'Minus', does: 'smaller' },
     { keys: 'T', does: 'change colours' },

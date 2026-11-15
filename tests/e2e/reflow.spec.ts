@@ -6,6 +6,8 @@
 // its own box. So the *page* must never be wider than the viewport.
 
 import { test, expect, type Page } from '@playwright/test';
+import { stubServerWithModels } from './server';
+
 
 const PROBLEM = {
   instructions: 'Solve for x, then check your answer by substituting it back into the original equation.',
@@ -74,6 +76,7 @@ test.describe('@smoke reflow at 400% zoom (320px)', () => {
   });
 
   test('capture', async ({ page }) => {
+    await stubServerWithModels(page); // capture needs the model (#127)
     await page.goto('/');
     await page.getByRole('button', { name: 'Capture a problem' }).click();
     await expectNoSidewaysScroll(page, 'capture');

@@ -7,6 +7,7 @@ import pypdfium2 as pdfium
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
+from starlette import formparsers
 
 from backend.app import main, pdfpages
 from backend.app.config import Settings
@@ -23,9 +24,9 @@ def blank_pdf(*sizes_pt) -> bytes:
     return out.getvalue()
 
 
-def text_pdf(line: str = "2x + 3 = 11") -> bytes:
+def text_pdf(line: str = "2x + 3 = 11", *, padding: int = 0) -> bytes:
     """A one-page Letter PDF with real text, written by hand."""
-    stream = f"BT /F1 48 Tf 72 600 Td ({line}) Tj ET".encode()
+    stream = f"BT /F1 48 Tf 72 600 Td ({line}) Tj ET".encode() + b" " * padding
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -136,6 +137,32 @@ def test_page_endpoint_returns_a_png(client):
     assert r.content.startswith(b"\x89PNG")
 
 
+@pytest.mark.parametrize(("path", "form"), [
+    ("/api/pdf/pages", {}),
+    ("/api/pdf/page", {"page": "1"}),
+])
+def test_large_pdf_upload_never_rolls_over_to_disk(client, monkeypatch, path, form):
+    create_spool = formparsers.SpooledTemporaryFile
+
+    def memory_only(*args, **kwargs):
+        spool = create_spool(*args, **kwargs)
+
+        def reject_rollover():
+            pytest.fail("PDF upload attempted to roll over to disk")
+
+        spool.rollover = reject_rollover
+        return spool
+
+    monkeypatch.setattr(formparsers, "SpooledTemporaryFile", memory_only)
+    data = text_pdf(padding=1024 * 1024)
+    response = client.post(path, files={"pdf": ("worksheet.pdf", data)}, data=form)
+    assert response.status_code == 200
+    if path.endswith("/pages"):
+        assert response.json() == {"pages": 1}
+    else:
+        assert response.content.startswith(b"\x89PNG")
+
+
 def test_page_endpoint_errors_use_the_error_shape(client):
     pdf = ("w.pdf", blank_pdf(LETTER), "application/pdf")
     out_of_range = client.post("/api/pdf/page", files={"pdf": pdf}, data={"page": "5"})
@@ -143,6 +170,14 @@ def test_page_endpoint_errors_use_the_error_shape(client):
     assert out_of_range.json()["error"]["message"] == "That PDF has 1 page. Choose a page from 1 to 1."
     missing_page = client.post("/api/pdf/page", files={"pdf": pdf})
     assert missing_page.json()["error"]["code"] == "BAD_INPUT"
+
+
+@pytest.mark.parametrize("page", ["0", "10001", "first"])
+def test_page_endpoint_rejects_invalid_page_fields(client, page):
+    pdf = ("worksheet.pdf", blank_pdf(LETTER), "application/pdf")
+    response = client.post("/api/pdf/page", files={"pdf": pdf}, data={"page": page})
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "BAD_INPUT"
 
 
 @pytest.mark.parametrize("data", [b"\x89PNG\r\n\x1a\n" + b"\0" * 20, b"MZ\x90\0" + b"\0" * 20])
@@ -156,6 +191,15 @@ def test_oversize_pdf_is_refused_before_reading(client):
     big = b"%PDF-1.7\n" + b"\0" * (9 * 1024 * 1024)
     r = client.post("/api/pdf/pages", files={"pdf": ("w.pdf", big, "application/pdf")})
     assert r.status_code == 413
+
+
+def test_pdf_file_limit_excludes_multipart_overhead():
+    data = text_pdf()
+    settings = Settings(_env_file=None, max_image_bytes=len(data) - 1)
+    with TestClient(main.create_app(settings, warm_cas=False)) as client:
+        response = client.post("/api/pdf/pages", files={"pdf": ("worksheet.pdf", data)})
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "BAD_INPUT"
 
 
 def test_pdf_page_flows_into_capture_unchanged(monkeypatch):

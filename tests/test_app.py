@@ -29,7 +29,16 @@ def client():
 def test_health_returns_ok(client):
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"ok": True}
+    assert response.json() == {"ok": True, "models": False}
+
+
+def test_health_says_when_models_are_configured():
+    settings = Settings(
+        _env_file=None, allowed_origin=FRONT_END, openai_api_key="test-value",
+        model_vision="vision", model_text="text", model_stt="speech",
+    )
+    with TestClient(create_app(settings, warm_cas=False)) as c:
+        assert c.get("/api/health").json() == {"ok": True, "models": True}
 
 
 def test_cors_allows_only_the_front_end_origin(client):

@@ -19,7 +19,10 @@ export interface HomeProps {
   onSample: () => void;
   /** Present only when a problem from earlier in the session is still loaded. */
   onResume?: () => void;
+  takeRestoredAnnouncement: () => string;
   onSettings: () => void;
+  /** Why capture cannot work right now, or undefined when it can (#127). */
+  captureUnavailable?: string;
   settings: Settings;
   onSettingsChange: (next: Settings) => void;
 }
@@ -61,7 +64,9 @@ export function Home({
   onCapture,
   onSample,
   onResume,
+  takeRestoredAnnouncement,
   onSettings,
+  captureUnavailable,
   settings,
   onSettingsChange,
 }: HomeProps) {
@@ -70,15 +75,24 @@ export function Home({
 
   useEffect(() => {
     heading.current?.focus();
-    if (firstVisit) {
-      announce(`${WHAT} ${ASK_VOICE} ${NEXT}`);
-    } else if (onResume) {
-      announce(`Welcome back. ${WHAT} Press B to go back to your problem, C to capture a new one, or S for the sample.`);
-    } else {
-      announce(`${WHAT} Capture a problem, or try the sample.`);
-    }
-    // Announce once, on arrival.
-  }, [onResume]);
+    const welcome = firstVisit
+      ? `${WHAT} ${ASK_VOICE} ${NEXT}`
+      : onResume
+        ? `Welcome back. ${WHAT} Press B to go back to your problem, C to capture a new one, or S for the sample.`
+        : `${WHAT} Capture a problem, or try the sample.`;
+    // Announce once, on arrival, after the live regions have mounted.
+    // StrictMode cancels the first timer before it can use the one-time
+    // restoration message.
+    const timer = window.setTimeout(() => {
+      const restored = takeRestoredAnnouncement();
+      if (!restored) announce(welcome);
+      // Work is restored exactly when a student comes back, so the way back
+      // has to be said here too, or "Press B" would never be heard.
+      else if (onResume && !firstVisit) announce(`${restored} Press B to go back to your problem.`);
+      else announce(restored);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [onResume, takeRestoredAnnouncement]);
 
   // A student with no screen reader hears nothing from a live region, and the
   // browser will not let the page speak until they do something. So on a first
@@ -124,9 +138,20 @@ export function Home({
     }
   }
 
+  // The button stays in the tab order when capture cannot work, so a student
+  // moving by Tab is told why instead of landing on a screen where every
+  // upload fails. `disabled` would drop it from the tab order and say nothing.
+  function capture() {
+    if (captureUnavailable) {
+      announce(`Capture is unavailable right now. ${captureUnavailable} Try the sample problem instead.`);
+      return;
+    }
+    onCapture();
+  }
+
   useShortcuts({
-    u: onCapture,
-    c: onCapture,
+    u: capture,
+    c: capture,
     s: onSample,
     ...(onResume ? { b: onResume } : {}),
     ...(firstVisit ? { y: () => chooseVoice(true), n: () => chooseVoice(false) } : {}),
@@ -137,7 +162,7 @@ export function Home({
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="display focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Math for students who are blind or have low vision
       </h2>
@@ -146,14 +171,14 @@ export function Home({
         // straight to "Capture a problem". The Read aloud switch below does
         // the same thing for anyone who prefers a control.
         <p
-          className="mt-4 rounded-lg border-2 border-[--accent] bg-[--surface] px-4 py-3 text-xl font-semibold"
+          className="mt-4 border-2 border-[--accent] bg-[--surface] px-4 py-3 text-xl font-semibold"
           data-testid="welcome"
         >
           New here? Press <kbd className="kbd">Y</kbd> to hear Glance speak to you, or{' '}
           <kbd className="kbd">N</kbd> if you use a screen reader.
         </p>
       )}
-      <p className="mt-3 text-lg">
+      <p className="mt-6 max-w-2xl border-l-2 border-[--fg] pl-4 text-lg">
         Glance reads a math problem aloud, lets you explore it piece by piece,
         and writes down your own working as you say it or type it. No pencil,
         no paper, no need to see the page.
@@ -175,8 +200,13 @@ export function Home({
       </ol>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button type="button" className="btn-primary" onClick={onCapture}>
-          Capture a problem
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={capture}
+          aria-disabled={captureUnavailable ? 'true' : undefined}
+        >
+          {captureUnavailable ? 'Capture a problem - unavailable right now' : 'Capture a problem'}
         </button>
         <button type="button" className="btn" onClick={onSample}>
           Try a sample problem

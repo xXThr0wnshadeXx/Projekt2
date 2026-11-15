@@ -2,50 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tokens. Dark is the default here because low-vision users overwhelmingly
-   prefer light-on-dark for long derivations; the three high-contrast themes in
-   issue #12 build on these. Contrast is checked against WCAG AA, AAA in
-   low-vision mode (DESIGN.md 13). --line is the edge of every button and box;
-   it is held to 3:1 against the page (WCAG 1.4.11), because an outline a
-   low-vision student cannot see is a control with no shape. */
+/* Tokens (#181). An editorial, technical look: a sage page, ink text, solid
+   square controls and monospace labels. Sage is the default; "ink" is the
+   dark version, for a system set to dark. Low-vision mode keeps its own three
+   AAA pairings (lowVisionThemes.ts). Every pairing is checked in
+   tests/e2e/contrast.spec.ts: text and warnings at AA (4.5:1) and --line at
+   3:1 against the page (WCAG 1.4.11), because an outline a low-vision student
+   can't see is a control with no shape. */
 :root {
-  --bg: #0b0f14;
-  --surface: #141b24;
-  --fg: #f2f6fa;
-  --muted: #a3b2c2;
-  --line: #5f7186;
-  --accent: #7cc4ff;
-  --accent-fg: #06121d;
-  --warn: #ffc46b;
+  --bg: #abbab9;
+  --surface: #c4d0cf;
+  --block: #f3f6f5;
+  --fg: #141616;
+  --muted: #2f3635;
+  --line: #3f4746;
+  --accent: #141616;
+  --accent-fg: #c8f1e8;
+  --teal: #5fc9b9;
+  --warn: #5c3200;
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) {
-    --bg: #ffffff;
-    --surface: #f4f7fa;
-    --fg: #0c1218;
-    --muted: #4a5a6a;
-    --line: #76838f;
-    --accent: #0b5fa5;
-    --accent-fg: #ffffff;
-    --warn: #7a4b00;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #141818;
+    --surface: #1d2323;
+    --block: #232b2b;
+    --fg: #e7eeec;
+    --muted: #aebcba;
+    --line: #74827f;
+    --accent: #8fe3d3;
+    --accent-fg: #0d1212;
+    --teal: #8fe3d3;
+    --warn: #ffc46b;
   }
 }
 
-:root[data-theme='light'] {
-  --bg: #ffffff;
-  --surface: #f4f7fa;
-  --fg: #0c1218;
-  --muted: #4a5a6a;
-  --line: #76838f;
-  --accent: #0b5fa5;
-  --accent-fg: #ffffff;
-  --warn: #7a4b00;
+:root[data-theme='dark'] {
+  --bg: #141818;
+  --surface: #1d2323;
+  --block: #232b2b;
+  --fg: #e7eeec;
+  --muted: #aebcba;
+  --line: #74827f;
+  --accent: #8fe3d3;
+  --accent-fg: #0d1212;
+  --teal: #8fe3d3;
+  --warn: #ffc46b;
 }
 
 body {
   background: var(--bg);
   color: var(--fg);
+  font-family: 'Inter Tight', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+/* Large, tight headings, as on an editorial page. */
+h1,
+h2 {
+  letter-spacing: -0.02em;
+  line-height: 1.02;
+}
+.display {
+  font-size: clamp(2.5rem, 6.5vw, 4.75rem);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+}
+.mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* A skip link moves focus to main, then the next Tab reaches its first
@@ -83,7 +108,7 @@ main:focus {
     align-items: center;
     min-height: 48px;
     padding: 0 1.25rem;
-    border-radius: 0.5rem;
+    border-radius: 0;
     background: var(--accent);
     color: var(--accent-fg);
     font-weight: 600;
@@ -94,28 +119,34 @@ main:focus {
   }
 
   .btn {
-    /* 48 px minimum touch target (DESIGN.md 13). */
-    @apply inline-flex min-h-[48px] items-center rounded-lg border border-[--line]
-           bg-[--surface] px-5 text-base font-medium text-[--fg]
-           hover:border-[--accent];
+    /* 48 px minimum touch target (DESIGN.md 13). A solid square block. */
+    @apply inline-flex min-h-[48px] items-center border-2 border-[--fg]
+           bg-[--block] px-5 text-base font-medium text-[--fg]
+           hover:bg-[--fg] hover:text-[--block];
   }
 
-  /* The one action a screen should be about. Filled rather than outlined so a
-     low-vision user can tell it apart at a glance, and larger than the rest
-     for the same reason. Contrast of --accent-fg on --accent is checked in
-     tests/e2e/contrast.spec.ts along with the low-vision pairings. */
+  /* The one action a screen should be about: a solid ink block, larger than
+     the rest, so a low-vision user can tell it apart at a glance. Contrast of
+     --accent-fg on --accent is checked in tests/e2e/contrast.spec.ts. */
   .btn-primary {
-    @apply inline-flex min-h-[56px] items-center rounded-lg border-2 border-[--accent]
+    @apply inline-flex min-h-[56px] items-center border-2 border-[--accent]
            bg-[--accent] px-7 text-lg font-semibold text-[--accent-fg]
-           hover:brightness-110;
+           hover:brightness-125;
   }
 
   /* For the way out of a screen: reachable, named, and not competing with the
      work. Still a full-size target. */
   .btn-quiet {
-    @apply inline-flex min-h-[48px] items-center rounded-lg px-4 text-base
+    @apply inline-flex min-h-[48px] items-center px-4 text-base
            font-medium text-[--muted] underline underline-offset-4
            hover:text-[--fg];
+  }
+
+  /* A label chip, like a category tag: ink block, monospace. */
+  .chip {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    @apply inline-flex min-h-[32px] items-center bg-[--accent] px-3 text-sm
+           font-medium text-[--accent-fg];
   }
   /* Low-vision controls. Sized generously and drawn from the active theme, so
      they stay AAA whichever pairing is chosen. */
@@ -144,8 +175,10 @@ main:focus {
     outline-offset: 3px;
   }
 
+  /* Keys, like a date stamp: an outlined monospace box. */
   .kbd {
-    @apply rounded border border-[--line] bg-[--surface] px-1.5 py-0.5 font-mono text-sm;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    @apply border border-[--fg] px-1.5 py-0.5 text-sm;
   }
 }
 
@@ -193,4 +226,26 @@ mjx-container:focus-visible {
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+/* The line the student is on (#236): highlighted wherever it is, so a
+   low-vision student can see where the keys have taken them. */
+.glance-current {
+  outline: 4px solid var(--accent) !important;
+  outline-offset: 4px;
+}
+/* A tint behind every line of text and maths, but not controls: on a button
+   it would fight the button's own colours and make its label hard to read. */
+.glance-current:not(button, a, input, select, textarea, summary, [role='button']) {
+  background-color: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* No scrolling on keyboard devices (#236): the arrow keys move through the
+   page and the app keeps the current line in view. Touch devices keep
+   scrolling, since they have no arrow keys. */
+@media (hover: hover) and (pointer: fine) {
+  html,
+  body {
+    overflow: hidden;
+  }
 }
