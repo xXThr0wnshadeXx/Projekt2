@@ -100,7 +100,12 @@ describe('understandTalk', () => {
     ['where was I', { kind: 'status' }],
     ['what can you do', { kind: 'capabilities' }],
     ['can you read the problem again', { kind: 'readProblem' }],
-    ['what does hypotenuse mean', { kind: 'unknownTerm', term: 'hypotenuse' }],
+    ['what does asymptote mean', { kind: 'unknownTerm', term: 'asymptote' }],
+    ['what does hypotenuse mean', {
+      kind: 'define',
+      term: 'hypotenuse',
+      meaning: 'The hypotenuse is the longest side of a right triangle. It is opposite the right angle.',
+    }],
     ['um, what is a coefficient', {
       kind: 'define',
       term: 'coefficient',
