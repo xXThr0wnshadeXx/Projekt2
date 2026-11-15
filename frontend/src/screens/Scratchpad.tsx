@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { announce, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
+import { MathExports } from '../components/MathExports';
 import { RecordButton } from '../components/RecordButton';
 import { ReadbackBar } from '../components/ReadbackBar';
 import { ClarifyDialog } from '../components/ClarifyDialog';
@@ -491,6 +492,8 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
           Back to the problem
         </button>
       </div>
+
+      <MathExports lines={lines} />
 
       {clarify && (
         <ClarifyDialog
