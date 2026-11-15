@@ -57,11 +57,11 @@ export function Home({
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="display focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Math for students who are blind or have low vision
       </h2>
-      <p className="mt-3 text-lg">
+      <p className="mt-6 max-w-2xl border-l-2 border-[--fg] pl-4 text-lg">
         Glance reads a math problem aloud, lets you explore it piece by piece,
         and writes down your own working as you say it or type it. No pencil,
         no paper, no need to see the page.
