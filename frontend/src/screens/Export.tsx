@@ -169,7 +169,7 @@ export function Export({ problem, onBack, autoRun }: ExportProps) {
       <h2
         ref={heading}
         tabIndex={-1}
-        className="no-print text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="no-print text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Hand in your work
       </h2>

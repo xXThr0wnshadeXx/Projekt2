@@ -16,6 +16,8 @@ import { capture, pdfPageCount, pdfPage, ApiFailure, CAPTURE_TYPES } from '../ap
 import { downscale, sharpestFrame } from '../image';
 import { useShortcuts } from '../shortcuts';
 import type { Problem } from '../state';
+import { analyseFrame } from '../camera/framing';
+import { FramingGuide, tick } from '../camera/guide';
 
 type Busy = 'idle' | 'preparing' | 'reading';
 
@@ -48,6 +50,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [cameraOn, setCameraOn] = useState(false);
+  const guideTimer = useRef<number | null>(null);
   const [cameraStarting, setCameraStarting] = useState(false);
   const [liveBoard, setLiveBoard] = useState(false);
   const [pdf, setPdf] = useState<PendingPdf | null>(null);
@@ -65,9 +68,39 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   }, []);
 
   function stopCamera() {
+    if (guideTimer.current) window.clearInterval(guideTimer.current);
+    guideTimer.current = null;
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
     setCameraOn(false);
+  }
+
+  /** Watch the preview and steer the phone onto the page (#198). Nothing is
+   *  uploaded while guiding; only the photo it finally takes is sent. */
+  function startGuiding() {
+    const frame = document.createElement('canvas');
+    const guide = new FramingGuide({
+      say: (text) => announce(text),
+      tone: tick,
+      onReady: () => {
+        if (guideTimer.current) window.clearInterval(guideTimer.current);
+        guideTimer.current = null;
+        announce('Got it. Taking the photo.');
+        void takePhoto();
+      },
+    });
+    guideTimer.current = window.setInterval(() => {
+      const v = video.current;
+      if (!v || v.readyState < 2 || !v.videoWidth) return;
+      const w = 160;
+      const h = Math.max(1, Math.round((v.videoHeight / v.videoWidth) * w));
+      frame.width = w;
+      frame.height = h;
+      const ctx = frame.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.drawImage(v, 0, 0, w, h);
+      guide.frame(analyseFrame(ctx.getImageData(0, 0, w, h).data, w, h));
+    }, 300);
   }
 
   useEffect(() => stopCamera, []);
@@ -225,12 +258,15 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       });
       stream.current = media;
       setCameraOn(true);
-      announce('Camera on. Hold the phone about 30 centimetres above the page, then press Take photo.');
+      announce(
+        'Camera on. Point it down at your worksheet. I will tell you how to move the phone, and take the photo when the whole page is in view.',
+      );
       // The element only exists once `cameraOn` has rendered it.
       window.setTimeout(() => {
         if (video.current) {
           video.current.srcObject = media;
           void video.current.play().catch(() => {});
+          startGuiding();
         }
       }, 0);
     } catch {
@@ -244,6 +280,8 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
 
   async function takePhoto() {
     if (!video.current) return;
+    if (guideTimer.current) window.clearInterval(guideTimer.current);
+    guideTimer.current = null;
     try {
       announce('Taking the photo. Hold still.');
       // Three frames, sharpest kept (DESIGN.md 5, Flow D) — a handheld shot of
@@ -282,7 +320,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Capture a problem
       </h2>
