@@ -17,11 +17,16 @@ arguments and results (plain strings, bools and tuples in practice).
 """
 
 import asyncio
+import json
+import logging
 import multiprocessing
+import os
 import threading
+import time
 from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 from .config import get_settings
@@ -29,11 +34,20 @@ from .errors import ApiError
 
 T = TypeVar("T")
 
-_WORKERS = 2
-_WARM_SECONDS = 30.0  # generous: this is process spawn plus the SymPy import
+log = logging.getLogger("glance.cas")
 _lock = threading.Lock()
-_pool: ProcessPoolExecutor | None = None
-_ready: threading.Event = threading.Event()
+
+
+@dataclass
+class _Pool:
+    """A worker pool and whether it has really finished warming."""
+
+    executor: ProcessPoolExecutor
+    ready: threading.Event = field(default_factory=threading.Event)
+    warm: bool = False
+
+
+_pool: _Pool | None = None
 
 
 class CasTimeout(ApiError):
@@ -42,44 +56,54 @@ class CasTimeout(ApiError):
 
 
 def _warm() -> bool:
+    # Test and rehearsal hook: simulate a slow host (a 0.1-CPU free plan).
+    delay = float(os.environ.get("GLANCE_CAS_WARM_DELAY", "0") or 0)
+    if delay:
+        time.sleep(delay)
     from sympy.parsing.latex import parse_latex
 
     parse_latex("x + 1 = 2", strict=True)
     return True
 
 
-def _warm_in_background(pool: ProcessPoolExecutor, ready: threading.Event) -> None:
-    """Import SymPy in every worker, then let waiting callers through."""
+def _warm_in_background(pool: _Pool, workers: int) -> None:
+    """Import SymPy in every worker, then let waiting callers through.
+
+    There is deliberately no time limit here: on a 0.1-CPU host warming takes
+    minutes, and declaring the pool ready before it is (#141) sends the first
+    step check to a worker still importing SymPy, where it times out.
+    """
+    started = time.monotonic()
     try:
-        for future in [pool.submit(_warm) for _ in range(_WORKERS)]:
-            future.result(timeout=_WARM_SECONDS)
-    except Exception:
-        pass  # a pool that cannot warm is replaced by the next `_submit`
+        for future in [pool.executor.submit(_warm) for _ in range(workers)]:
+            future.result()
+        pool.warm = True
+        log.info(json.dumps({"evt": "cas_warm", "seconds": round(time.monotonic() - started, 1)}))
+    except Exception as exc:  # broken pool: the next _submit replaces it
+        log.warning(json.dumps({"evt": "cas_warm_failed", "error": type(exc).__name__}))
     finally:
-        ready.set()
+        pool.ready.set()
 
 
-def _get_pool() -> tuple[ProcessPoolExecutor, threading.Event]:
-    global _pool, _ready
+def _get_pool() -> _Pool:
+    global _pool
     with _lock:
         if _pool is None:
+            workers = max(1, get_settings().cas_workers)
             ctx = multiprocessing.get_context("spawn")
-            _pool = ProcessPoolExecutor(max_workers=_WORKERS, mp_context=ctx)
-            _ready = threading.Event()
-            threading.Thread(
-                target=_warm_in_background, args=(_pool, _ready), daemon=True
-            ).start()
-        return _pool, _ready
+            _pool = _Pool(ProcessPoolExecutor(max_workers=workers, mp_context=ctx))
+            threading.Thread(target=_warm_in_background, args=(_pool, workers), daemon=True).start()
+        return _pool
 
 
-def _kill_pool(pool: ProcessPoolExecutor) -> None:
+def _kill_pool(pool: _Pool) -> None:
     global _pool
     with _lock:
         if _pool is pool:
             _pool = None
-    for proc in list((pool._processes or {}).values()):  # no public API to stop a busy worker
+    for proc in list((pool.executor._processes or {}).values()):  # no public API to stop a busy worker
         proc.terminate()
-    pool.shutdown(wait=False, cancel_futures=True)
+    pool.executor.shutdown(wait=False, cancel_futures=True)
     _get_pool()  # start warming the replacement now, not on the next request
 
 
@@ -87,45 +111,73 @@ def _budget(timeout: float | None) -> float:
     return get_settings().cas_timeout_seconds if timeout is None else timeout
 
 
-def _submit(fn: Callable[..., T], args: tuple) -> tuple[ProcessPoolExecutor, Future]:
-    pool, _ = _get_pool()
+def _warm_limit() -> float:
+    return get_settings().cas_warm_seconds
+
+
+def _submit(fn: Callable[..., T], args: tuple) -> tuple[_Pool, Future]:
+    pool = _get_pool()
     try:
-        return pool, pool.submit(fn, *args)
+        return pool, pool.executor.submit(fn, *args)
     except BrokenProcessPool:
         _kill_pool(pool)
-        pool, _ = _get_pool()
-        return pool, pool.submit(fn, *args)
+        pool = _get_pool()
+        return pool, pool.executor.submit(fn, *args)
+
+
+def _on_timeout(pool: _Pool) -> None:
+    # Only a warm pool is stuck. A pool still warming is just slow: killing it
+    # would start another cold pool, and on a small host every check would
+    # then time out the same way, for ever (#141).
+    if pool.warm:
+        _kill_pool(pool)
 
 
 async def run_cas(fn: Callable[..., T], *args: Any, timeout: float | None = None) -> T:
-    """Run `fn(*args)` in a warm worker process; raise CasTimeout past the budget."""
-    _, ready = _get_pool()
-    if not ready.is_set():
-        await asyncio.to_thread(ready.wait, _WARM_SECONDS)
+    """Run `fn(*args)` in a warm worker process; raise CasTimeout past the budget.
+
+    Waiting for the pool to warm is not charged to the budget.
+    """
+    pool = _get_pool()
+    if not pool.ready.is_set():
+        await asyncio.to_thread(pool.ready.wait, _warm_limit())
     pool, future = _submit(fn, args)
     try:
         return await asyncio.wait_for(asyncio.wrap_future(future), _budget(timeout))
-    except (asyncio.TimeoutError, BrokenProcessPool):
+    except BrokenProcessPool:
         _kill_pool(pool)
+        raise CasTimeout() from None
+    except asyncio.TimeoutError:
+        _on_timeout(pool)
         raise CasTimeout() from None
 
 
 def run_cas_sync(fn: Callable[..., T], *args: Any, timeout: float | None = None) -> T:
     """Blocking variant for scripts and evals."""
-    _, ready = _get_pool()
-    ready.wait(_WARM_SECONDS)
+    _get_pool().ready.wait(_warm_limit())
     pool, future = _submit(fn, args)
     try:
         return future.result(timeout=_budget(timeout))
-    except (TimeoutError, BrokenProcessPool):
+    except BrokenProcessPool:
         _kill_pool(pool)
+        raise CasTimeout() from None
+    except TimeoutError:
+        _on_timeout(pool)
         raise CasTimeout() from None
 
 
-def warm_up() -> None:
-    """Start the workers and import SymPy so the first real request is fast."""
-    _, ready = _get_pool()
-    ready.wait(_WARM_SECONDS)
+def warm_up() -> bool:
+    """Start the workers and wait until they have really warmed.
+
+    Called before the server starts answering, so /api/health only says ok
+    once a step check can actually run (#141). Returns whether it warmed in
+    time; if not, the server starts anyway and checks wait for the warm-up.
+    """
+    pool = _get_pool()
+    pool.ready.wait(_warm_limit())
+    if not pool.warm:
+        log.warning(json.dumps({"evt": "cas_not_warm_at_startup", "waited_seconds": _warm_limit()}))
+    return pool.warm
 
 
 def shutdown() -> None:
@@ -133,4 +185,4 @@ def shutdown() -> None:
     with _lock:
         pool, _pool = _pool, None
     if pool is not None:
-        pool.shutdown(wait=False, cancel_futures=True)
+        pool.executor.shutdown(wait=False, cancel_futures=True)
