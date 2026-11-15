@@ -55,17 +55,10 @@ def is_safe_note(text: str, numbers: set[str], letters: set[str]) -> bool:
 
 def guard_capture_text(result: dict[str, Any]) -> dict[str, Any]:
     """Drop (never rewrite) unsafe warnings, intent notes and diagram text."""
+    # Captured lines are never dropped here: a page's own "Solve: 2x + 3 = 7" or
+    # "Simplify 3x + 2x" must come back exactly as printed. Whether capture added
+    # or completed a line is the fidelity harness's job (#176), not a word list's.
     lines = result.get("lines", [])
-    # A "line" whose words are solving language was not a math line on the page.
-    kept = []
-    for line in lines:
-        words = " ".join(re.findall(r"\\(?:text|textrm|mathrm|textit|mbox)\s*\{([^{}]*)\}",
-                                     str(line.get("latex", ""))))
-        if words and SOLVING_LANGUAGE.search(words) and re.search(r"[=\d]", re.sub(
-                r"\\(?:text|textrm|mathrm|textit|mbox)\s*\{[^{}]*\}", "", str(line.get("latex", "")))):
-            continue
-        kept.append(line)
-    lines = kept
     numbers, letters = _math_content(lines)
     for line in lines:
         if not is_safe_note(str(line.get("intent_notes", "")), numbers, letters):

@@ -95,11 +95,16 @@ def test_a_note_with_math_not_on_the_page_is_dropped():
     assert r.json()["warnings"] == ["The 8 is hard to read."]
 
 
-def test_a_solved_line_built_from_page_instructions_is_not_kept():
-    solved = {"latex": r"\text{solution: } x = 4", "confidence": 1, "intent_notes": ""}
-    r, _ = capture(base(lines=[
-        {"latex": "2x=8", "confidence": 1, "intent_notes": ""}, solved]))
-    assert [line["latex"] for line in r.json()["lines"]] == ["2x=8"]
+@pytest.mark.parametrize("printed", [
+    r"\text{Solve: } 2x + 3 = 7",
+    r"\text{Simplify } 3x + 2x",
+    r"\text{Find the value of } x \text{ when } 2x = 8",
+])
+def test_a_page_instruction_line_comes_back_exactly_as_printed(printed):
+    # A reader reads what is printed. Lines are never dropped by a word list;
+    # catching an added or completed line is the fidelity harness's job (#176).
+    r, _ = capture(base(lines=[{"latex": printed, "confidence": 1, "intent_notes": ""}]))
+    assert [line["latex"] for line in r.json()["lines"]] == [printed]
 
 
 def test_context_is_capped_stripped_and_delimited():
