@@ -1,7 +1,7 @@
 // High-contrast themes for low-vision mode — issue #12.
 //
 // Three pairings that low-vision users actually ask for. Every ratio here is
-// computed and asserted in `contrast.test.ts`, not eyeballed. WCAG AAA wants
+// computed and asserted in `tests/e2e/contrast.spec.ts`, not eyeballed. WCAG AAA wants
 // 7:1 for body text and 4.5:1 for large text; all three clear 7:1 by a wide
 // margin, which leaves room for the focus ring and the dimmed chrome.
 
