@@ -330,6 +330,9 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       case 'repeat':
         tell(before || SAYS.nothingToRepeat);
         return;
+      case 'describes':
+        tell(SAYS.describes);
+        return;
       case 'filler':
         tell(SAYS.filler);
         return;
@@ -465,7 +468,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         return;
       }
       default:
-        announce("I didn't catch that.");
+        announce(`I didn't catch that. ${SAYS.notMath}`);
     }
   }
 

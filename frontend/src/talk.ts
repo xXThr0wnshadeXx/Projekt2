@@ -22,6 +22,7 @@ export type Talk =
   | { kind: 'greeting' }
   | { kind: 'thanks' }
   | { kind: 'repeat' }
+  | { kind: 'describes' }
   | { kind: 'capabilities' }
   | { kind: 'readProblem' }
   | { kind: 'status' }
@@ -109,6 +110,13 @@ const THANKS = /^(?:thanks|thank you|cheers|great|perfect|nice|cool|got it)(?: v
 const ASKS_REPEAT =
   /^(?:(?:can|could) you )?(?:say that again|say it again|repeat(?: that| it)?|read that again|what did you say|what was that|pardon|sorry what|come again|again|what)(?: please)?$/i;
 
+// Saying what you are about to do ("next I divide both sides by two") is not
+// a line: nothing has been written yet. Carrying it out would be doing the
+// step, so the student is asked for the line they get. The verbs are in the
+// form an instruction takes; "x divided by two" is math and does not match.
+const DESCRIBES_A_STEP =
+  /\b(?:both sides|each side)\b|^(?:(?:next|now|then|first|i|we|you|let me|let's|i'll|i will|i'm going to|i am going to|going to|i want to|want to|i need to|need to|i have to|have to|should|can|just|gonna) )*(?:add|subtract|multiply|divide|factor|expand|distribute|simplify|cancel|combine|isolate|move|take|get rid of)\b/i;
+
 /** What the student meant, when it was neither math nor a command. */
 export function understandTalk(text: string): Talk | null {
   const said = text.trim().replace(/[.!?]+$/, '');
@@ -126,6 +134,7 @@ export function understandTalk(text: string): Talk | null {
     }
   }
   if (asksToSolve(said)) return { kind: 'refuse' };
+  if (DESCRIBES_A_STEP.test(lower)) return { kind: 'describes' };
   if (ASKS_CAPABILITIES.test(lower)) return { kind: 'capabilities' };
   if (ASKS_FOR_PROBLEM.test(lower)) return { kind: 'readProblem' };
   if (ASKS_STATUS.test(lower)) return { kind: 'status' };
@@ -142,6 +151,8 @@ export const SAYS = {
     'Hello. Say or type a line of your work and I will read it back. Ask what can you do to hear the rest.',
   thanks: 'You are welcome.',
   nothingToRepeat: 'I have not said anything yet.',
+  describes:
+    'That says what you are going to do. Do it, then say or type the whole line you get, and I will write it down.',
   refuse:
     'I cannot solve it, give the answer, or say what to do next. The work is yours. I can read the problem again, explain a math word, or check a line once you have written it.',
   capabilities:

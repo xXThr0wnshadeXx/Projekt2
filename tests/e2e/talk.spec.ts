@@ -147,6 +147,29 @@ test.describe('@smoke talking to Glance', () => {
     await expect(page.getByRole('main')).not.toContainText(/x\s*=\s*4|subtract|divide/i);
   });
 
+  test('saying what you are about to do is not written down as a line', async ({ page }) => {
+    const sent = await keyless(page);
+    await openScratchpad(page);
+
+    for (const plan of [
+      'next I divide both sides by two',
+      'subtract three from both sides',
+      "um so I'm going to factor it",
+      'take the square root of both sides',
+    ]) {
+      await say(page, plan);
+      await expect(polite(page)).toHaveText(
+        'That says what you are going to do. Do it, then say or type the whole line you get, and I will write it down.',
+      );
+    }
+    expect(sent).toEqual([]);
+    await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+
+    // A line that only sounds similar is still a line.
+    await say(page, 'x minus 3 = 4');
+    await expect(polite(page)).toContainText('I read: x minus 3 equals 4');
+  });
+
   test('in exam mode words are not explained', async ({ page }) => {
     await page.addInitScript(() =>
       window.localStorage.setItem('glance.settings.v1', JSON.stringify({ mode: 'exam' })),
