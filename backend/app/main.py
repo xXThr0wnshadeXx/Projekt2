@@ -16,7 +16,12 @@ from . import guards, observability, timeouts
 from .config import Settings, get_settings
 from .errors import ApiError, install_error_handlers
 from .explain import Explainer, model_explainer
+from .mathcheck import validate_latex
+from .openai_client import ModelClient, ModelSettings
+from .routes.capture import capture_router
 from .routes.diff import diff_router
+from .routes.spoken import spoken_router
+from .routes.transcribe import transcribe_router
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -29,12 +34,27 @@ def create_app(
     settings = settings or get_settings()
     explainer = explainer or model_explainer(settings)
 
+    # Without model credentials the app still starts and serves /api/health and
+    # /api/diff; the model-backed routes are simply not registered (issue #4).
+    models = None
+    if settings.models_configured:
+        models = ModelClient(ModelSettings(
+            openai_api_key=settings.openai_api_key,
+            model_vision=settings.model_vision,
+            model_text=settings.model_text,
+            model_stt=settings.model_stt,
+        ))
+
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        if warm_cas:
-            await asyncio.to_thread(timeouts.warm_up)  # first step check isn't a cold start
-        yield
-        timeouts.shutdown()
+        try:
+            if warm_cas:
+                await asyncio.to_thread(timeouts.warm_up)
+            yield
+        finally:
+            if models is not None:
+                await models.close()
+            timeouts.shutdown()
 
     app = FastAPI(
         title="Glance API", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
@@ -65,6 +85,10 @@ def create_app(
     app.add_middleware(observability.RequestLogMiddleware)
 
     app.include_router(diff_router(explainer))
+    if models is not None:
+        app.include_router(capture_router(models, validate_latex, settings.max_image_bytes))
+        app.include_router(spoken_router(models, validate_latex))
+        app.include_router(transcribe_router(models, min(settings.max_audio_seconds, 30)))
 
     @app.get("/api/health")
     async def health() -> dict:
