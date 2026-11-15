@@ -66,10 +66,12 @@ def handler(request: httpx.Request) -> httpx.Response:
 def client(monkeypatch):
     monkeypatch.setattr(observability, "_prices", lambda: PRICES)
     real = AsyncOpenAI
-    monkeypatch.setattr(openai_client, "AsyncOpenAI", lambda api_key: real(
-        api_key=api_key, base_url="http://model.test/v1", max_retries=0,
-        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
-    ))
+    def fake_openai(api_key, **options):  # keep whatever timeout/retries the client sets
+        options.setdefault("max_retries", 0)
+        return real(api_key=api_key, base_url="http://model.test/v1",
+                    http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)), **options)
+
+    monkeypatch.setattr(openai_client, "AsyncOpenAI", fake_openai)
     observability.reset()
     settings = Settings(_env_file=None, openai_api_key="test-value",
                         model_vision="vision-model", model_text="text-model",
