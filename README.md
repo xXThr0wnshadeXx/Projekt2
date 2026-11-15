@@ -78,7 +78,7 @@ Accessibility is the product, not a feature of it.
 - Touch targets at least 48 px, no gestures that conflict with VoiceOver or TalkBack
 - WCAG AA contrast throughout, AAA in low-vision mode, usable at 400% zoom
 - Exported HTML is accessible: MathML, headings, language attributes
-- Verified with VoiceOver (macOS and iOS, Screen Curtain on), NVDA with its Braille Viewer, and axe-core
+- Automated keyboard and axe-core checks cover the browser flow; manual VoiceOver (macOS/iOS) and NVDA/Braille Viewer verification is tracked in #32 and #154
 
 ## Running it locally
 
@@ -87,10 +87,9 @@ you can open it from either, and from a phone on the same network.
 
 ### Before anything else: Python 3.11
 
-The back end pins **Python 3.11** (`backend/.python-version`). This is not a
-preference — `pydantic==2.10.4` has no wheels for 3.13 or newer, so on a newer
-interpreter `pip install` fails and the app will not even import. macOS with a
-Homebrew Python and a fresh Windows install are both commonly on 3.13+.
+Use **Python 3.11**, the version pinned in `backend/.python-version`, used in
+CI, and deployed with the back end. Newer versions may work but are not the
+tested project baseline.
 
 Check first:
 
@@ -102,9 +101,15 @@ If it is not 3.11, the quickest way to get one without touching your system
 Python is [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
+cd backend
 uv python install 3.11
 uv venv --python 3.11 .venv
+uv pip install --python .venv -r requirements.txt
 ```
+
+Run this from the repository root. It is an alternative to the Python/venv
+creation and dependency installation below; it creates the environment inside
+`backend/`, where the server commands and `.env` belong.
 
 ### macOS
 
@@ -116,9 +121,12 @@ bash scripts/setup.sh
 cd backend
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # then add the API key and model IDs
+[ -f .env ] || cp .env.example .env
+# Add model credentials to backend/.env only if you need capture or speech.
 uvicorn app.main:app --reload
 ```
+
+In a second terminal, starting from the repository root:
 
 ```bash
 cd frontend && npm install && npm run dev
@@ -135,28 +143,50 @@ In Git Bash:
 bash scripts/setup.sh
 ```
 
-Back end, in PowerShell or Git Bash:
+Back end, in **PowerShell**, starting from the repository root. Calling the
+environment's Python directly avoids needing to change script-execution policy:
+
+```powershell
+cd backend
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+# Add model credentials to backend/.env only if you need capture or speech.
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+If you use **Git Bash** instead, start from the repository root:
 
 ```bash
 cd backend
 py -3.11 -m venv .venv
-.venv/Scripts/activate      # PowerShell: .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-cp .env.example .env        # then add the API key and model IDs
-uvicorn app.main:app --reload
+source .venv/Scripts/activate
+python -m pip install -r requirements.txt
+[ -f .env ] || cp .env.example .env
+python -m uvicorn app.main:app --reload
 ```
 
-```bash
-cd frontend && npm install && npm run dev
+Front end, in a second PowerShell terminal from the repository root:
+
+```powershell
+cd frontend
+npm install
+npm run dev
 ```
 
 ### Without an API key
 
 The back end starts fine without model credentials — it just does not register
-the capture, transcribe and spoken-to-latex routes. `/api/health` and
-`/api/diff` still work, and in the app **Try a sample problem** gives you the
-glance, the explorer and low-vision mode. Useful for front-end work, and it is
-the demo fallback if the key is not set in time.
+the capture, transcribe and spoken-to-latex routes. `/api/health`, `/api/diff`,
+`/api/validate`, rule-based `/api/command`, and `/api/pdf/*` still work. PDF
+page counting and rendering need no key; reading the resulting image into
+math still requires capture and model credentials.
+
+**Try a sample problem** supports glance, exploration, low-vision mode, typed
+work with readback/confirmation, and export. The typed fallback works without
+a model; server-side validation, step checks, commands and PDF processing
+still need a running back end. MathJax also needs to load, so keyless does not
+mean every feature works without a network connection.
 
 ### Demoing from an iPhone
 
@@ -173,7 +203,9 @@ least once before the demo.
    Wi-Fi.
 3. The phone must also be able to reach the back end, so set
    `VITE_API_BASE` to the machine's network address, not `localhost`, and add
-   that front-end origin to the back end's `ALLOWED_ORIGIN`.
+   that front-end origin to the back end's `ALLOWED_ORIGIN`. Start Uvicorn
+   with `--host 0.0.0.0 --port 8000` on your trusted local network, and restart
+   Vite after changing `VITE_API_BASE` in `frontend/.env.local`.
 
 Camera and microphone need a secure context: Safari allows them on
 `localhost`, but over the network it wants HTTPS. The simplest way around that
