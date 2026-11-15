@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import httpx
 import pytest
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, RateLimitError
 
 from backend.app.openai_client import ModelClient, ModelError, ModelSettings
 
@@ -82,3 +82,23 @@ async def test_transcribe_uses_configured_model_and_json(model_client, monkeypat
         )
     finally:
         await model_client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("code,logged", [
+    ("insufficient_quota", "insufficient_quota"),
+    ("private-data", "unknown"),
+])
+async def test_provider_failure_logs_only_safe_metadata(model_client, monkeypatch, caplog, code, logged):
+    response = httpx.Response(429, request=httpx.Request("POST", "https://api.openai.com"))
+    error = RateLimitError("private-data", response=response, body={"code": code})
+    monkeypatch.setattr(
+        model_client.client.chat.completions, "create", AsyncMock(side_effect=error)
+    )
+    try:
+        with pytest.raises(ModelError):
+            await model_client.interpret("spoken", [{"role": "user", "content": "private-data"}])
+    finally:
+        await model_client.close()
+    assert f"task=spoken status=429 code={logged}" in caplog.text
+    assert "private-data" not in caplog.text
