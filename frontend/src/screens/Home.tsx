@@ -32,7 +32,7 @@ export function Home({ onCapture, onSample, onResume, backEndReachable, onSettin
   useShortcuts({ u: onCapture, c: onCapture });
 
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}

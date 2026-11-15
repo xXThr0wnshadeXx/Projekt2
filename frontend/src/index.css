@@ -53,6 +53,10 @@ body {
   outline-offset: 2px;
 }
 
+main:focus {
+  outline: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

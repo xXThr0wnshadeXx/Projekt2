@@ -84,7 +84,7 @@ export function Export({ problem, onBack }: ExportProps) {
   useShortcuts({ d: () => void downloadHtml() }, !busy);
 
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}

@@ -166,3 +166,15 @@ for (const scheme of ['dark', 'light'] as const) {
     });
   });
 }
+
+test('@smoke skip link moves focus to main', async ({ page }) => {
+  await page.goto('/');
+  const skip = page.getByRole('link', { name: 'Skip to main content' });
+  for (let i = 0; i < 10; i += 1) {
+    if (await skip.evaluate((el) => el === document.activeElement)) break;
+    await page.keyboard.press('Tab');
+  }
+  await expect(skip).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('main#main')).toBeFocused();
+});
