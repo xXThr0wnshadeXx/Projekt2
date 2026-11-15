@@ -11,6 +11,7 @@ import { MathLine } from '../components/MathLine';
 import { announce } from '../components/LiveRegion';
 import { LOW_VISION_THEMES } from '../lowVisionThemes';
 import { isSupported, setSelfVoicing, speak, cancel } from '../audio/tts';
+import { isPressable, readAloud } from '../lineKeys';
 
 export interface LowVisionProps {
   lines: { id: string; latex: string }[];
@@ -86,6 +87,15 @@ export function LowVision({ lines, spokenLines, startIndex = 0, onExit }: LowVis
           e.preventDefault();
           setThemeIndex((t) => (t + 1) % LOW_VISION_THEMES.length);
           break;
+        case ' ': {
+          // A tap of Space reads the current line aloud (#236). Space still
+          // presses a focused button.
+          if (e.repeat || isPressable(e.target)) break;
+          e.preventDefault();
+          const line = lines[index];
+          if (line) readAloud(`Line ${index + 1}. ${spokenLines[line.id] ?? line.latex}`);
+          break;
+        }
         case 'Escape':
           e.preventDefault();
           onExit(index);
@@ -96,7 +106,7 @@ export function LowVision({ lines, spokenLines, startIndex = 0, onExit }: LowVis
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [go, index, onExit]);
+  }, [go, index, onExit, lines, spokenLines]);
 
   useEffect(() => {
     stage.current?.focus();
