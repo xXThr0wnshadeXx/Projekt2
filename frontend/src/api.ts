@@ -211,7 +211,30 @@ export function diff(
   });
 }
 
-// The remaining endpoints are implemented with their own issues:
-//   /api/command          issue #24
+/** Voice/typed command — DESIGN.md 9, issue #24. `target_line` is "W" plus a
+ *  1-based line number. Unknown commands come back as intent "unknown". */
+export type CommandIntent =
+  | 'navigate' | 'read' | 'edit' | 'delete' | 'undo' | 'new_line'
+  | 'check' | 'what_changed' | 'export' | 'help' | 'unknown';
+
+export interface CommandResponse {
+  intent: CommandIntent;
+  target_line: string | null;
+  instruction: string | null;
+}
+
+export function command(
+  text: string,
+  currentLine: string | null,
+  lineCount: number,
+): Promise<CommandResponse> {
+  return request<CommandResponse>('/api/command', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, current_line: currentLine, line_count: lineCount }),
+  });
+}
+
+// The remaining endpoint is implemented with its own issue:
 //   /api/summary          issue #11
 export { BASE as apiBase };

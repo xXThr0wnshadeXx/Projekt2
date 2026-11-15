@@ -1,3 +1,39 @@
 {
-  "_comment": "Strict JSON schema for the command call. See DESIGN.md 10. additionalProperties must be false and every field required."
+  "type": "object",
+  "properties": {
+    "intent": {
+      "type": "string",
+      "enum": [
+        "navigate",
+        "read",
+        "edit",
+        "delete",
+        "undo",
+        "new_line",
+        "check",
+        "what_changed",
+        "export",
+        "help",
+        "unknown"
+      ]
+    },
+    "target_line": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "instruction": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "intent",
+    "target_line",
+    "instruction"
+  ],
+  "additionalProperties": false
 }
