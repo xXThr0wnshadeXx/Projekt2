@@ -1,9 +1,11 @@
 """2-second timeout for SymPy work.
 
-SymPy runs in a small pool of worker *processes*, not threads: a thread stuck in
+SymPy runs in a few worker *processes*, not threads: a thread stuck in
 `simplify` cannot be stopped and would hold the GIL, stalling every other
-request. When a call runs past its budget the pool's workers are terminated and
-a fresh pool is started on the next call.
+request. Each worker is its own one-process slot, so when a call runs past its
+budget only that slot is terminated and replaced. Another student's check
+running at the same moment, in another slot, is not touched (#209). With one
+shared pool, killing the stuck worker took every other in-flight check with it.
 
 A fresh pool is *cold*: spawning a worker and importing SymPy costs about two
 seconds on its own. That is startup cost, not math, so it is never charged
@@ -38,16 +40,17 @@ log = logging.getLogger("glance.cas")
 _lock = threading.Lock()
 
 
-@dataclass
+@dataclass(eq=False)
 class _Pool:
-    """A worker pool and whether it has really finished warming."""
+    """One worker slot: a one-process pool, and whether it has really warmed."""
 
     executor: ProcessPoolExecutor
     ready: threading.Event = field(default_factory=threading.Event)
     warm: bool = False
+    inflight: int = 0
 
 
-_pool: _Pool | None = None
+_slots: list[_Pool | None] = []
 
 
 class CasTimeout(ApiError):
@@ -85,26 +88,44 @@ def _warm_in_background(pool: _Pool, workers: int) -> None:
         pool.ready.set()
 
 
-def _get_pool() -> _Pool:
-    global _pool
+def _new_slot() -> _Pool:
+    ctx = multiprocessing.get_context("spawn")
+    slot = _Pool(ProcessPoolExecutor(max_workers=1, mp_context=ctx))
+    threading.Thread(target=_warm_in_background, args=(slot, 1), daemon=True).start()
+    return slot
+
+
+def _pools() -> list[_Pool]:
+    """Every slot, starting any that are missing (warming in the background)."""
     with _lock:
-        if _pool is None:
-            workers = max(1, get_settings().cas_workers)
-            ctx = multiprocessing.get_context("spawn")
-            _pool = _Pool(ProcessPoolExecutor(max_workers=workers, mp_context=ctx))
-            threading.Thread(target=_warm_in_background, args=(_pool, workers), daemon=True).start()
-        return _pool
+        wanted = max(1, get_settings().cas_workers)
+        while len(_slots) < wanted:
+            _slots.append(None)
+        for i, slot in enumerate(_slots):
+            if slot is None:
+                _slots[i] = _new_slot()
+        return [slot for slot in _slots if slot is not None]
+
+
+def _get_pool() -> _Pool:
+    """The slot the next call should go to: the least busy of the ready ones,
+    or, while none is ready, the least busy of all (callers wait for it)."""
+    pools = _pools()
+    with _lock:
+        ready = [p for p in pools if p.ready.is_set()] or pools
+        return min(ready, key=lambda p: p.inflight)
 
 
 def _kill_pool(pool: _Pool) -> None:
-    global _pool
+    """Stop one stuck slot and start warming its replacement straight away."""
     with _lock:
-        if _pool is pool:
-            _pool = None
+        for i, slot in enumerate(_slots):
+            if slot is pool:
+                _slots[i] = None
     for proc in list((pool.executor._processes or {}).values()):  # no public API to stop a busy worker
         proc.terminate()
     pool.executor.shutdown(wait=False, cancel_futures=True)
-    _get_pool()  # start warming the replacement now, not on the next request
+    _pools()
 
 
 def _budget(timeout: float | None) -> float:
@@ -115,14 +136,23 @@ def _warm_limit() -> float:
     return get_settings().cas_warm_seconds
 
 
-def _submit(fn: Callable[..., T], args: tuple) -> tuple[_Pool, Future]:
-    pool = _get_pool()
+def _submit(fn: Callable[..., T], args: tuple, pool: _Pool | None = None) -> tuple[_Pool, Future]:
+    pool = pool or _get_pool()
     try:
-        return pool, pool.executor.submit(fn, *args)
+        future = pool.executor.submit(fn, *args)
     except BrokenProcessPool:
         _kill_pool(pool)
         pool = _get_pool()
-        return pool, pool.executor.submit(fn, *args)
+        future = pool.executor.submit(fn, *args)
+    with _lock:
+        pool.inflight += 1
+
+    def done(_: Future) -> None:
+        with _lock:
+            pool.inflight -= 1
+
+    future.add_done_callback(done)
+    return pool, future
 
 
 def _on_timeout(pool: _Pool) -> None:
@@ -141,7 +171,7 @@ async def run_cas(fn: Callable[..., T], *args: Any, timeout: float | None = None
     pool = _get_pool()
     if not pool.ready.is_set():
         await asyncio.to_thread(pool.ready.wait, _warm_limit())
-    pool, future = _submit(fn, args)
+    pool, future = _submit(fn, args, pool)
     try:
         return await asyncio.wait_for(asyncio.wrap_future(future), _budget(timeout))
     except BrokenProcessPool:
@@ -154,8 +184,9 @@ async def run_cas(fn: Callable[..., T], *args: Any, timeout: float | None = None
 
 def run_cas_sync(fn: Callable[..., T], *args: Any, timeout: float | None = None) -> T:
     """Blocking variant for scripts and evals."""
-    _get_pool().ready.wait(_warm_limit())
-    pool, future = _submit(fn, args)
+    pool = _get_pool()
+    pool.ready.wait(_warm_limit())
+    pool, future = _submit(fn, args, pool)
     try:
         return future.result(timeout=_budget(timeout))
     except BrokenProcessPool:
@@ -173,16 +204,19 @@ def warm_up() -> bool:
     once a step check can actually run (#141). Returns whether it warmed in
     time; if not, the server starts anyway and checks wait for the warm-up.
     """
-    pool = _get_pool()
-    pool.ready.wait(_warm_limit())
-    if not pool.warm:
+    pools = _pools()
+    deadline = time.monotonic() + _warm_limit()
+    for pool in pools:
+        pool.ready.wait(max(0.0, deadline - time.monotonic()))
+    warm = all(pool.warm for pool in pools)
+    if not warm:
         log.warning(json.dumps({"evt": "cas_not_warm_at_startup", "waited_seconds": _warm_limit()}))
-    return pool.warm
+    return warm
 
 
 def shutdown() -> None:
-    global _pool
     with _lock:
-        pool, _pool = _pool, None
-    if pool is not None:
+        pools = [slot for slot in _slots if slot is not None]
+        _slots.clear()
+    for pool in pools:
         pool.executor.shutdown(wait=False, cancel_futures=True)
