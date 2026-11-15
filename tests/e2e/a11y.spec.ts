@@ -21,6 +21,9 @@ const PROBLEM = {
 const WORK = [{ id: 'W1', latex: '2x = 8', readback: '2 x equals 8', valid: true }];
 
 test.describe('@smoke progressive web app shell', () => {
+  // The rest of the suite blocks service workers (playwright.config.ts).
+  test.use({ serviceWorkers: 'allow' });
+
   test('publishes its manifest and explains the install fallback', async ({ page }) => {
     await page.addInitScript(() => {
       window.addEventListener('beforeinstallprompt', (event) => event.stopImmediatePropagation());
@@ -34,16 +37,24 @@ test.describe('@smoke progressive web app shell', () => {
   });
 });
 
-test('@smoke skip link moves focus to main content', async ({ page }) => {
+test('@smoke skip link moves focus to main content', async ({ page, browserName }) => {
   await page.goto('/');
   // Home deliberately focuses its heading on arrival. Two Shift+Tabs pass the
   // header shortcut button and reach the preceding skip link.
   await expect(
     page.getByRole('heading', { name: 'Math for students who are blind or have low vision' }),
   ).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
-  await page.keyboard.press('Shift+Tab');
-  await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
+  const skip = page.getByRole('link', { name: 'Skip to main content' });
+  if (browserName === 'webkit') {
+    // Safari leaves links out of the Tab order unless "Press Tab to highlight
+    // each item" is on, so the walk is checked on Chromium. What matters on
+    // both is what Enter on the link does.
+    await skip.focus();
+  } else {
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Shift+Tab');
+  }
+  await expect(skip).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('main')).toBeFocused();
 });
