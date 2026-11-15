@@ -321,6 +321,26 @@ export function command(
   });
 }
 
+export interface FeedbackResponse {
+  outcome: 'confirmed' | 'needs_review' | 'hint';
+  message: string;
+}
+
+/** Final hand-in feedback. The server is instructed never to return an answer
+ * or next step; it only reviews the work the student chose to submit. */
+export function feedback(
+  problemLines: string[],
+  workLines: string[],
+  mode: 'study' | 'homework',
+  kind: 'review' | 'hint',
+): Promise<FeedbackResponse> {
+  return request<FeedbackResponse>('/api/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problem_lines: problemLines, work_lines: workLines, mode, kind }),
+  });
+}
+
 // The remaining endpoint is implemented with its own issue:
 //   /api/summary          issue #11
 export { BASE as apiBase };

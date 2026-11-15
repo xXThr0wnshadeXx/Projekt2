@@ -73,6 +73,7 @@ const SETTINGS_KEY = 'glance.settings.v2';
 // v1 defaulted to homework, so a stored 'homework' there was never a choice.
 const OLD_SETTINGS_KEY = 'glance.settings.v1';
 const CHECKS_KEY = 'glance.checks.v1';
+const FEEDBACK_KEY = 'glance.feedback.v1';
 
 /** Step checks allowed per problem, automatic and asked-for together. */
 export const MAX_CHECKS = 3;
@@ -120,6 +121,7 @@ export function clearProblem(): void {
   // A new problem means the old work no longer belongs to anything.
   remove(WORK_KEY);
   remove(CHECKS_KEY);
+  remove(FEEDBACK_KEY);
 }
 
 /** How many step checks this problem has used. Survives a reload on purpose. */
@@ -133,6 +135,21 @@ export function spendCheck(): boolean {
   const used = loadChecksUsed();
   if (used >= MAX_CHECKS) return false;
   write(CHECKS_KEY, used + 1);
+  return true;
+}
+
+export type FeedbackKind = 'review' | 'hint';
+
+/** Whether this problem's one AI review / one hint is already spent. Survives a reload on purpose. */
+export function feedbackUsed(kind: FeedbackKind): boolean {
+  const used = read<Partial<Record<FeedbackKind, boolean>>>(FEEDBACK_KEY);
+  return used?.[kind] === true;
+}
+
+/** Spend the one review or hint. False, and nothing spent, when it was already used. */
+export function spendFeedback(kind: FeedbackKind): boolean {
+  if (feedbackUsed(kind)) return false;
+  write(FEEDBACK_KEY, { review: feedbackUsed('review'), hint: feedbackUsed('hint'), [kind]: true });
   return true;
 }
 

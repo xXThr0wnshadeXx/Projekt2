@@ -44,6 +44,7 @@ Picture → structured math → navigable audio, large print and braille → the
 - **Low-vision mode** — one line full-screen, adjustable size, high-contrast themes.
 - **Scratchpad** — speak or type each step. Every line is read back and confirmed before it's saved. When speech is genuinely ambiguous, Glance asks ("did you mean *x + 1, all over 2*, or *x plus one half*?") instead of guessing.
 - **Reader and scribe by default** — Glance reads the problem and writes down your work. It never checks, solves or hints.
+- **Optional AI review** — same gate as step checks (Study or Homework): one review and one hint of your finished work per problem, in neutral words, never in your hand-in file or sent to your teacher.
 - **Optional step checks** — only if your instructor allows them (Study or Homework mode in Settings): a computer algebra system checks that a line follows from your own previous line, at most three times per problem. A step that can't be verified is reported as "couldn't confirm," never as "wrong."
 - **Export** — numbered typed work as PDF, accessible HTML (with MathML), `.tex`, or Nemeth.
 

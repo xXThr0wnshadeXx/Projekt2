@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": ["confirmed", "needs_review", "hint"]
+    },
+    "message": {"type": "string"}
+  },
+  "required": ["outcome", "message"],
+  "additionalProperties": false
+}

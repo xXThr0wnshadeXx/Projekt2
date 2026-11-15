@@ -24,12 +24,12 @@ export const MODE_INFO: Record<Mode, { name: string; detail: string }> = {
   study: {
     name: 'Study',
     detail:
-      'After each step you save, hear whether it follows from the line before, and which operation you used.',
+      'After each step you save, hear whether it follows from the line before, and which operation you used, and one AI review of your finished work.',
   },
   homework: {
     name: 'Homework',
     detail:
-      'After each step you save, hear only whether it checks out or could not be confirmed.',
+      'After each step you save, hear only whether it checks out or could not be confirmed, and one AI review of your finished work.',
   },
   exam: {
     name: 'Exam',

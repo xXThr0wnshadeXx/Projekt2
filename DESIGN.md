@@ -454,11 +454,14 @@ Glance is a reader and scribe. It never solves, so it is safe in exams. Reader a
 | Scratchpad + readback | ✅ | ✅ | ✅ | ✅ |
 | Word meanings | ✅ | ❌ | ✅ | ✅ |
 | Step check on own work | ❌ | ❌ | ✅ "checks out" / "couldn't confirm" | ✅ with explanation |
+| One AI review + one hint of the finished work (hand-in screen; never in the file, never sent to the teacher) | ❌ | ❌ | ✅ neutral wording only | ✅ neutral wording only |
 | Solve / hint / next step | ❌ never | ❌ never | ❌ never | ❌ never |
 
 Where checks are allowed (homework, study) they cannot hunt for answers: a check only compares a saved work line with the student's own previous work line, never a problem line, and at most 3 checks are allowed per problem (auto and asked-for together; the count survives a reload and resets with a new problem). After that: "I can't check more lines on this problem."
 
-Enforced in both UI (controls hidden/disabled) and API (`/diff` returns 403 in reader and exam).
+The AI review (`/api/feedback`) uses the same gate: one review and one hint per problem (persisted, cleared with a new problem), never "correct"/"wrong", no answers or next steps; after use: "I can't review this problem again."
+
+Enforced in both UI (controls hidden/disabled) and API (`/diff` and `/api/feedback` return 403 in reader and exam).
 
 ---|---|---|---|
 | Capture / read / explore | ✅ | ✅ | ✅ |
