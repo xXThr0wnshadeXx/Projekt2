@@ -14,9 +14,10 @@ export interface HomeProps {
   /** Present only when a problem from earlier in the session is still loaded. */
   onResume?: () => void;
   backEndReachable: boolean;
+  onSettings: () => void;
 }
 
-export function Home({ onCapture, onSample, onResume, backEndReachable }: HomeProps) {
+export function Home({ onCapture, onSample, onResume, backEndReachable, onSettings }: HomeProps) {
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -56,6 +57,9 @@ export function Home({ onCapture, onSample, onResume, backEndReachable }: HomePr
             Back to your problem
           </button>
         )}
+        <button type="button" className="btn" onClick={onSettings}>
+          Settings
+        </button>
       </div>
 
       {!backEndReachable && (

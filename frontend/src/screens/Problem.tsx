@@ -13,13 +13,16 @@ import { announce, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
 import { structureSummary } from '../math/sre';
 import { useShortcuts } from '../shortcuts';
-import type { Problem as ProblemData } from '../state';
+import { checkStep, stepChecksAllowed } from '../stepCheck';
+import type { Mode, Problem as ProblemData } from '../state';
 
 export interface ProblemProps {
   problem: ProblemData;
   onLowVision: (index: number) => void;
   onNewCapture: () => void;
-  onStartWorking: () => void;
+  /** Called with the line the student was on, which their first step follows. */
+  onStartWorking: (index: number) => void;
+  mode: Mode;
 }
 
 export function Problem({
@@ -27,6 +30,7 @@ export function Problem({
   onLowVision,
   onNewCapture,
   onStartWorking,
+  mode,
 }: ProblemProps) {
   const [index, setIndex] = useState(0);
   const [summary, setSummary] = useState('');
@@ -88,6 +92,29 @@ export function Problem({
     announce(`${problem.instructions} ${body}`.trim());
   }
 
+  /** "What changed?" on the source (DESIGN.md 14): how this line follows from
+   *  the one before. Study mode names the operation; homework only says
+   *  whether it checks out. Off in exam mode. Never solves or hints. */
+  async function whatChanged() {
+    if (!stepChecksAllowed(mode)) {
+      announce('What changed is off in exam mode.');
+      return;
+    }
+    if (!current) return;
+    if (index === 0) {
+      announce('This is the first line, so there is nothing before it to compare.');
+      return;
+    }
+    const before = lines[index - 1];
+    if (!before.valid || !current.valid) {
+      announce('I couldn\'t confirm this step. One of these lines could not be read as math.');
+      return;
+    }
+    announce('Checking…');
+    const message = await checkStep(before.latex, current.latex, mode);
+    announce(message ?? 'I couldn\'t check that right now. Try again in a moment.');
+  }
+
   useShortcuts({
     g: glance,
     r: readLine,
@@ -95,7 +122,8 @@ export function Problem({
     n: () => goTo(index + 1, 'next'),
     p: () => goTo(index - 1, 'previous'),
     l: () => onLowVision(index),
-    s: onStartWorking,
+    s: () => onStartWorking(index),
+    w: () => void whatChanged(),
     u: onNewCapture,
   });
 
@@ -168,9 +196,14 @@ export function Problem({
         <button type="button" className="btn" onClick={readAll}>
           Read all
         </button>
-        <button type="button" className="btn" onClick={onStartWorking}>
+        <button type="button" className="btn" onClick={() => onStartWorking(index)}>
           Start working
         </button>
+        {stepChecksAllowed(mode) && lines.length > 1 && (
+          <button type="button" className="btn" onClick={() => void whatChanged()}>
+            What changed?
+          </button>
+        )}
         <button type="button" className="btn" onClick={() => onLowVision(index)}>
           Low-vision mode
         </button>
