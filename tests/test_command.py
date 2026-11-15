@@ -122,3 +122,15 @@ def test_out_of_range_line_is_kept_so_the_app_can_say_so():
 def test_bad_input_is_rejected():
     assert client().post("/api/command", json={"text": "", "line_count": 3}).status_code == 422
     assert client().post("/api/command", json={"text": "x" * 501}).status_code == 422
+
+
+def test_shared_fixture_matches_the_server_rules():
+    """tests/fixtures/commands.json is also checked against the front-end copy
+    of these rules (frontend/src/commands.ts, issue #128): change both together."""
+    import json
+    from pathlib import Path
+
+    data = json.loads((Path(__file__).parent / "fixtures" / "commands.json").read_text())
+    for case in data["cases"]:
+        got = parse_command(case["text"], case["current"], case["line_count"])
+        assert got == case["expected"], case["text"]

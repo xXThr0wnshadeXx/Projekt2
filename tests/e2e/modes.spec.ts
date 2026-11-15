@@ -205,6 +205,6 @@ test.describe('@smoke modes', () => {
     await openSample(page);
     await page.keyboard.press('s');
     await saveTypedLine(page);
-    await expect(polite(page)).toHaveText('Saved as line 1.');
+    await expect(polite(page)).toHaveText('Saved as line 1. Step checking is unavailable right now.');
   });
 });

@@ -98,7 +98,11 @@ test.describe('@smoke scratchpad', () => {
     await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
     await page.keyboard.press('Enter');
 
-    await expect(page.getByTestId('live-polite')).toHaveText('Saved as line 1.');
+    // The checker is unreachable here (see beforeEach), so #131's one-time
+    // notice follows the save.
+    await expect(page.getByTestId('live-polite')).toHaveText(
+      'Saved as line 1. Step checking is unavailable right now.',
+    );
     await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
     await expect(readback).toBeHidden();
   });
