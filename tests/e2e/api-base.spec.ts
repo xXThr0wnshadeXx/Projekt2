@@ -26,6 +26,10 @@ test.describe('API base @smoke', () => {
     expect(resolveApiBase({ PROD: false, VITE_API_BASE: live })).toBe(live);
   });
 
+  test('a same-origin service rewrite has an empty API base', () => {
+    expect(resolveApiBase({ PROD: true, VITE_API_BASE: '/' })).toBe('');
+  });
+
   test('the wording says the site is not connected, not that a server is down', () => {
     expect(UNCONNECTED_MESSAGE).toBe('This site has not been connected to a server yet.');
   });
