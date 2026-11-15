@@ -37,6 +37,16 @@ _FORBIDDEN = re.compile(
     re.IGNORECASE,
 )
 
+# An explanation names an operation. It never states a result: "3 was
+# subtracted from both sides, giving x = 4" has no forbidden word in it and
+# hands over a value all the same. The student's own line already says what
+# they got, so a sentence that restates or extends it adds only risk.
+_STATES_A_RESULT = re.compile(
+    r"=|\b(equals?|equal to|gives?|giving|yields?|yielding|leaving|leaves|to get|"
+    r"results? in|resulting in|so [a-z] is|which is|becomes?)\b",
+    re.IGNORECASE,
+)
+
 
 @lru_cache
 def _schema() -> dict:
@@ -49,7 +59,7 @@ def acceptable(text: str) -> bool:
         return False
     if text.count(".") > 1 or "\n" in text:
         return False  # more than one sentence
-    return not _FORBIDDEN.search(text)
+    return not _FORBIDDEN.search(text) and not _STATES_A_RESULT.search(text)
 
 
 def model_explainer(

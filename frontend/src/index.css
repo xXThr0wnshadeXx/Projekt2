@@ -5,13 +5,15 @@
 /* Tokens. Dark is the default here because low-vision users overwhelmingly
    prefer light-on-dark for long derivations; the three high-contrast themes in
    issue #12 build on these. Contrast is checked against WCAG AA, AAA in
-   low-vision mode (DESIGN.md 13). */
+   low-vision mode (DESIGN.md 13). --line is the edge of every button and box;
+   it is held to 3:1 against the page (WCAG 1.4.11), because an outline a
+   low-vision student cannot see is a control with no shape. */
 :root {
   --bg: #0b0f14;
   --surface: #141b24;
   --fg: #f2f6fa;
   --muted: #a3b2c2;
-  --line: #2a3644;
+  --line: #5f7186;
   --accent: #7cc4ff;
   --accent-fg: #06121d;
   --warn: #ffc46b;
@@ -23,7 +25,7 @@
     --surface: #f4f7fa;
     --fg: #0c1218;
     --muted: #4a5a6a;
-    --line: #cdd8e3;
+    --line: #76838f;
     --accent: #0b5fa5;
     --accent-fg: #ffffff;
     --warn: #7a4b00;
@@ -35,7 +37,7 @@
   --surface: #f4f7fa;
   --fg: #0c1218;
   --muted: #4a5a6a;
-  --line: #cdd8e3;
+  --line: #76838f;
   --accent: #0b5fa5;
   --accent-fg: #ffffff;
   --warn: #7a4b00;
@@ -90,6 +92,24 @@ body {
     @apply inline-flex min-h-[48px] items-center rounded-lg border border-[--line]
            bg-[--surface] px-5 text-base font-medium text-[--fg]
            hover:border-[--accent];
+  }
+
+  /* The one action a screen should be about. Filled rather than outlined so a
+     low-vision user can tell it apart at a glance, and larger than the rest
+     for the same reason. Contrast of --accent-fg on --accent is checked in
+     tests/e2e/contrast.spec.ts along with the low-vision pairings. */
+  .btn-primary {
+    @apply inline-flex min-h-[56px] items-center rounded-lg border-2 border-[--accent]
+           bg-[--accent] px-7 text-lg font-semibold text-[--accent-fg]
+           hover:brightness-110;
+  }
+
+  /* For the way out of a screen: reachable, named, and not competing with the
+     work. Still a full-size target. */
+  .btn-quiet {
+    @apply inline-flex min-h-[48px] items-center rounded-lg px-4 text-base
+           font-medium text-[--muted] underline underline-offset-4
+           hover:text-[--fg];
   }
   /* Low-vision controls. Sized generously and drawn from the active theme, so
      they stay AAA whichever pairing is chosen. */
@@ -156,4 +176,15 @@ mjx-container:focus-visible {
   #export-preview * {
     color: #000 !important;
   }
+}
+
+/* 400% zoom (WCAG 1.4.10, DESIGN.md 13). A long equation scrolls inside its
+   line instead of pushing the whole page sideways; math is the one kind of
+   content WCAG lets scroll in two dimensions. The scrolling box is the line's
+   own focusable group — the one tab stop per line — so keyboard users can
+   reach and scroll it (axe: scrollable-region-focusable). */
+[data-testid^='math-line-'] {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
 }

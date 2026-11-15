@@ -109,6 +109,10 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'U', does: 'undo a delete' },
     { keys: 'P', does: 'show or hide the problem' },
     { keys: 'X', does: 'hand in your work' },
+    {
+      keys: 'Say or type a command',
+      does: 'for example next line, read line two, delete line two, undo, check this step, change the three to a four, hand in, help',
+    },
     HELP,
   ],
   settings: [
