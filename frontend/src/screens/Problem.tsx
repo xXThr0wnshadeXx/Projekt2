@@ -198,22 +198,22 @@ export function Problem({
       {lines.length ? (
         <ul className="mt-6 space-y-4" aria-label="Problem lines">
           {lines.map((l, i) => (
-            <li key={l.id} className="flex items-start gap-3" onFocus={() => setIndex(i)}>
-              <div className="min-w-0 flex-1">
-                <MathLine
-                  id={l.id}
-                  latex={l.latex}
-                  label={`Line ${i + 1}`}
-                  unsure={!l.valid}
-                />
-              </div>
+            <li key={l.id} className="relative" onFocus={() => setIndex(i)}>
+              <MathLine
+                id={l.id}
+                latex={l.latex}
+                label={`Line ${i + 1}`}
+                unsure={!l.valid}
+              />
               <button
                 type="button"
-                className="btn mt-1"
+                className="btn absolute right-3 top-3 min-w-[48px] justify-center px-0 text-2xl leading-none"
                 onClick={() => discardLine(i)}
                 aria-label={`Discard problem line ${i + 1}`}
+                title="Discard this line"
               >
-                Discard
+                <span aria-hidden="true">×</span>
+                <span className="sr-only">Discard</span>
               </button>
             </li>
           ))}
