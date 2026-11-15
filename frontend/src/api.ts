@@ -184,6 +184,16 @@ export function spokenToLatex(
   });
 }
 
+/** Check whether an exact typed line parses, without calling a model. */
+export function validateLatex(latex: string, signal: AbortSignal): Promise<{ valid: boolean }> {
+  return request('/api/validate-latex', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ latex }),
+    signal,
+  });
+}
+
 /** Step check — DESIGN.md 9, 11, 14.
  *
  *  SymPy decides; the model only names the operation, and only in study mode

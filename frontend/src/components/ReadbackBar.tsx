@@ -8,10 +8,13 @@
 // Enter saves, E edits, Escape discards (DESIGN.md 12).
 
 import { useEffect, useRef } from 'react';
+import { MathLine } from './MathLine';
 
 export interface ReadbackBarProps {
   /** How the line is spoken back, e.g. "2 x equals 8". */
   readback: string;
+  /** Exact typed math gets an explorable preview before confirmation. */
+  typedLatex?: string;
   /** True when SymPy could not parse it — saved anyway, flagged as unsure. */
   unsure: boolean;
   onSave: () => void;
@@ -19,7 +22,7 @@ export interface ReadbackBarProps {
   onDiscard: () => void;
 }
 
-export function ReadbackBar({ readback, unsure, onSave, onEdit, onDiscard }: ReadbackBarProps) {
+export function ReadbackBar({ readback, typedLatex, unsure, onSave, onEdit, onDiscard }: ReadbackBarProps) {
   const save = useRef<HTMLButtonElement>(null);
 
   // Focus lands on Save, so Enter confirms without the student having to find
@@ -48,10 +51,14 @@ export function ReadbackBar({ readback, unsure, onSave, onEdit, onDiscard }: Rea
       data-testid="readback-bar"
       className="mt-6 rounded-lg border border-[--accent] bg-[--surface] px-4 py-4"
     >
-      <p className="text-lg">
-        <span className="sr-only">I heard: </span>
-        {readback}
-      </p>
+      {typedLatex ? (
+        <MathLine id="typed-preview" latex={typedLatex} label="Your typed line" />
+      ) : (
+        <p className="text-lg">
+          <span className="sr-only">I heard: </span>
+          {readback}
+        </p>
+      )}
 
       {unsure && (
         <p className="mt-2 text-sm text-[--warn]">

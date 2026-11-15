@@ -34,6 +34,17 @@ def post(client, a, b, mode):
     return client.post("/api/diff", json={"from_latex": a, "to_latex": b, "mode": mode})
 
 
+def test_exact_typed_math_uses_cas_with_no_model():
+    with make_client() as client:
+        valid = client.post("/api/validate-latex", json={"latex": " 2x = 8 "})
+        invalid = client.post("/api/validate-latex", json={"latex": "x +"})
+        blank = client.post("/api/validate-latex", json={"latex": " "})
+    assert valid.status_code == invalid.status_code == 200
+    assert valid.json() == {"valid": True}
+    assert invalid.json() == {"valid": False}
+    assert blank.status_code == 400
+
+
 def test_study_mode_explains_a_verified_step():
     explainer = FakeExplainer()
     with make_client(explainer) as client:

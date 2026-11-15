@@ -116,6 +116,29 @@ test.describe('@smoke scratchpad', () => {
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
   });
 
+  test('exact typed math can be confirmed and handed in without a model or server', async ({ page }) => {
+    const modelRequests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().endsWith('/api/spoken-to-latex')) modelRequests.push(request.url());
+    });
+    await page.route('**/api/validate-latex', (route) => route.abort());
+    await openScratchpad(page);
+    await page.getByLabel('Or type your line').fill('2x = 8');
+    await page.getByRole('button', { name: 'Review as LaTeX' }).click();
+
+    const readback = page.getByRole('region', { name: 'Confirm your line' });
+    await expect(readback.getByRole('group', { name: 'Your typed line' })).toBeVisible();
+    await expect(readback).toContainText('I could not check this line.');
+    await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
+    await expect(readback.getByRole('button', { name: 'Save' })).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    await expect(page.getByRole('group', { name: 'Your line 1, unsure' })).toBeVisible();
+    await page.getByRole('button', { name: 'Hand in my work' }).click();
+    await expect(page.getByRole('button', { name: 'Download accessible HTML' })).toBeVisible();
+    expect(modelRequests).toEqual([]);
+  });
+
   test('an ambiguous line asks instead of guessing', async ({ page }) => {
     await stubSpoken(page, AMBIGUOUS);
     await openScratchpad(page);

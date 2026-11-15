@@ -20,6 +20,7 @@ let loading: Promise<void> | null = null;
 export function configureMathJax(): void {
   if (window.MathJax) return;
   window.MathJax = {
+    loader: { load: ['ui/safe'] },
     tex: {
       // String.raw, or the backslashes become escape sequences and the
       // delimiters silently stop matching.
@@ -30,6 +31,8 @@ export function configureMathJax(): void {
       ],
     },
     options: {
+      // LaTeX is user input. Keep links and document styling out of equations.
+      safeOptions: { allow: { URLs: 'none', cssIDs: 'none', classes: 'none', styles: 'none' } },
       enableMenu: true,
       // Verified against MathJax 4.1.3 at runtime — these are the real option
       // names. An unrecognised one is only a console warning, so a typo here

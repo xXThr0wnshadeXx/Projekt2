@@ -22,6 +22,7 @@ import { ClarifyDialog } from '../components/ClarifyDialog';
 import {
   transcribe,
   spokenToLatex,
+  validateLatex,
   command,
   ApiFailure,
   type SpokenAlternative,
@@ -47,6 +48,7 @@ interface Pending {
   latex: string;
   readback: string;
   valid: boolean;
+  exact?: boolean;
 }
 
 interface Clarify {
@@ -162,8 +164,32 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     }
   }
 
+  async function reviewTypedMath() {
+    const latex = typed.trim();
+    if (busy || !latex) return;
+    if (latex.length > 500) {
+      fail('Type one line of math, up to 500 characters.');
+      return;
+    }
+    lastAction.current = 'interpret';
+    setBusy(true);
+    setError('');
+    let valid = false;
+    try {
+      ({ valid } = await validateLatex(latex, AbortSignal.timeout(2500)));
+    } catch {
+      // The student can review and save their line even without the server.
+    } finally {
+      setBusy(false);
+    }
+    setPending({ latex, readback: latex, valid, exact: true });
+    const checkNote = valid ? '' : ' I could not check this line.';
+    announce(`You typed: ${latex}.${checkNote} Enter to save, E to edit.`);
+  }
+
   async function savePending(line: Pending) {
-    const entry: WorkLine = { id: newId(), ...line };
+    const { latex, readback, valid } = line;
+    const entry: WorkLine = { id: newId(), latex, readback, valid };
     // An edit (#24) replaces its line in place; anything else is appended.
     const editIndex = editTarget ? lines.findIndex((l) => l.id === editTarget) : -1;
     const index = editIndex >= 0 ? editIndex : lines.length;
@@ -414,6 +440,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       {pending && (
         <ReadbackBar
           readback={pending.readback}
+          typedLatex={pending.exact ? pending.latex : undefined}
           unsure={!pending.valid}
           onSave={() => void savePending(pending)}
           onEdit={() => {
@@ -421,7 +448,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
             // so a near-miss is a correction rather than a re-recording.
             setTyped(pending.latex);
             setPending(null);
-            announce('Edit your line, then press Save.');
+            announce(pending.exact ? 'Edit your line, then choose Review as LaTeX.' : 'Edit your line, then press Add line.');
             window.setTimeout(() => focusFirst('#typed-line'), 60);
           }}
           onDiscard={() => {
@@ -449,7 +476,8 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
               Or type your line
             </label>
             <p id="typed-line-help" className="mt-1 text-sm text-[--muted]">
-              Plain words or LaTeX both work, for example "two x equals eight".
+              Type in words, like "two x equals eight", and choose Add line. For math
+              as written, like "2x = 8", choose Review as LaTeX.
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               <input
@@ -462,6 +490,14 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
               />
               <button type="submit" className="btn" disabled={busy || !typed.trim()}>
                 Add line
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={busy || !typed.trim()}
+                onClick={() => void reviewTypedMath()}
+              >
+                Review as LaTeX
               </button>
             </div>
           </form>
