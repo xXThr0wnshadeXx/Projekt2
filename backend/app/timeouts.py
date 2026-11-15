@@ -1,16 +1,24 @@
 """2-second timeout for SymPy work.
 
-SymPy runs in a small pool of worker *processes*, not threads: a thread stuck in
+SymPy runs in a small set of worker *processes*, not threads: a thread stuck in
 `simplify` cannot be stopped and would hold the GIL, stalling every other
-request. When a call runs past its budget the pool's workers are terminated and
-a fresh pool is started on the next call.
+request. Each worker is its own single-process executor ("slot") and takes one
+call at a time. When a call runs past its budget only *its* worker is
+terminated and replaced; calls running in the other slots finish normally
+(issue #209).
 
-A fresh pool is *cold*: spawning a worker and importing SymPy costs about two
+A fresh worker is *cold*: spawning a worker and importing SymPy costs about two
 seconds on its own. That is startup cost, not math, so it is never charged
-against the CAS budget — a cold pool warms itself in the background and callers
-wait for it before the clock starts. Without that, the first call after any
-timeout would spend its whole budget on the import, time out, and mark a
+against the CAS budget — a cold worker warms itself in the background and callers
+wait for it before the clock starts. Without that, the first call on a
+replaced worker would spend its whole budget on the import, time out, and mark a
 perfectly valid line "unsure", so one slow expression would cost two lines.
+
+Warming has no time limit of its own (#141). On a 0.1-CPU host it takes over a
+minute, and declaring a worker ready before it is sends the first step check to
+a worker still importing SymPy, where it times out. Callers wait up to
+`cas_warm_seconds` for it, and a worker that is still warming is never killed
+for being slow: that would only start another cold worker, for ever.
 
 Functions sent here must be importable top-level functions with picklable
 arguments and results (plain strings, bools and tuples in practice).
@@ -21,12 +29,12 @@ import json
 import logging
 import multiprocessing
 import os
+import queue
 import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
-from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 from .config import get_settings
@@ -36,18 +44,8 @@ T = TypeVar("T")
 
 log = logging.getLogger("glance.cas")
 _lock = threading.Lock()
-
-
-@dataclass
-class _Pool:
-    """A worker pool and whether it has really finished warming."""
-
-    executor: ProcessPoolExecutor
-    ready: threading.Event = field(default_factory=threading.Event)
-    warm: bool = False
-
-
-_pool: _Pool | None = None
+_slots: "queue.Queue[_Slot] | None" = None  # idle slots; None until first use
+_all_slots: "list[_Slot]" = []
 
 
 class CasTimeout(ApiError):
@@ -66,45 +64,59 @@ def _warm() -> bool:
     return True
 
 
-def _warm_in_background(pool: _Pool, workers: int) -> None:
-    """Import SymPy in every worker, then let waiting callers through.
+class _Slot:
+    """One worker process. Replaced in place when its call times out."""
 
-    There is deliberately no time limit here: on a 0.1-CPU host warming takes
-    minutes, and declaring the pool ready before it is (#141) sends the first
-    step check to a worker still importing SymPy, where it times out.
-    """
-    started = time.monotonic()
-    try:
-        for future in [pool.executor.submit(_warm) for _ in range(workers)]:
-            future.result()
-        pool.warm = True
-        log.info(json.dumps({"evt": "cas_warm", "seconds": round(time.monotonic() - started, 1)}))
-    except Exception as exc:  # broken pool: the next _submit replaces it
-        log.warning(json.dumps({"evt": "cas_warm_failed", "error": type(exc).__name__}))
-    finally:
-        pool.ready.set()
+    def __init__(self) -> None:
+        self.executor: ProcessPoolExecutor
+        self.ready: threading.Event
+        self.warm = False
+        self.start()
+
+    def start(self) -> None:
+        ctx = multiprocessing.get_context("spawn")
+        self.executor = ProcessPoolExecutor(max_workers=1, mp_context=ctx)
+        self.ready = threading.Event()
+        self.warm = False
+        threading.Thread(target=self._warm_in_background, args=(self.executor, self.ready), daemon=True).start()
+
+    def _warm_in_background(self, executor: ProcessPoolExecutor, ready: threading.Event) -> None:
+        """Import SymPy in the worker, then let waiting callers through.
+
+        No time limit (#141): on a slow host warming takes minutes, and saying
+        "ready" before it is sends the first check to a worker still importing.
+        """
+        started = time.monotonic()
+        try:
+            executor.submit(_warm).result()
+            if executor is self.executor:  # not replaced while warming
+                self.warm = True
+            log.info(json.dumps({"evt": "cas_warm", "seconds": round(time.monotonic() - started, 1)}))
+        except Exception as exc:  # broken worker: the next call that breaks on it replaces it
+            log.warning(json.dumps({"evt": "cas_warm_failed", "error": type(exc).__name__}))
+        finally:
+            ready.set()
+
+    def kill(self) -> None:
+        """Stop this slot's worker and start a replacement. Touches no other slot."""
+        old = self.executor
+        for proc in list((old._processes or {}).values()):  # no public API to stop a busy worker
+            proc.terminate()
+        old.shutdown(wait=False, cancel_futures=True)
+        self.start()
 
 
-def _get_pool() -> _Pool:
-    global _pool
+def _idle_queue() -> "queue.Queue[_Slot]":
+    global _slots
     with _lock:
-        if _pool is None:
-            workers = max(1, get_settings().cas_workers)
-            ctx = multiprocessing.get_context("spawn")
-            _pool = _Pool(ProcessPoolExecutor(max_workers=workers, mp_context=ctx))
-            threading.Thread(target=_warm_in_background, args=(_pool, workers), daemon=True).start()
-        return _pool
-
-
-def _kill_pool(pool: _Pool) -> None:
-    global _pool
-    with _lock:
-        if _pool is pool:
-            _pool = None
-    for proc in list((pool.executor._processes or {}).values()):  # no public API to stop a busy worker
-        proc.terminate()
-    pool.executor.shutdown(wait=False, cancel_futures=True)
-    _get_pool()  # start warming the replacement now, not on the next request
+        if _slots is None:
+            _slots = queue.Queue()
+            _all_slots.clear()
+            for _ in range(max(1, get_settings().cas_workers)):
+                slot = _Slot()
+                _all_slots.append(slot)
+                _slots.put(slot)
+        return _slots
 
 
 def _budget(timeout: float | None) -> float:
@@ -115,74 +127,101 @@ def _warm_limit() -> float:
     return get_settings().cas_warm_seconds
 
 
-def _submit(fn: Callable[..., T], args: tuple) -> tuple[_Pool, Future]:
-    pool = _get_pool()
-    try:
-        return pool, pool.executor.submit(fn, *args)
-    except BrokenProcessPool:
-        _kill_pool(pool)
-        pool = _get_pool()
-        return pool, pool.executor.submit(fn, *args)
-
-
-def _on_timeout(pool: _Pool) -> None:
-    # Only a warm pool is stuck. A pool still warming is just slow: killing it
-    # would start another cold pool, and on a small host every check would
+def _on_timeout(slot: _Slot) -> None:
+    # Only a warm worker is stuck. One still warming is just slow: killing it
+    # would start another cold worker, and on a small host every check would
     # then time out the same way, for ever (#141).
-    if pool.warm:
-        _kill_pool(pool)
+    if slot.warm:
+        slot.kill()
+
+
+def _submit(slot: _Slot, fn: Callable[..., T], args: tuple) -> Future:
+    try:
+        return slot.executor.submit(fn, *args)
+    except BrokenProcessPool:
+        slot.kill()
+        slot.ready.wait(_warm_limit())
+        return slot.executor.submit(fn, *args)
+
+
+async def _take_slot(idle: "queue.Queue[_Slot]", deadline: float) -> _Slot:
+    # Polling, not a blocking get in a thread: cancelling the caller then can
+    # never strand a slot.
+    while True:
+        try:
+            return idle.get_nowait()
+        except queue.Empty:
+            if time.monotonic() >= deadline:
+                raise CasTimeout() from None
+            await asyncio.sleep(0.005)
 
 
 async def run_cas(fn: Callable[..., T], *args: Any, timeout: float | None = None) -> T:
-    """Run `fn(*args)` in a warm worker process; raise CasTimeout past the budget.
-
-    Waiting for the pool to warm is not charged to the budget.
-    """
-    pool = _get_pool()
-    if not pool.ready.is_set():
-        await asyncio.to_thread(pool.ready.wait, _warm_limit())
-    pool, future = _submit(fn, args)
+    """Run `fn(*args)` in a warm worker process; raise CasTimeout past the budget."""
+    budget = _budget(timeout)
+    idle = _idle_queue()
+    slot = await _take_slot(idle, time.monotonic() + budget)
     try:
-        return await asyncio.wait_for(asyncio.wrap_future(future), _budget(timeout))
-    except BrokenProcessPool:
-        _kill_pool(pool)
-        raise CasTimeout() from None
-    except asyncio.TimeoutError:
-        _on_timeout(pool)
-        raise CasTimeout() from None
+        if not slot.ready.is_set():
+            # Waiting for the warm-up is not charged to the budget.
+            await asyncio.to_thread(slot.ready.wait, _warm_limit())
+        future = _submit(slot, fn, args)
+        try:
+            return await asyncio.wait_for(asyncio.wrap_future(future), budget)
+        except BrokenProcessPool:
+            slot.kill()
+            raise CasTimeout() from None
+        except asyncio.TimeoutError:
+            _on_timeout(slot)
+            raise CasTimeout() from None
+    finally:
+        idle.put(slot)
 
 
 def run_cas_sync(fn: Callable[..., T], *args: Any, timeout: float | None = None) -> T:
     """Blocking variant for scripts and evals."""
-    _get_pool().ready.wait(_warm_limit())
-    pool, future = _submit(fn, args)
+    budget = _budget(timeout)
+    idle = _idle_queue()
     try:
-        return future.result(timeout=_budget(timeout))
-    except BrokenProcessPool:
-        _kill_pool(pool)
+        slot = idle.get(timeout=budget)
+    except queue.Empty:
         raise CasTimeout() from None
-    except TimeoutError:
-        _on_timeout(pool)
-        raise CasTimeout() from None
+    try:
+        slot.ready.wait(_warm_limit())
+        future = _submit(slot, fn, args)
+        try:
+            return future.result(timeout=budget)
+        except BrokenProcessPool:
+            slot.kill()
+            raise CasTimeout() from None
+        except TimeoutError:
+            _on_timeout(slot)
+            raise CasTimeout() from None
+    finally:
+        idle.put(slot)
 
 
 def warm_up() -> bool:
     """Start the workers and wait until they have really warmed.
 
     Called before the server starts answering, so /api/health only says ok
-    once a step check can actually run (#141). Returns whether it warmed in
-    time; if not, the server starts anyway and checks wait for the warm-up.
+    once a step check can actually run (#141). Returns whether every worker
+    warmed in time; if not, the server starts anyway and checks wait.
     """
-    pool = _get_pool()
-    pool.ready.wait(_warm_limit())
-    if not pool.warm:
+    _idle_queue()
+    deadline = time.monotonic() + _warm_limit()
+    for slot in list(_all_slots):
+        slot.ready.wait(max(0.0, deadline - time.monotonic()))
+    warm = all(slot.warm for slot in _all_slots)
+    if not warm:
         log.warning(json.dumps({"evt": "cas_not_warm_at_startup", "waited_seconds": _warm_limit()}))
-    return pool.warm
+    return warm
 
 
 def shutdown() -> None:
-    global _pool
+    global _slots
     with _lock:
-        pool, _pool = _pool, None
-    if pool is not None:
-        pool.executor.shutdown(wait=False, cancel_futures=True)
+        slots, _slots = list(_all_slots), None
+        _all_slots.clear()
+    for slot in slots:
+        slot.executor.shutdown(wait=False, cancel_futures=True)

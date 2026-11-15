@@ -51,8 +51,19 @@ test.describe('@smoke critical path', () => {
     await expect(l1).toBeFocused();
 
     // Enter hands control to the explorer, where arrow keys walk the tree.
+    // Assert focus moved *into* the equation rather than onto one particular
+    // element: once speech is attached MathJax focuses its own speech node
+    // inside the container, and which node holds focus is its business, not
+    // ours. What matters to a student is that they are now inside the maths.
     await page.keyboard.press('Enter');
-    await expect(page.locator('#L1 mjx-container')).toBeFocused();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const container = document.querySelector('#L1 mjx-container');
+          return !!container && container.contains(document.activeElement);
+        }),
+      )
+      .toBe(true);
   });
 
   test('capture results move focus to the first line and are announced', async ({ page }) => {
@@ -63,6 +74,15 @@ test.describe('@smoke critical path', () => {
     await expect(page.locator('#L1')).toBeFocused();
     await expect(page.getByTestId('live-polite')).toContainText('Solve for x.');
     await expect(page.getByTestId('live-polite')).toContainText('2 lines');
+  });
+
+  test('a student can discard an inaccurate captured line', async ({ page }) => {
+    await openSample(page);
+    await page.getByRole('button', { name: 'Discard problem line 1' }).click();
+
+    await expect(page.getByTestId('math-line-L1')).toHaveCount(0);
+    await expect(page.getByTestId('math-line-L2')).toBeVisible();
+    await expect(page.getByTestId('live-polite')).toContainText('Discarded line 1. 1 line remains.');
   });
 
   test('state changes are announced to screen readers', async ({ page }) => {
@@ -102,6 +122,24 @@ test.describe('@smoke critical path', () => {
     // answer to line 1, and 99 to line 2; neither may appear.
     await expect(summary).not.toContainText('x = 4');
     await expect(summary).not.toContainText('99');
+  });
+
+  test('a line says its number once, then how to explore it', async ({ page }) => {
+    // #133: the number was in the group's label and again in hidden text, so
+    // a screen reader said "Line 1, group. Line 1. Press Enter to explore."
+    await openSample(page);
+    const line = page.getByRole('group', { name: 'Line 1', exact: true });
+    await expect(line).toHaveAccessibleName('Line 1');
+    await expect(line).toHaveAccessibleDescription('Press Enter to explore.');
+    await expect(page.locator('#L1 mjx-container')).toBeVisible();
+    // Nothing a reader would speak inside the line repeats the number.
+    const spokenInside = await line.evaluate((el) =>
+      Array.from(el.querySelectorAll('*'))
+        .filter((child) => !child.closest('[hidden]') && child.children.length === 0)
+        .map((child) => child.textContent ?? '')
+        .join(' '),
+    );
+    expect(spokenInside).not.toContain('Line 1');
   });
 
   test('N and P move between lines and announce the position', async ({ page }) => {
@@ -183,7 +221,7 @@ test.describe('@smoke critical path', () => {
     await expect(page.getByRole('button', { name: 'Take a photo' })).toBeVisible();
 
     // Back returns to the start without a reload.
-    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('button', { name: 'Back to the start' }).click();
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
   });
 

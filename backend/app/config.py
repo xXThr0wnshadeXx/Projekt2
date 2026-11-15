@@ -8,7 +8,7 @@ and the CAS-only endpoints stay up while keys are being configured.
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -39,8 +39,13 @@ class Settings(BaseSettings):
     # Per-IP request budgets. Model-backed endpoints share the tighter one.
     rate_limit_model_per_minute: int = 20
     rate_limit_per_minute: int = 120
+    model_call_limit: int = Field(default=0, ge=0)
+    model_call_window_seconds: int = Field(default=3600, gt=0)
     # Proxies in front of the app that append to X-Forwarded-For (1 on Render).
     trusted_proxy_hops: int = 0
+    # Set to "production" on the live service. Startup then refuses to run
+    # without a proxy setting and a model-call cap (issue #209).
+    app_env: str = ""
 
     # Enables GET /api/stats when set; sent as the X-Stats-Token header.
     stats_token: SecretStr | None = None
@@ -52,6 +57,22 @@ class Settings(BaseSettings):
     def allowed_origins(self) -> list[str]:
         origins = [o.strip().rstrip("/") for o in self.allowed_origin.split(",")]
         return [o for o in origins if o and o != "*"]
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.strip().lower() == "production"
+
+    def check_production(self) -> None:
+        """Raise RuntimeError if a production deploy is missing a safety setting."""
+        if not self.is_production:
+            return
+        problems = []
+        if self.trusted_proxy_hops < 1:
+            problems.append("TRUSTED_PROXY_HOPS must be set (1 on Render), or every student shares one rate limit")
+        if self.model_call_limit < 1:
+            problems.append("MODEL_CALL_LIMIT must be set above 0, or nothing caps the model bill")
+        if problems:
+            raise RuntimeError("Refusing to start in production: " + "; ".join(problems) + ".")
 
     @property
     def models_configured(self) -> bool:

@@ -45,12 +45,15 @@ def test_a_timeout_while_warming_does_not_kill_the_pool(slow_host):
     slow_host(delay=3.0, warm_limit=0.3)
     with pytest.raises(timeouts.CasTimeout):
         asyncio.run(timeouts.run_cas(is_parseable, "2x = 8", timeout=0.2))
-    pool = timeouts._get_pool()
-    assert pool.warm is False
-    # Killing it would start another cold pool, and every check would time out
-    # the same way for ever. It is kept, finishes warming, and then works.
-    pool.ready.wait(10)
-    assert timeouts._get_pool() is pool and pool.warm is True
+    slots = list(timeouts._all_slots)
+    executors = [slot.executor for slot in slots]
+    assert not any(slot.warm for slot in slots)
+    # Killing it would start another cold worker, and every check would time
+    # out the same way for ever. It is kept, finishes warming, and then works.
+    for slot in slots:
+        slot.ready.wait(10)
+    assert [slot.executor for slot in timeouts._all_slots] == executors
+    assert all(slot.warm for slot in slots)
     assert asyncio.run(timeouts.run_cas(is_parseable, "2x = 8", timeout=1.0)) is True
 
 
@@ -62,8 +65,10 @@ def test_startup_says_so_when_it_runs_out_of_time(slow_host, caplog):
 
 def test_a_stuck_check_on_a_warm_pool_is_still_stopped():
     timeouts.warm_up()
-    pool = timeouts._get_pool()
-    assert pool.warm
+    before = [slot.executor for slot in timeouts._all_slots]
+    assert all(slot.warm for slot in timeouts._all_slots)
     with pytest.raises(timeouts.CasTimeout):
         asyncio.run(timeouts.run_cas(time.sleep, 10, timeout=0.3))
-    assert timeouts._get_pool() is not pool  # the stuck worker's pool was replaced
+    after = [slot.executor for slot in timeouts._all_slots]
+    # Only the stuck worker was replaced; the other slot kept its worker.
+    assert sum(a is not b for a, b in zip(before, after)) == 1

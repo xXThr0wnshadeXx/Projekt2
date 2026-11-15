@@ -16,7 +16,7 @@ Follows the demo order in DESIGN.md §25. Use the **sample problem** or a prepar
 
 | # | Time | Show | Narrator says (see `script.md`) |
 |---|---|---|---|
-| 1 | 0:00 | Title card: "Glance — math you can hear and speak" | Who it's for |
+| 1 | 0:00 | Title card: "Glance — math for students who are blind or have low vision" | Who it's for |
 | 2 | 0:10 | Upload a worksheet; focus lands on line 1 | The problem |
 | 3 | 0:25 | `G` (glance), then explore with arrows | Hear the shape first |
 | 4 | 0:45 | Hold Space, say "two x equals eight", readback, Enter | Your own work, confirmed |
