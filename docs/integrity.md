@@ -11,6 +11,7 @@ work still required. It is not a certification for use in any particular exam.
 | Writes down exactly what the student dictates or types, and reads it back | Changes, fixes or completes the student's maths |
 | Asks when dictation is ambiguous | Guesses |
 | In Study/Homework only, if the instructor allows, says whether a step follows | Says “wrong”, or explains how to do a step |
+| In Study/Homework only, once per problem before hand-in, says which line of the work may be worth another look | Says what is wrong with it, hints, or reviews the same problem twice |
 | Exports the student's own work | Stores images, audio or student work on Glance's server |
 
 Images and audio are sent to the configured model provider for processing.

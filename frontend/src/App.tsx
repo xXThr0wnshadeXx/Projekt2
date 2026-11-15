@@ -21,7 +21,8 @@ import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { spokenMath } from './math/sre';
-import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
+import { health, apiBase, apiConnected, ApiFailure, diagnoseUnreachable } from './api';
+import { UNCONNECTED_MESSAGE } from './apiBase';
 import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
@@ -48,8 +49,17 @@ type Screen =
   | 'export';
 type BackEnd = 'checking' | 'up' | 'down';
 
+/** How soon an unanswered health check is asked again, doubling up to the cap. */
+const HEALTH_RETRY_FIRST_MS = 2_000;
+const HEALTH_RETRY_MAX_MS = 30_000;
+
 export function App() {
   const [screen, setScreen] = useState<Screen>('home');
+  // This is deliberately app history rather than window.history: browser Back
+  // must still belong to the browser, while this control always returns to the
+  // last Glance screen. It also means a student never leaves the app by
+  // accident when they were only trying to return to their work.
+  const [screenBackStack, setScreenBackStack] = useState<Screen[]>([]);
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
   const [initialRestore] = useState(() => {
     const count = loadWork().length || problem?.lines.length;
@@ -62,11 +72,25 @@ export function App() {
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
   const [backEndNote, setBackEndNote] = useState('');
+  // Whether the server said it can read images and speech (#127).
+  const [models, setModels] = useState(true);
   const [settings, setSettings] = useState<SettingsData>(() => loadSettings());
   // Where to go back to from Settings, and which problem line the student was
   // on when they started working (their first step is checked against it).
-  const [settingsFrom, setSettingsFrom] = useState<Screen>('home');
   const [workingFrom, setWorkingFrom] = useState(0);
+
+  function navigate(next: Screen) {
+    if (next === screen) return;
+    setScreenBackStack((stack) => [...stack, screen]);
+    setScreen(next);
+  }
+
+  function goBack() {
+    const previous = screenBackStack.at(-1);
+    if (!previous) return;
+    setScreenBackStack((stack) => stack.slice(0, -1));
+    setScreen(previous);
+  }
 
   useEffect(() => {
     setSelfVoicing(settings.selfVoicing);
@@ -78,7 +102,7 @@ export function App() {
     restored.current = '';
     return announcement;
   }, []);
-  const resumeProblem = useCallback(() => setScreen('problem'), []);
+  const resumeProblem = useCallback(() => navigate('problem'), [screen]);
 
   // Every size in the app is in rem, so this one number is large print for
   // all of it — buttons, notes and maths alike.
@@ -93,15 +117,12 @@ export function App() {
     saveSettings(next);
   }
 
-  const [exportFrom, setExportFrom] = useState<Screen>('scratchpad');
-  function openExport(from: Screen) {
-    setExportFrom(from);
-    setScreen('export');
+  function openExport() {
+    navigate('export');
   }
 
   function openSettings() {
-    setSettingsFrom(screen === 'settings' ? 'home' : screen);
-    setScreen('settings');
+    navigate('settings');
   }
   // Keyboard help (#25): `null` when closed, otherwise whether it took focus.
   const [help, setHelp] = useState<null | { takeFocus: boolean }>(null);
@@ -126,33 +147,76 @@ export function App() {
     });
   }, []);
 
-  useEffect(() => {
-    health()
-      .then(() => {
-        setBackEnd('up');
-        setBackEndNote('');
-      })
-      .catch(async (e: unknown) => {
-        setBackEnd('down');
-        // A server that is up but refusing this origin looks identical to one
-        // that is down, so find out which before telling anyone anything.
-        if (e instanceof ApiFailure && e.code === 'NETWORK') {
-          setBackEndNote(
-            (await diagnoseUnreachable()) === 'blocked'
-              ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
-              : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
-          );
-          return;
-        }
-        setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
-      });
+  // Health is asked again, not trusted from one request at load (#127). A
+  // cold start can make the first request fail, and a student told "capture
+  // is unavailable" should not have to reload to find out it came back.
+  const healthRun = useRef(0);
+  const healthRetry = useRef<number | undefined>(undefined);
+  const retryDelay = useRef(HEALTH_RETRY_FIRST_MS);
+  const checkHealth = useCallback(async () => {
+    // A deployed build with no server address has nothing to ask (#135).
+    if (!apiConnected) {
+      setBackEnd('down');
+      setBackEndNote(UNCONNECTED_MESSAGE);
+      return;
+    }
+    const run = ++healthRun.current;
+    window.clearTimeout(healthRetry.current);
+    try {
+      const h = await health();
+      if (run !== healthRun.current) return;
+      retryDelay.current = HEALTH_RETRY_FIRST_MS;
+      setBackEnd('up');
+      setBackEndNote('');
+      setModels(h.models !== false);
+    } catch (e: unknown) {
+      if (run !== healthRun.current) return;
+      setBackEnd('down');
+      // Try again on its own, further apart each time, until it answers.
+      healthRetry.current = window.setTimeout(() => void checkHealth(), retryDelay.current);
+      retryDelay.current = Math.min(retryDelay.current * 2, HEALTH_RETRY_MAX_MS);
+      // A server that is up but refusing this origin looks identical to one
+      // that is down, so find out which before telling anyone anything.
+      if (e instanceof ApiFailure && e.code === 'NETWORK') {
+        const why = await diagnoseUnreachable();
+        if (run !== healthRun.current) return;
+        setBackEndNote(
+          why === 'blocked'
+            ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
+            : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
+        );
+        return;
+      }
+      setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
+    }
   }, []);
+
+  useEffect(() => () => window.clearTimeout(healthRetry.current), []);
+
+  // Asked on load, and again each time Home or the scratchpad is shown: the
+  // two screens whose controls depend on the answer.
+  const healthAsked = useRef(false);
+  useEffect(() => {
+    if (!healthAsked.current || screen === 'home' || screen === 'scratchpad') {
+      healthAsked.current = true;
+      void checkHealth();
+    }
+  }, [screen, checkHealth]);
+
+  // Recording and capture need the server's model. They are hidden only when
+  // a server that answered says it has none, or when this build has no
+  // server at all. An unanswered request proves nothing: it may be a cold
+  // start, and a failed upload explains itself.
+  const modelsUsable = apiConnected && models;
+  const modelsUnavailableWhy = apiConnected
+    ? 'The server cannot read images or speech right now.'
+    : UNCONNECTED_MESSAGE;
 
   function openProblem(next: ProblemData) {
     setProblem(next);
     saveProblem(next);
     setLineIndex(0);
-    setScreen('problem');
+    navigate('problem');
 
     // A capture announces its own result, in more detail than is possible here
     // — it knows what was unsure and what the photo warnings were. The sample
@@ -193,7 +257,7 @@ export function App() {
     setSpokenLines(spoken);
     setLowVisionFailed(false);
     setLineIndex(index);
-    setScreen('lowvision');
+    navigate('lowvision');
   }
 
   // Low-vision mode takes over the whole screen, so it renders instead of the
@@ -213,7 +277,7 @@ export function App() {
           startIndex={lineIndex}
           onExit={(i) => {
             setLineIndex(i);
-            setScreen('problem');
+            goBack();
             announce('Left low-vision mode.');
             window.setTimeout(() => focusFirst(`#${problem.lines[i]?.id ?? 'L1'}`), 60);
           }}
@@ -233,11 +297,22 @@ export function App() {
 
         <header className="border-b border-[--line] px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                className="btn"
+                aria-label={screenBackStack.length ? 'Back to previous page' : 'Back (no previous page)'}
+                disabled={!screenBackStack.length}
+                onClick={goBack}
+              >
+                Back
+              </button>
+              <div>
               <h1 className="mono inline-flex min-h-[40px] items-center bg-[--accent] px-3 text-xl font-medium text-[--accent-fg]">Glance</h1>
               <p className="mt-1 text-[--muted]">Math you can hear, explore and write without seeing the page.</p>
               <div className="mt-2">
                 <ModeBadge mode={settings.mode} />
+              </div>
               </div>
             </div>
             <button
@@ -276,7 +351,8 @@ export function App() {
         {lowVision}
         {screen === 'home' && (
           <Home
-            onCapture={() => setScreen('capture')}
+            captureUnavailable={modelsUsable ? undefined : modelsUnavailableWhy}
+            onCapture={() => navigate('capture')}
             onSample={() => openProblem(sampleProblem())}
             onResume={problem ? resumeProblem : undefined}
             takeRestoredAnnouncement={takeRestoredAnnouncement}
@@ -287,7 +363,7 @@ export function App() {
         )}
 
         {screen === 'capture' && (
-          <Capture onCaptured={openProblem} onBack={() => setScreen('home')} />
+          <Capture onCaptured={openProblem} onBack={goBack} />
         )}
 
         {screen === 'problem' && problem && (
@@ -296,14 +372,14 @@ export function App() {
             startIndex={lineIndex}
             onLowVision={enterLowVision}
             mode={settings.mode}
-            onNewCapture={() => setScreen('capture')}
+          onNewCapture={() => navigate('capture')}
             onDiscardLine={discardProblemLine}
             onStartWorking={(index) => {
               setWorkingFrom(index);
               setLineIndex(index);
-              setScreen('scratchpad');
+            navigate('scratchpad');
             }}
-            onExport={() => openExport('problem')}
+          onExport={openExport}
           />
         )}
 
@@ -312,20 +388,21 @@ export function App() {
             problem={problem}
             mode={settings.mode}
             startLine={workingFrom}
-            onBack={() => setScreen('problem')}
-            onExport={() => openExport('scratchpad')}
+            speechAvailable={modelsUsable}
+          onBack={goBack}
+          onExport={openExport}
           />
         )}
 
         {screen === 'export' && problem && (
-          <Export problem={problem} onBack={() => setScreen(exportFrom)} />
+          <Export problem={problem} mode={settings.mode} onBack={goBack} />
         )}
 
         {screen === 'settings' && (
           <Settings
             settings={settings}
             onChange={updateSettings}
-            onBack={() => setScreen(settingsFrom)}
+          onBack={goBack}
           />
         )}
 
@@ -361,7 +438,7 @@ export function App() {
               <summary className="cursor-pointer">Why</summary>
               <p className="mt-2">{backEndNote}</p>
               <p className="mt-1">
-                Server address: <code>{apiBase}</code>
+                Server address: <code>{apiBase ?? 'not set'}</code>
               </p>
             </details>
           </div>

@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": ["nothing_flagged", "look_again"]
+    },
+    "line": {"type": ["integer", "null"]}
+  },
+  "required": ["outcome", "line"],
+  "additionalProperties": false
+}

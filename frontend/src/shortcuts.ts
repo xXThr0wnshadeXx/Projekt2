@@ -84,7 +84,14 @@ const MOVE: Shortcut[] = [
 ];
 
 export const KEYMAP: Record<ScreenName, Shortcut[]> = {
-  home: [...MOVE, { keys: 'U or C', does: 'capture a problem' }, HELP],
+  home: [
+    ...MOVE,
+    { keys: 'U or C', does: 'capture a problem' },
+    { keys: 'S', does: 'try a sample problem' },
+    { keys: 'B', does: 'go back to your problem, when there is one' },
+    { keys: 'Y or N', does: 'on your first visit: Y to hear Glance speak, N if you use a screen reader' },
+    HELP,
+  ],
   capture: [
     ...MOVE,
     { keys: 'U', does: 'upload a file' },
@@ -120,7 +127,7 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'X', does: 'hand in your work' },
     {
       keys: 'Say or type a command',
-      does: 'for example next line, read line two, delete line two, undo, check this step, change the three to a four, hand in, help',
+      does: 'for example describe it, what is on top, what is under the root, how many terms, spell it out, next line, read line two, delete line two, undo, check this step, change the three to a four, hand in, help',
     },
     HELP,
   ],
