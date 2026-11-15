@@ -2,12 +2,29 @@ from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 import openai
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.app import model_quota, openai_client
 from backend.app.config import Settings
 from backend.app.errors import ApiError
 from backend.app.main import create_app
+
+
+@pytest.mark.asyncio
+async def test_quota_disables_unmetered_sdk_retries():
+    settings = openai_client.ModelSettings(
+        _env_file=None, openai_api_key="test-value", model_vision="vision",
+        model_text="text", model_stt="speech", model_max_retries=2,
+    )
+    unmetered = openai_client.ModelClient(settings)
+    metered = openai_client.ModelClient(settings, quota=model_quota.ModelQuota(3, 10))
+    try:
+        assert unmetered.client.max_retries == 2
+        assert metered.client.max_retries == 0
+    finally:
+        await unmetered.close()
+        await metered.close()
 
 
 def test_shared_quota_is_atomic_and_expires(monkeypatch):

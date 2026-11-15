@@ -65,11 +65,12 @@ export function health(): Promise<HealthResponse> {
 
 /** Capture response — DESIGN.md 9. `id` and `valid` are filled in server-side.
  *
- *  The back end accepts JPEG, PNG, WebP and GIF. PDF pages are issue #26; until
- *  then the Capture screen says so rather than letting the upload fail at the
- *  server with a less helpful message.
+ *  The back end checks the file signature, not the declared type, and allows
+ *  JPEG, PNG and WebP. A PDF is not sent here directly: the Capture screen
+ *  asks which page, renders it through /api/pdf/page, and captures the
+ *  resulting image like any other photo (issue #26).
  */
-export const CAPTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+export const CAPTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export interface CaptureLine {
   id: string;
@@ -101,6 +102,38 @@ export function capture(image: Blob, context = ''): Promise<CaptureResponse> {
   return request<CaptureResponse>('/api/capture', { method: 'POST', body: form });
 }
 
+/** How many pages a PDF has, so the student can be asked which one. */
+export function pdfPageCount(pdf: Blob): Promise<{ pages: number }> {
+  const form = new FormData();
+  form.append('pdf', pdf, 'worksheet.pdf');
+  return request<{ pages: number }>('/api/pdf/pages', { method: 'POST', body: form });
+}
+
+/** One page of a PDF, rendered to a PNG that `capture` can read.
+ *
+ *  This returns an image rather than JSON, so it cannot go through `request`.
+ *  The error shape is still the DESIGN.md 9 one, so failures are read the same
+ *  way and reach the student as a sentence.
+ */
+export async function pdfPage(pdf: Blob, page: number): Promise<Blob> {
+  const form = new FormData();
+  form.append('pdf', pdf, 'worksheet.pdf');
+  form.append('page', String(page));
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/api/pdf/page`, { method: 'POST', body: form });
+  } catch {
+    throw new ApiFailure('NETWORK', 'Could not reach the server. Check your connection.');
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const err = (body as { error?: ApiError } | null)?.error;
+    throw new ApiFailure(err?.code ?? 'MODEL_ERROR', err?.message ?? 'Could not read that page.');
+  }
+  return res.blob();
+}
+
 export interface TranscribeResponse {
   text: string;
 }
@@ -118,7 +151,10 @@ export function transcribe(audio: Blob, contentType: string): Promise<Transcribe
 export interface SpokenAlternative {
   latex: string;
   readback: string;
-  valid?: boolean;
+  /** False when SymPy could not read this option. It is still offered — the
+   *  student knows what they said, and DESIGN.md 27 marks such a line unsure
+   *  rather than hiding it — but it is flagged as unchecked. */
+  valid: boolean;
 }
 
 /** Spoken math turned into LaTeX — DESIGN.md 9.
@@ -148,8 +184,34 @@ export function spokenToLatex(
   });
 }
 
+/** Step check — DESIGN.md 9, 11, 14.
+ *
+ *  SymPy decides; the model only names the operation, and only in study mode
+ *  after SymPy has verified the step. A step that isn't verified is always
+ *  "I couldn't confirm this step." — never "wrong". Exam mode is refused by
+ *  the server (403), and the UI never calls it there.
+ */
+export interface DiffResponse {
+  verified: boolean;
+  method: string;
+  message: string;
+}
+
+export function diff(
+  fromLatex: string,
+  toLatex: string,
+  mode: 'study' | 'homework' | 'exam',
+  signal?: AbortSignal,
+): Promise<DiffResponse> {
+  return request<DiffResponse>('/api/diff', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from_latex: fromLatex, to_latex: toLatex, mode }),
+    signal,
+  });
+}
+
 // The remaining endpoints are implemented with their own issues:
 //   /api/command          issue #24
-//   /api/diff             issue #20
 //   /api/summary          issue #11
 export { BASE as apiBase };

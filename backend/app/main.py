@@ -21,6 +21,7 @@ from .model_quota import ModelQuota
 from .openai_client import ModelClient, ModelSettings
 from .routes.capture import capture_router
 from .routes.diff import diff_router
+from .routes.pdf import pdf_router
 from .routes.spoken import spoken_router
 from .routes.transcribe import transcribe_router
 
@@ -49,6 +50,9 @@ def create_app(
             model_text=settings.model_text,
             model_stt=settings.model_stt,
         ), quota=quota)
+        # Every capture, spoken-line and transcription call adds its model,
+        # tokens and cost to the request's log line and /api/stats (issue #44).
+        observability.instrument_openai(models.client)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -91,6 +95,8 @@ def create_app(
     app.add_middleware(observability.RequestLogMiddleware)
 
     app.include_router(diff_router(explainer))
+    # PDFs need no model: page count and page render work without keys (issue #26).
+    app.include_router(pdf_router(settings.max_image_bytes))
     if models is not None:
         app.include_router(capture_router(models, validate_latex, settings.max_image_bytes))
         app.include_router(spoken_router(models, validate_latex))

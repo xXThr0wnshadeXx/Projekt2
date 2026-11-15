@@ -23,12 +23,29 @@ const AMBIGUOUS = {
   ambiguous: true,
   clarifying_question: 'Did you mean x plus one, all over two, or x plus one half?',
   alternatives: [
-    { latex: '\\frac{x+1}{2}', readback: 'x plus one, all over two' },
-    { latex: 'x + \\frac{1}{2}', readback: 'x plus one half' },
+    { latex: '\\frac{x+1}{2}', readback: 'x plus one, all over two', valid: true },
+    { latex: 'x + \\frac{1}{2}', readback: 'x plus one half', valid: true },
   ],
   readback: null,
   valid: false,
 };
+
+/** The case from #79: one option is offered but SymPy could not read it. */
+const AMBIGUOUS_ONE_UNCHECKED = {
+  ...AMBIGUOUS,
+  alternatives: [
+    { latex: '\\frac{x+1}{2}', readback: 'x plus one, all over two', valid: true },
+    { latex: 'x \\to 2', readback: 'x goes to two', valid: false },
+  ],
+};
+
+// The step check (#21) runs after every save. These tests are about the
+// scratchpad, not the checker, so it is made unreachable here: that is the
+// same as running with no back end, and keeps the announcements exact on a
+// machine that happens to have one running. tests/e2e/modes.spec.ts covers it.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/diff', (route) => route.abort());
+});
 
 async function stubSpoken(page: Page, body: unknown) {
   await page.route('**/api/spoken-to-latex', async (route) => {
@@ -143,6 +160,32 @@ test.describe('@smoke scratchpad', () => {
     const readback = page.getByRole('region', { name: 'Confirm your line' });
     await expect(readback).toBeVisible();
     await expect(readback).toContainText('x plus one half');
+  });
+
+  test('an option the parser could not read is still offered, and flagged', async ({ page }) => {
+    // #79: requiring every alternative to parse used to throw the whole
+    // question away. The student knows what they said, so the option stays —
+    // but it says plainly that it was not checked, and saving it keeps that.
+    await stubSpoken(page, AMBIGUOUS_ONE_UNCHECKED);
+    await openScratchpad(page);
+
+    await page.getByLabel('Or type your line').fill('x plus one over two');
+    await page.getByRole('button', { name: 'Add line' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('x goes to two');
+    await expect(dialog).toContainText('I could not check this one');
+
+    await page.keyboard.press('2');
+    const readback = page.getByRole('region', { name: 'Confirm your line' });
+    await expect(readback).toContainText('x goes to two');
+    await expect(readback).toContainText('I could not check this line');
+
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByTestId('live-polite')).toHaveText(
+      'Saved as line 1. I could not check it.',
+    );
   });
 
   test('Escape cancels the question without saving', async ({ page }) => {
