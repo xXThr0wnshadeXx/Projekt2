@@ -18,7 +18,7 @@ def test_capture_preserves_transcription_and_adds_validation():
     app = FastAPI()
     app.include_router(capture_router(models, validate))
     with TestClient(app) as client:
-        response = client.post("/api/capture", files={"image": ("page.png", b"png", "image/png")})
+        response = client.post("/api/capture", files={"image": ("page.png", b"\x89PNG\r\n\x1a\n", "image/png")})
 
     assert response.status_code == 200
     assert response.json()["lines"] == [
@@ -36,6 +36,18 @@ def test_capture_rejects_oversized_image_before_model_call():
     with TestClient(app) as client:
         response = client.post("/api/capture", files={"image": ("page.png", b"12345", "image/png")})
 
-    assert response.status_code == 400
+    assert response.status_code == 413
     assert response.json()["error"]["code"] == "BAD_INPUT"
+    models.interpret.assert_not_awaited()
+
+
+def test_capture_rejects_forged_image_type_before_model_call():
+    models = AsyncMock()
+    app = FastAPI()
+    app.include_router(capture_router(models, AsyncMock()))
+    with TestClient(app) as client:
+        response = client.post("/api/capture", files={
+            "image": ("fake.png", b"MZ executable data", "image/png"),
+        })
+    assert response.status_code == 415
     models.interpret.assert_not_awaited()

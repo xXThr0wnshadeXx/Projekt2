@@ -118,6 +118,7 @@ export function transcribe(audio: Blob, contentType: string): Promise<Transcribe
 export interface SpokenAlternative {
   latex: string;
   readback: string;
+  valid?: boolean;
 }
 
 /** Spoken math turned into LaTeX — DESIGN.md 9.

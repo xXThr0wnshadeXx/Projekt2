@@ -9,10 +9,10 @@ from fastapi.responses import JSONResponse
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 
+from ..errors import ApiError
+from ..guards import check_image
 from ..openai_client import ModelClient, ModelError
 from ..prompts import CAPTURE_PROMPT
-
-IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 
 def capture_router(
@@ -55,16 +55,22 @@ def capture_router(
         try:
             image = form.get("image")
             context = form.get("context", "")
-            if not isinstance(image, UploadFile) or image.content_type not in IMAGE_TYPES:
-                return bad_input("Upload a JPEG, PNG, WebP, or GIF image.")
+            if not isinstance(image, UploadFile):
+                return bad_input("Upload a JPEG, PNG, or WebP image.")
             if not isinstance(context, str) or len(context) > 4096:
                 return bad_input("Image context must be at most 4,096 characters.")
             data = await image.read()
-            if not data or len(data) > max_image_bytes:
-                return bad_input("The image is empty or exceeds the size limit.")
         finally:
             await form.close()
 
+        try:
+            kind = check_image(data, max_image_bytes)
+        except ApiError as error:
+            return JSONResponse(status_code=error.status, content={
+                "error": {"code": error.code, "message": error.message}
+            })
+        if kind == "application/pdf":
+            return bad_input("Upload a page as an image for now. PDF support is coming.")
         encoded = base64.b64encode(data).decode("ascii")
         try:
             result = await models.interpret("capture", [
@@ -72,7 +78,7 @@ def capture_router(
                 {"role": "user", "content": [
                     {"type": "text", "text": context or "Transcribe the uploaded image."},
                     {"type": "image_url", "image_url": {
-                        "url": f"data:{image.content_type};base64,{encoded}",
+                        "url": f"data:{kind};base64,{encoded}",
                     }},
                 ]},
             ])

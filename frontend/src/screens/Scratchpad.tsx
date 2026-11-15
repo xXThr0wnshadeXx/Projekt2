@@ -350,7 +350,7 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
             setClarify(null);
             // The student has told us which grouping they meant, so this is
             // theirs now — it goes straight to the readback to be confirmed.
-            setPending({ latex: choice.latex, readback: choice.readback, valid: true });
+            setPending({ latex: choice.latex, readback: choice.readback, valid: choice.valid ?? true });
             announce(`You chose: ${choice.readback}. Enter to save, E to edit.`);
           }}
           onCancel={() => {
