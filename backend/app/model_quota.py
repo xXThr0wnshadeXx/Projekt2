@@ -24,7 +24,8 @@ class ModelQuota:
                 retry_after = ceil(self.window_seconds - (now - self._calls[0]))
                 raise ApiError(
                     "RATE_LIMITED",
-                    "Glance has reached its shared model limit. Try again shortly.",
+                    "Glance has used up its AI allowance for now. Reading, typing and handing in "
+                    "still work. Try the AI features again later.",
                     429,
                     headers={"Retry-After": str(max(1, retry_after))},
                 )

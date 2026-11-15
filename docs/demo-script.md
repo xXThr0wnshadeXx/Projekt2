@@ -1,184 +1,50 @@
 # Demo script
 
-The exact run for the live demo. Issue #36.
+Rehearsal target for [#193](https://github.com/xXThr0wnshadeXx/Projekt2/issues/193) and [#197](https://github.com/xXThr0wnshadeXx/Projekt2/issues/197). This is not a record of a successful live run. TODOs below are release gates, not optional polish.
 
-Written against what is actually built and merged, not against the plan. Where
-a step in `DESIGN.md` §25 does not exist yet, it says so rather than being
-rehearsed into the script and discovered live.
+## The presentation
 
-**Before you start, read [Known gaps](#known-gaps).** Two of them change what
-you can show.
+**0:00–0:15, why.** Show the paper worksheet. “A paper equation shouldn't mean waiting for someone else to read it. Stanford asks for materials four to five business days before accessible-format conversion is needed. Here's the experience we're building: understanding the page by voice, on your own.” [Source and qualification](pitch.md): institutional submission lead time, not a measured delay for this worksheet.
 
----
+Introduce the participant accurately: a consenting blind or low-vision tester if available, otherwise “This is our teammate demonstrating the workflow.” Do not describe a teammate as a user-study participant. Turn Screen Curtain on before the take starts. The screen stays black throughout; the room hears the app. No helper touches the participant, phone or app.
 
-## Setup, ten minutes before the slot
+## The take: 0:15–1:45, unbroken
 
-| | |
-|---|---|
-| Back end warm | `curl -s https://<domain>/api/health` → `{"ok":true}`. Do this 5 minutes before, and again right before walking up. |
-| Model key set | Capture and voice need `OPENAI_API_KEY` in the Railway dashboard (#4). **Without it those routes are not registered at all** — the app still loads and the sample problem still works. |
-| Backup video | Open in a second tab, already loaded, muted, ready to play. |
-| Hotspot | On and tested. Do not trust venue Wi-Fi. |
-| Browser | One window, no other tabs visible, bookmarks bar off. Zoom at 100%. |
-| Screen reader | VoiceOver on, Screen Curtain **off** for judges (they need to see), speech audible to the room. |
-| Fresh state | Open the deployed link in a private window, or the last run's problem is still cached and "Back to your problem" appears on Home. |
+Use a clean printed worksheet containing one problem, `\frac{\sqrt{x + 1}}{2} = 5`. The times are rehearsal budgets, not measured performance. All app speech should use the natural voice from #182. The expected wording below is a rehearsal cue, not a transcript of observed output.
 
-Have the worksheet image on the desktop, ready to drag. Do not hunt for a file
-in front of judges.
+| Presentation time | Participant action | What the room should hear |
+|---|---|---|
+| 0:15–0:25 | Open Glance independently, with Screen Curtain already on. | Glance speaks first and offers a way to capture the page; no sighted setup during the take. |
+| 0:25–0:45 | Point the phone at the paper and follow the app's spoken and sound cues. | Framing guidance and automatic capture when the page is ready; no helper positions the phone or presses the shutter. |
+| 0:45–1:00 | Listen. | “One problem. An equation: on the left a fraction, the square root of x plus 1 over 2; on the right, 5.” |
+| 1:00–1:15 | Ask “what's on top?”, “read the bottom slower”, and “what does square root mean?” | The numerator, the denominator read more slowly, and a definition of the symbol; no suggested operation or next step. |
+| 1:15–1:35 | Say “write: square root of x plus 1 equals 10”, listen to the readback, then confirm using the supported voice control. | The student's own line is read back before saving; if grouping is ambiguous, the app asks and the student chooses. It must not silently repair the line. |
+| 1:35–1:45 | Request hand-in using the supported voice control. | Confirmation that typed work is ready, with only the student's confirmed line. |
 
----
+Do not insert another problem, a mode tour, a staged error or a keyboard shortcut demonstration. If natural use takes longer, record the real duration and adjust the presentation; never speed up or cut a recording to make it appear to meet the budget. After the take ends, the presenter may show the exported file to judges separately. Screen Curtain stays on for the whole take.
 
-## The run — four minutes
+**1:45–1:50, one proof line.** TODO: use a consented, dated result from [proof-log.md](proof-log.md), with the task and outcome. With no recorded trial, say “We haven't recorded a real student trial yet.” Never turn this rehearsal into a user-testing claim.
 
-### 0:00–0:25 · Who and what
+**1:50–2:00, trust.** “Glance is built to describe the maths and write down your work, without telling you what to do next. The school decides whether the tested configuration meets its accommodation rules.” The intended no-solving boundary is not a claim of universal exam approval.
 
-> "Math assumes you can see it and write it. For a blind student that is the
-> barrier — not ability. This is Glance: bring in any math problem, hear its
-> shape, work it out loud, hand in typed work."
+## Before calling the demo ready
 
-Nothing on screen but the app's Home. Let VoiceOver read it: *"Glance. Math
-for students who are blind or have low vision. It reads a problem aloud and
-writes down your own work as you say it. It never solves it for you. Capture a
-problem, or try the sample."* Let it finish: the last sentence before the
-choices is the promise the rest of the demo keeps.
+Record the deployed commit, device, operating system, browser, assistive technology, network and voice setting for every run. TODO: confirm all of these on that exact build:
 
-### 0:25–0:45 · The cost of today
+- Voice-first opening (#200), natural voice (#182), camera framing and automatic capture (#198), questions about the page (#199), dictation and ambiguity (#183), and voice controls including confirmation and hand-in (#184).
+- Microphone/camera permission prompts are operable without sighted help. Record whether the device was previously authorized; a prepared permission state is not evidence of a first-use experience.
+- The worksheet is read faithfully and the saved/exported line matches the student's confirmed words. The operator guard (#191) and integrity boundaries (#188) must be evaluated without claiming all gaps are closed.
+- Screen Curtain stays on, the app speaks audibly without competing voices, and no helper intervenes. Obtain consent for any participant recording and label teammate runs.
+- Three consecutive end-to-end takes on the venue network, plus an unbroken backup recording (#37). TODO: attach the run log and recording; none is certified by this document.
 
-> "Converting one STEM worksheet has historically cost thousands of dollars and
-> taken weeks. Even a top programme targets four to five business days. The
-> student falls behind while they wait."
+| Run | Deployed commit/device/network | Actual duration | Independent completion and failures | Recording |
+|---|---|---|---|---|
+| 1 | TODO | TODO | TODO | TODO |
+| 2 | TODO | TODO | TODO | TODO |
+| 3 | TODO | TODO | TODO | TODO |
 
-Sources are in `BUSINESS.md` §2. **Say the K–12 qualifier** on the 75% figure if
-you use it.
+Before the slot, check the backend health endpoint and perform a real capture and dictation on the deployed build. A healthy process alone does not prove model credentials or audio work. Prepare the consenting participant, paper, charged device, network and recorded backup. Do not expose keys or student material while checking configuration.
 
-### 0:45–2:30 · The demo
+## If the take fails
 
-Upload the worksheet. Press nothing while it reads — let the announcement do
-the work:
-
-> *"Reading your problem…"* → *"Found 2 lines. Solve for x. Line 1: 2 x plus 3
-> equals 11."*
-
-Focus lands on Line 1 by itself. Say that out loud — it is the part sighted
-people do not notice:
-
-> "Notice it moved me to the first line. I did not have to go looking."
-
-Then, in order:
-
-| Key | What to say |
-|---|---|
-| `G` | "This is the glance. Before reading a single symbol, I know its shape." |
-| `N` | Move to line 2, the fraction with a root on top. |
-| `G` | *"This is an equation, with a left side and a right side. It contains 1 fraction and 1 square root, nested."* — "That is the sentence a sighted reader gets for free." |
-| `Enter` | Explore. Arrow keys walk inside the expression. Subtitles are on, so judges see speech and braille. |
-| `Esc` | Back out to the line. |
-| `P` | **Back to line 1.** Do not skip this — see below. |
-| `S` | Start working. |
-
-> **Why `P` matters.** Since #92 the first line you save is checked against the
-> problem line you pressed `S` on. Press `S` on line 2 and "two x equals eight"
-> is checked against the fraction, which correctly comes back *"I couldn't
-> confirm this step."* — contradicting the narration a sentence later. Press
-> `S` on line 1 and it checks out. nicolashlam ran both through the real
-> checker to confirm.
-
-Now the student's own work. Hold `Space`, say **"two x equals eight"**, release.
-
-> *"I heard: 2 x equals 8. Enter to save, E to edit."* → press `Enter` →
-> *"Saved as line 1."* → *"This step checks out."*
-
-> "Nothing is saved until I confirm it. The model does not get the last word —
-> I do. And a computer algebra system just checked that step. It did not solve
-> anything — it checked that what I wrote follows from the line above. When it
-> cannot tell, it says it could not confirm. It never tells me I am wrong."
-
-**Then the moment.** Hold `Space`, say **"x plus one over two"**.
-
-> *"Did you mean x plus one, all over two, or x plus one half?"*
-
-Stop talking. Let it sit for a beat.
-
-> "That is two different expressions, and speech cannot tell them apart. A tool
-> that guesses is worse than useless for homework, because I cannot see what it
-> chose. So it asks."
-
-Press `2`, then **`Escape` to discard the readback.**
-
-> "The point was the question, not the line."
-
-**Do not save this one.** Both options are expressions rather than equations,
-so after `2x = 8` the checker returns `mixed` and the app says *"I couldn't
-confirm this step."* — which is correct behaviour but lands as an anticlimax
-straight after the wow moment. Discarding keeps the beat clean.
-
-If you would rather keep it, own it instead of ignoring it: *"it couldn't
-confirm that one, because it is an expression, not a step — and it says so
-rather than guessing."* That is a fair answer, but it costs you ten seconds.
-
-`L` for low-vision mode. `+` a few times, `T` once to flip the pairing.
-
-> "Same problem, no screen reader, for the much larger group who have some
-> sight."
-
-`Escape` back. Then `X`, or **Hand in my work** in the scratchpad:
-
-> "And this is the part that closes the loop — my own work, typed, as
-> accessible HTML with real MathML in it. My instructor opens it like any other
-> file, and a blind student can still read and navigate it. That is a hand-in,
-> not a screenshot."
-
-### 2:30–3:10 · Proof
-
-Scoreboard from `proof-log.md` and the eval reports. **Real numbers only.** If a
-number is not in the ledger, do not say it. If a hypothesis failed, say it
-failed and what changed — `BUSINESS.md` §3 is explicit that judges reward that.
-
-### 3:10–3:45 · Who pays
-
-Disability services and alternate-format offices. Free for students. Cal Poly →
-CSU's 22 campuses → other public universities. The pilot one-pager is #43
-and is not written yet — do not point at a document that does not exist.
-
-### 3:45–4:00 · Close
-
-> "Same-day math access, without anyone solving it for them."
-
----
-
-## Known gaps
-
-Read these before rehearsing, because two of them change the script.
-
-1. **Export is on `main`** (#107). Close the demo on the hand-in, as
-   `DESIGN.md` §25 step 6 intends: `X`, or **Hand in my work** in the
-   scratchpad. Show the accessible HTML rather than only the PDF — the point is
-   that an instructor opens it and a blind student can still read and navigate
-   the math. `.tex` and Nemeth are a separate panel in the scratchpad (#94).
-   Check the deployed build has caught up before you rely on it.
-
-2. **Capture and voice need the API key** (#4). Without it those routes are not
-   registered. The sample problem, glance, explore and low-vision mode all work
-   regardless, so a key failure is survivable: switch to "Try a sample problem"
-   and keep going. Know this path cold.
-3. **The step check works now** (#92). After you save a line in homework mode
-   you get "This step checks out." In study mode it names the operation. In
-   exam mode it is off — in the interface *and* at the server, which is the
-   thing an instructor is actually relying on. Say that out loud if a judge
-   asks about cheating; it is a stronger answer than a promise.
-4. **Handwriting is out of demo scope** unless the go/no-go test (#5) says
-   otherwise. Use typed or clean printed material.
-
-## If something breaks
-
-| | |
-|---|---|
-| Capture hangs | It cannot hang for long — model calls are bounded at 10 s for capture, 4 s for a spoken line. You will get an error, not a freeze. Say "that is the venue Wi-Fi", switch to the sample, carry on. |
-| A line comes back "unsure" | **Do not apologise.** Say "it flagged that it could not check that line — it does not pretend." That is the product working. |
-| Nothing is announced | VoiceOver lost focus. Click once on the page body, press `Tab`. |
-| Total failure | Backup video tab. Keep talking over it; do not restart the app in front of judges. |
-
-## Rehearse
-
-Three full runs on the demo laptop, one of them on the hotspot, one of them with
-the back end deliberately unreachable so the fallback is muscle memory (#55).
+Say what actually happened. Do not blame Wi-Fi without evidence, hide an intervention or call an interrupted run successful. End the live take and label the backup as a recording, including its device and date. If there is no validated backup, explain which part failed. A sample-problem demonstration can illustrate a component, but it does not satisfy the independent paper-to-hand-in take. Record the failure and repeat the three-run gate after the fix.
