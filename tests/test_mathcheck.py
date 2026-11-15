@@ -290,3 +290,19 @@ def test_mixed_numbers_only_when_whole_numbers(latex, expected):
     from sympy import simplify, sympify
 
     assert simplify(parse(latex) - sympify(expected)) == 0
+
+
+@pytest.mark.parametrize(
+    "b, valid",
+    [
+        (r"x = \pm 2", True),
+        (r"x = \mp 2", True),
+        (r"x = 2 \text{ or } x = -2", True),
+        ("x = 2, x = -2", True),         # two solutions written with a comma
+        ("x = 2, x = 3", False),
+        (r"x = \pm 3", False),
+    ],
+)
+def test_last_line_of_a_quadratic_keeps_both_roots(b, valid):
+    """Issue #129: the usual last line of a quadratic must check out."""
+    assert steps_equivalent("x^2 = 4", b)[0] is valid

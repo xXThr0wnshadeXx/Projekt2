@@ -144,8 +144,10 @@ def _same_real_solutions(da, db) -> bool:
 # comparing the set of real numbers each line allows. One variable only.
 
 _REL_TOKEN = re.compile(r"\\(?:leq|geq|le|ge|neq|ne|lt|gt)(?![a-zA-Z])|<|>|=")
-_OR_TOKEN = re.compile(r"\bor\b|\\(?:lor|vee)(?![a-zA-Z])")
-_SET_TRIGGER = re.compile(r"\\(?:leq|geq|le|ge|neq|ne|lt|gt|pm)(?![a-zA-Z])|<|>|\bor\b|\\(?:lor|vee)(?![a-zA-Z])")
+# "or" between answers, or a comma between whole statements ("x = 2, x = -2").
+# A comma only splits at the top level, so f(1, 2) and the point (1, 2) don't.
+_OR_TOKEN = re.compile(r"\bor\b|\\(?:lor|vee)(?![a-zA-Z])|,")
+_SET_TRIGGER = re.compile(r"\\(?:leq|geq|le|ge|neq|ne|lt|gt|pm|mp)(?![a-zA-Z])|<|>|\bor\b|\\(?:lor|vee)(?![a-zA-Z])|,")
 
 
 def _split_top(text: str, pattern: re.Pattern) -> tuple[list[str], list[str]]:
@@ -169,9 +171,10 @@ def _alternatives(text: str) -> list[str] | None:
     """"x = 3 or x = -3" and "x = \\pm 3" → one string per alternative."""
     alts: list[str] = []
     for alt in _split_top(text, _OR_TOKEN)[0]:
-        n = alt.count(r"\pm")
+        n = alt.count(r"\pm") + alt.count(r"\mp")
         if n > 1:
             return None  # several ± signs: which pairing is meant is ambiguous
+        alt = alt.replace(r"\mp", r"\pm")  # ∓ alone is the same pair of answers
         alts.extend([alt.replace(r"\pm", "+"), alt.replace(r"\pm", "-")] if n else [alt])
     return alts if all(alts) else None
 
