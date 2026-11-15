@@ -48,6 +48,12 @@ body {
   color: var(--fg);
 }
 
+/* A skip link moves focus to main, then the next Tab reaches its first
+   control. Do not leave a focus ring around the entire page in between. */
+main:focus {
+  outline: none;
+}
+
 /* Visible focus everywhere. Never remove this — it is how a sighted keyboard
    user knows where they are (DESIGN.md 13). */
 :focus-visible {

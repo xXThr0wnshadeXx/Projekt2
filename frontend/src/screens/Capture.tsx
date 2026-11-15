@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
+import { LiveBoard } from './LiveBoard';
 import { capture, pdfPageCount, pdfPage, ApiFailure, CAPTURE_TYPES } from '../api';
 import { downscale, sharpestFrame } from '../image';
 import { useShortcuts } from '../shortcuts';
@@ -47,6 +48,8 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [cameraOn, setCameraOn] = useState(false);
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const [liveBoard, setLiveBoard] = useState(false);
   const [pdf, setPdf] = useState<PendingPdf | null>(null);
   const [pageWanted, setPageWanted] = useState('1');
 
@@ -200,7 +203,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   // drop zone first.
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
-      if (busy !== 'idle') return;
+      if (busy !== 'idle' || liveBoard) return;
       const item = Array.from(e.clipboardData?.items ?? []).find((i) =>
         i.type.startsWith('image/'),
       );
@@ -210,10 +213,11 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
     }
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [busy]);
+  }, [busy, liveBoard]);
 
   async function startCamera() {
     setError('');
+    setCameraStarting(true);
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         // The back camera is the one pointed at a page or a board.
@@ -233,6 +237,8 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       const message = 'I could not open the camera. Check the permission, or upload a photo instead.';
       setError(message);
       announce(message, 'assertive');
+    } finally {
+      setCameraStarting(false);
     }
   }
 
@@ -260,11 +266,19 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       u: () => fileInput.current?.click(),
       c: () => void startCamera(),
     },
-    !working,
+    !working && !liveBoard && !cameraStarting,
   );
 
+  if (liveBoard) {
+    return <LiveBoard onBack={() => {
+      setLiveBoard(false);
+      announce('Back to capture.');
+      window.setTimeout(() => heading.current?.focus(), 0);
+    }} />;
+  }
+
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}
@@ -308,8 +322,16 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
         >
           Upload a file
         </button>
-        <button type="button" className="btn" disabled={working} onClick={startCamera}>
+        <button type="button" className="btn" disabled={working || cameraStarting} onClick={startCamera}>
           {cameraOn ? 'Restart camera' : 'Take a photo'}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={working || cameraOn || cameraStarting || Boolean(pdf)}
+          onClick={() => setLiveBoard(true)}
+        >
+          Live board
         </button>
       </div>
 
