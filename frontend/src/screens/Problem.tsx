@@ -131,17 +131,6 @@ export function Problem({
     );
   }
 
-  // Arrows and Space (#236): the easiest keys to find without looking.
-  useLineKeys({
-    previous: () => goTo(index - 1, 'previous'),
-    next: () => goTo(index + 1, 'next'),
-    read: () => {
-      if (!current) return;
-      const spoken = spokenMath(document.getElementById(current.id));
-      readAloud(spoken ? `Line ${index + 1}. ${spoken}` : `Line ${index + 1} is not ready to read yet.`);
-    },
-  });
-
   useShortcuts({
     g: glance,
     r: readLine,

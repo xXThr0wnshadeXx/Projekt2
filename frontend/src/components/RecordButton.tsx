@@ -20,6 +20,10 @@ import { announce } from './LiveRegion';
 import { shouldIgnore } from '../shortcuts';
 import { isPressable } from '../lineKeys';
 
+/** Said before the browser asks for the microphone, so the prompt is expected. */
+export const MIC_EXPLAINED =
+  'To hear you, I need the microphone. Your browser will ask now. Choose Allow.';
+
 export interface RecordButtonProps {
   onResult: (recording: Recording) => void;
   onError: (message: string) => void;
@@ -31,6 +35,30 @@ export interface RecordButtonProps {
 
 /** Held this long, Space records; released sooner, it was a tap (#236). */
 export const HOLD_MS = 350;
+
+const MIC_KEY = 'glance.microphoneAllowed';
+// Safari cannot be asked about the microphone, so a start that worked is
+// remembered instead, and the explanation is not repeated after it (#200).
+let micWorked = false;
+
+function micRemembered(): boolean {
+  if (micWorked) return true;
+  try {
+    micWorked = localStorage.getItem(MIC_KEY) === '1';
+  } catch {
+    // Storage may be blocked. Then it is remembered for this visit only.
+  }
+  return micWorked;
+}
+
+function rememberMic(): void {
+  micWorked = true;
+  try {
+    localStorage.setItem(MIC_KEY, '1');
+  } catch {
+    // Ignore: the in-memory flag still holds.
+  }
+}
 
 /** True when this is a touch device, where hold-to-talk must not be used. */
 export function prefersTapToggle(): boolean {
@@ -56,11 +84,38 @@ export function RecordButton({ onResult, onError, disabled = false, onTap }: Rec
     return () => r.cancel();
   }, []);
 
+  // Whether the browser will ask for the microphone (#200). Looked up ahead of
+  // time, so the explanation is said inside the student's own press, before
+  // the browser's prompt, with no extra wait.
+  const micState = useRef<PermissionState | 'unknown'>('unknown');
+  useEffect(() => {
+    let status: PermissionStatus | undefined;
+    navigator.permissions
+      ?.query({ name: 'microphone' as PermissionName })
+      .then((s) => {
+        status = s;
+        micState.current = s.state;
+        s.onchange = () => {
+          micState.current = s.state;
+        };
+      })
+      .catch(() => {
+        // Not every browser can be asked. Then the explanation is always given.
+      });
+    return () => {
+      if (status) status.onchange = null;
+    };
+  }, []);
+
   async function start() {
     if (busy.current || disabled || recording) return;
     busy.current = true;
+    if (micState.current !== 'granted' && !micRemembered()) {
+      announce(MIC_EXPLAINED, 'assertive');
+    }
     try {
       await recorder.current?.start();
+      rememberMic();
       setRecording(true);
       announce('Recording. Speak your line.', 'assertive');
     } catch (e: unknown) {
@@ -131,12 +186,14 @@ export function RecordButton({ onResult, onError, disabled = false, onTap }: Rec
       if (recorder.current?.recording) void stop();
     }
 
-    window.addEventListener('keydown', onDown);
-    window.addEventListener('keyup', onUp);
+    // Capture phase, so this runs before the page-wide keys (#236) and a held
+    // Space records instead of reading.
+    window.addEventListener('keydown', onDown, true);
+    window.addEventListener('keyup', onUp, true);
     window.addEventListener('blur', onBlur);
     return () => {
-      window.removeEventListener('keydown', onDown);
-      window.removeEventListener('keyup', onUp);
+      window.removeEventListener('keydown', onDown, true);
+      window.removeEventListener('keyup', onUp, true);
       window.removeEventListener('blur', onBlur);
     };
   });

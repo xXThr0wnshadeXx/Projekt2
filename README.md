@@ -6,7 +6,7 @@ Our focus is algebra-level maths, for blind and low-vision students and the disa
 
 That full voice flow is the target in [#197](https://github.com/xXThr0wnshadeXx/Projekt2/issues/197), not a claim that every page or device has been validated. See the [demo release gates](docs/demo-script.md#before-calling-the-demo-ready), [pitch and comparison](docs/pitch.md), and [judge Q&A](docs/qa-sheet.md) for evidence and open TODOs. Exam permission depends on the institution and the approved configuration.
 
-Try it: **https://glance-shreev2703.vercel.app**
+Try it: **https://glance-shreev2703.vercel.app** · Code: **https://github.com/xXThr0wnshadeXx/Projekt2**
 
 ### Try it in one minute
 
@@ -129,6 +129,17 @@ Workflow, branch naming and review rules are in [`DESIGN.md`](DESIGN.md) §18.
 ## Privacy
 
 No accounts and no database. Images and audio are sent to the OpenAI API for processing and are not stored by Glance. Session state lives in the browser. In user research we record roles, not names, and no disability details without explicit consent.
+
+## Team
+
+| Who | Role |
+|---|---|
+| Shreevatson Babu Sreegeetha (`shreev2703`), lead | Front end, accessibility, product, export, user research, pitch, submission |
+| Nicolas Lam (`nicolashlam`) | Back end and math: FastAPI app and deploy, step checking (SymPy), timeouts, mode enforcement in the API, latency, CI, request guards |
+| Shaswath (`xXThr0wnshadeXx`) | Capture and interpretation: `/api/capture`, `/api/transcribe`, `/api/spoken-to-latex`, `/api/command`, prompts, JSON schemas, both eval sets |
+| `tuffling` | Board visibility; not assigned implementation work |
+
+Roles follow [`docs/owners.md`](docs/owners.md).
 
 ## Credits and licences
 
