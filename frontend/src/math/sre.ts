@@ -67,11 +67,13 @@ function list(parts: [number, string, string][]): string {
 
 /** Find the top-level relation symbol, if there is one. */
 function topLevelRelation(root: Element): string | null {
-  // Only direct children of the row count: an `=` inside a fraction is not
-  // what makes the whole thing an equation.
-  const row = root.localName === 'math' ? (root.firstElementChild ?? root) : root;
-  const scan = row.localName === 'mrow' ? row : root;
-  for (const child of Array.from(scan.children)) {
+  // MathJax can wrap the whole line in one row, or group just the left side
+  // in a row alongside the relation and right side. Unwrap only whole lines.
+  let row = root;
+  while (row.childElementCount === 1 && row.firstElementChild?.localName === 'mrow') {
+    row = row.firstElementChild;
+  }
+  for (const child of Array.from(row.children)) {
     if (child.localName === 'mo') {
       const op = (child.textContent ?? '').trim();
       if (op in RELATIONS) return op;
