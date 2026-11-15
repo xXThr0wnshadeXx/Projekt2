@@ -7,7 +7,10 @@
 // Three rules shape everything here:
 //   - Nothing is saved until the student confirms it.
 //   - When speech is ambiguous we ask, we never guess (issue #19).
-//   - Nothing is ever solved, hinted, or corrected, in any mode.
+//   - Nothing is ever solved, hinted, or corrected, in any mode. Reader mode
+//     (the default) never checks a step either; study and homework check a
+//     line only against the student's own previous line, at most three times
+//     per problem, and exam never checks.
 //
 // Typing is a first-class alternative, not a fallback. Some students cannot
 // speak reliably, some are in a quiet library, and some browsers cannot record.
@@ -33,7 +36,15 @@ import { applyEdit, lineNumber, looksLikeCommand } from '../commands';
 import { SAYS, stripFiller, understandTalk, type Talk } from '../talk';
 import { helpText, useShortcuts } from '../shortcuts';
 import type { Recording } from '../audio/recorder';
-import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
+import {
+  checkStep,
+  checksOffMessage,
+  stepChecksAllowed,
+  takeCheck,
+  withBasis,
+  SAYS_CAP,
+  SAYS_NO_PREVIOUS,
+} from '../stepCheck';
 import { loadWork, saveWork, type Mode, type Problem, type WorkLine } from '../state';
 
 export interface ScratchpadProps {
@@ -228,9 +239,9 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     // An edit (#24) replaces its line in place; anything else is appended.
     const editIndex = editTarget ? lines.findIndex((l) => l.id === editTarget) : -1;
     const index = editIndex >= 0 ? editIndex : lines.length;
-    // The step is checked against the line it follows: the student's previous
-    // line, or for their first line, the problem line they were working from.
-    const from = lines[index - 1] ?? problem.lines[startLine] ?? problem.lines[0];
+    // A step is only ever checked against the student's own previous line,
+    // never a problem line, so a check cannot be used to hunt for an answer.
+    const from = lines[index - 1];
     setLines((prev) =>
       editIndex >= 0 ? prev.map((l, i) => (i === editIndex ? entry : l)) : [...prev, entry],
     );
@@ -241,10 +252,14 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     window.setTimeout(() => focusFirst(`#${entry.id}`), 80);
 
     const saved = editIndex >= 0 ? `Updated line ${position}.` : `Saved as line ${position}.`;
-    announce(line.valid ? saved : `${saved} I could not check it.`);
+    announce(line.valid ? saved : `${saved} I could not read it as math.`);
     lastAction.current = entry.id;
 
     if (!line.valid || !from?.valid || !stepChecksAllowed(mode)) return;
+    if (!takeCheck()) {
+      if (lastAction.current === entry.id) announce(SAYS_CAP);
+      return;
+    }
     const checked = await checkStep(from.latex, entry.latex, mode);
     if (!checked) return;
     const verdict = withBasis(checked, basisFor(index));
@@ -256,9 +271,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
 
   /** What the work line at `index` is checked against, in words. */
   function basisFor(index: number): string {
-    return index > 0
-      ? `your line ${index}`
-      : `line ${Math.min(startLine, problem.lines.length - 1) + 1} of the problem`;
+    return `your line ${index}`;
   }
 
   function remove(line: WorkLine, index: number) {
@@ -431,12 +444,20 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       case 'check':
       case 'what_changed': {
         if (!stepChecksAllowed(mode)) {
-          announce('Step checking is off in exam mode.');
+          announce(checksOffMessage(mode));
           return;
         }
-        const before = lines[n! - 2] ?? problem.lines[startLine] ?? problem.lines[0];
-        if (!target!.valid || !before?.valid) {
+        const before = lines[n! - 2];
+        if (!before) {
+          announce(SAYS_NO_PREVIOUS);
+          return;
+        }
+        if (!target!.valid || !before.valid) {
           announce(`I couldn't confirm line ${n}. It could not be read as math.`);
+          return;
+        }
+        if (!takeCheck()) {
+          announce(SAYS_CAP);
           return;
         }
         const verdict = await checkStep(before.latex, target!.latex, mode);
@@ -508,8 +529,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       {/* The problem stays within reach but collapsed, so it does not sit
           between the student and the thing they came here to do. */}
       {/* On screen as well as announced: a low-vision student reading the page
-          without a screen reader needs the same context, and it is the line
-          their first step is checked against. */}
+          without a screen reader needs the same context. */}
       {problem.lines.length > 1 && (
         <p className="mt-4 text-sm text-[--muted]">
           Following line {startLine + 1} of the problem.

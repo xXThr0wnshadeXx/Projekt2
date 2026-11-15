@@ -7,6 +7,7 @@
 import type { Mode } from '../state';
 
 const LABEL: Record<Mode, string> = {
+  reader: 'Reader and scribe',
   study: 'Study mode',
   homework: 'Homework mode',
   exam: 'Exam mode',

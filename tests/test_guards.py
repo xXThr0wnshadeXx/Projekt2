@@ -43,9 +43,16 @@ def test_model_endpoints_have_a_tighter_budget():
     assert [rl.check("1.1.1.1", "/api/capture") for _ in range(3)] == [0, 0, 0]
     assert rl.check("1.1.1.1", "/api/capture") > 0
     # the cheap bucket is separate
-    assert rl.check("1.1.1.1", "/api/diff") == 0
+    assert rl.check("1.1.1.1", "/api/validate") == 0
     # another IP is unaffected
     assert rl.check("2.2.2.2", "/api/capture") == 0
+
+
+def test_diff_uses_the_model_bucket():
+    assert "/api/diff" in guards.MODEL_PATHS
+    rl = limiter(Clock())
+    assert [rl.check("1.1.1.1", "/api/diff") for _ in range(3)] == [0, 0, 0]
+    assert rl.check("1.1.1.1", "/api/diff") > 0
 
 
 def test_window_slides():
@@ -68,21 +75,21 @@ def test_forwarded_for_uses_the_address_the_proxy_recorded():
 def test_sweep_forgets_idle_clients():
     clock = Clock()
     rl = limiter(clock)
-    rl.check("a", "/api/diff")
+    rl.check("a", "/api/validate")
     clock.t += 3600
-    rl.check("b", "/api/diff")
+    rl.check("b", "/api/validate")
     assert ("a", "all") not in rl.hits
 
 
 def test_rate_limit_response_is_friendly_and_readable_cross_origin():
     settings = Settings(_env_file=None, allowed_origin=ORIGIN, rate_limit_per_minute=2)
     app = create_app(settings, warm_cas=False)
-    body = {"from_latex": "x", "to_latex": "x", "mode": "exam"}
+    body = {"latex": "x"}
     with TestClient(app) as c:
-        codes = [c.post("/api/diff", json=body, headers={"Origin": ORIGIN}).status_code for _ in range(3)]
-        r = c.post("/api/diff", json=body, headers={"Origin": ORIGIN})
+        codes = [c.post("/api/validate", json=body, headers={"Origin": ORIGIN}).status_code for _ in range(3)]
+        r = c.post("/api/validate", json=body, headers={"Origin": ORIGIN})
         health = c.get("/api/health")
-    assert codes[:2] == [403, 403] and codes[2] == 429
+    assert codes[:2] == [200, 200] and codes[2] == 429
     assert r.json()["error"]["code"] == "RATE_LIMITED"
     assert "try again" in r.json()["error"]["message"]
     assert int(r.headers["retry-after"]) >= 1

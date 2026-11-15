@@ -9,7 +9,7 @@ Try it: **https://glance-shreev2703.vercel.app**
 1. Open the link and press **Try a sample problem**.
 2. Press **S** to start working.
 3. Type `two x equals eight` and press Enter. Glance reads the line back.
-4. Press Enter again to save it. Glance says whether the step checks out.
+4. Press Enter again to save it. Glance says which line it saved. It does not check your work.
 5. Type `what does coefficient mean` and press Enter.
 6. Type `what is x` and press Enter. Glance declines, because the work is the student's.
 
@@ -43,12 +43,13 @@ Picture → structured math → navigable audio, large print and braille → the
 - **Glance** — hear the *structure* of an expression before its contents, then explore inside it with arrow keys, with speech, Nemeth braille and a keyboard magnifier.
 - **Low-vision mode** — one line full-screen, adjustable size, high-contrast themes.
 - **Scratchpad** — speak or type each step. Every line is read back and confirmed before it's saved. When speech is genuinely ambiguous, Glance asks ("did you mean *x + 1, all over 2*, or *x plus one half*?") instead of guessing.
-- **Verified steps** — a computer algebra system checks that your step follows from the last one before anything is said about it. A step that can't be verified is reported as "couldn't confirm," never as "wrong."
+- **Reader and scribe by default** — Glance reads the problem and writes down your work. It never checks, solves or hints.
+- **Optional step checks** — only if your instructor allows them (Study or Homework mode in Settings): a computer algebra system checks that a line follows from your own previous line, at most three times per problem. A step that can't be verified is reported as "couldn't confirm," never as "wrong."
 - **Export** — numbered typed work as PDF, accessible HTML (with MathML), `.tex`, or Nemeth.
 
 ### It never solves anything
 
-No answers, no hints, no next steps, in any mode. Study, homework and exam modes change what's available, and exam mode is transcription only. This is enforced in the interface *and* in the API, so an instructor can rely on it.
+No answers, no hints, no next steps, in any mode. Reader and scribe is the default and never checks a step. Exam mode is the same with no word meanings either. Study and homework modes, for students whose instructor allows step checks, are the only ones that check anything. This is enforced in the interface *and* in the API, so an instructor can rely on it.
 
 ## How it's built
 
