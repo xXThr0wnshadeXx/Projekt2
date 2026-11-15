@@ -112,8 +112,10 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
         </label>
       </fieldset>
 
+      {/* "Back" alone says nothing when it is read out with no screen to look
+          at. Every way out of a screen now names where it goes. */}
       <button type="button" className="btn mt-8" onClick={onBack}>
-        Back
+        Back to the start
       </button>
     </main>
   );

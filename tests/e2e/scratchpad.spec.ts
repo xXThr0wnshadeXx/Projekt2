@@ -229,7 +229,7 @@ test.describe('@smoke scratchpad', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Back to the problem' }).click();
+    await page.getByRole('button', { name: 'Leave and read the problem again' }).click();
     await expect(page.getByRole('heading', { name: 'Your problem' })).toBeVisible();
     await page.getByRole('button', { name: 'Start working' }).click();
 

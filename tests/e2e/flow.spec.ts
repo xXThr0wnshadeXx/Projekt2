@@ -194,7 +194,7 @@ test.describe('@smoke critical path', () => {
     await expect(page.getByRole('button', { name: 'Take a photo' })).toBeVisible();
 
     // Back returns to the start without a reload.
-    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('button', { name: 'Back to the start' }).click();
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
   });
 

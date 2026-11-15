@@ -79,6 +79,10 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   // One step of undo is enough in practice and is far easier to explain than a
   // history: "undo" always means "put back the line I just removed".
   const undone = useRef<{ line: WorkLine; at: number } | null>(null);
+  // A ref cannot drive the UI, and the Undo button must not be offered when
+  // there is nothing to put back — a control that can only answer "there is
+  // nothing to undo" is a dead end for someone moving by Tab.
+  const [canUndo, setCanUndo] = useState(false);
   // The most recent thing the student did, so a slow step-check result can
   // tell whether it is still the news.
   const lastAction = useRef<string>('');
@@ -195,6 +199,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   function remove(line: WorkLine, index: number) {
     lastAction.current = `remove:${line.id}`;
     undone.current = { line, at: index };
+    setCanUndo(true);
     setLines((prev) => prev.filter((l) => l.id !== line.id));
     announce(`Deleted line ${index + 1}. Press U to undo.`);
   }
@@ -212,6 +217,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       return next;
     });
     undone.current = null;
+    setCanUndo(false);
     announce('Put the line back.');
   }
 
@@ -478,19 +484,41 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         </p>
       )}
 
-      <div className="mt-8 flex flex-wrap gap-3">
-        <button type="button" className="btn" onClick={readAll}>
-          Read my work
-        </button>
-        <button type="button" className="btn" onClick={undo}>
-          Undo delete
-        </button>
-        <button type="button" className="btn" onClick={onExport}>
-          Hand in my work
-        </button>
-        <button type="button" className="btn" onClick={onBack}>
-          Back to the problem
-        </button>
+      {/* Nothing is offered here that cannot act. With no lines written,
+          reading the work back, handing it in and undoing a delete are all
+          dead ends — and for someone moving by Tab a dead end costs the same
+          as a real control. They appear as the work does. */}
+      <div className="mt-8">
+        {lines.length > 0 && (
+          <>
+            <button type="button" className="btn-primary" onClick={onExport}>
+              Hand in my work
+            </button>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button type="button" className="btn" onClick={readAll}>
+                Read my work
+              </button>
+              {canUndo && (
+                <button type="button" className="btn" onClick={undo}>
+                  Undo delete
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        <div
+          className={
+            lines.length > 0 ? 'mt-6 border-t border-[--line] pt-4' : 'mt-2'
+          }
+        >
+          {/* Named for where it goes, not "back" — "Show the problem" above
+              opens it here beside the work, and two controls that both read as
+              "the problem" is a guess the student should not have to make. */}
+          <button type="button" className="btn-quiet" onClick={onBack}>
+            Leave and read the problem again
+          </button>
+        </div>
       </div>
 
       <MathExports lines={lines} />

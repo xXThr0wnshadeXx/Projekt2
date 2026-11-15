@@ -56,7 +56,7 @@ async function setMode(page: Page, mode: 'Study' | 'Homework' | 'Exam') {
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeFocused();
   await page.getByRole('radio', { name: new RegExp(`^${mode}`) }).check();
   await expect(page.getByTestId('mode-badge')).toHaveText(`${mode} mode`);
-  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Back to the start' }).click();
 }
 
 async function openSample(page: Page) {
