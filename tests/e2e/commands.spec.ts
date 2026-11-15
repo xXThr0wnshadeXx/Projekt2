@@ -56,7 +56,7 @@ async function open(page: Page, reply: Reply, spoken?: unknown) {
   await page.getByRole('button', { name: 'Back to your problem' }).click();
   await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
   await page.keyboard.press('s');
-  await expect(page.getByRole('heading', { name: 'Your work' })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
   return calls;
 }
 
