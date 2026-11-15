@@ -19,6 +19,10 @@ import { Recorder, isSupported, type Recording } from '../audio/recorder';
 import { announce } from './LiveRegion';
 import { shouldIgnore } from '../shortcuts';
 
+/** Said before the browser asks for the microphone, so the prompt is expected. */
+export const MIC_EXPLAINED =
+  'To hear you, I need the microphone. Your browser will ask now. Choose Allow.';
+
 export interface RecordButtonProps {
   onResult: (recording: Recording) => void;
   onError: (message: string) => void;
@@ -48,9 +52,35 @@ export function RecordButton({ onResult, onError, disabled = false }: RecordButt
     return () => r.cancel();
   }, []);
 
+  // Whether the browser will ask for the microphone (#200). Looked up ahead of
+  // time, so the explanation is said inside the student's own press, before
+  // the browser's prompt, with no extra wait.
+  const micState = useRef<PermissionState | 'unknown'>('unknown');
+  useEffect(() => {
+    let status: PermissionStatus | undefined;
+    navigator.permissions
+      ?.query({ name: 'microphone' as PermissionName })
+      .then((s) => {
+        status = s;
+        micState.current = s.state;
+        s.onchange = () => {
+          micState.current = s.state;
+        };
+      })
+      .catch(() => {
+        // Not every browser can be asked. Then the explanation is always given.
+      });
+    return () => {
+      if (status) status.onchange = null;
+    };
+  }, []);
+
   async function start() {
     if (busy.current || disabled || recording) return;
     busy.current = true;
+    if (micState.current !== 'granted') {
+      announce(MIC_EXPLAINED, 'assertive');
+    }
     try {
       await recorder.current?.start();
       setRecording(true);
