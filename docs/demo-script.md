@@ -92,12 +92,26 @@ Stop talking. Let it sit for a beat.
 
 Press `2`. It goes to the readback, you confirm.
 
+It then confirms the step:
+
+> *"This step checks out."*
+
+> "A computer algebra system checked that. It did not solve anything — it
+> checked that what I wrote follows from the line above. And if it cannot tell,
+> it says it could not confirm. It never tells me I am wrong."
+
 `L` for low-vision mode. `+` a few times, `T` once to flip the pairing.
 
 > "Same problem, no screen reader, for the much larger group who have some
 > sight."
 
-`Escape` back.
+`Escape` back. Then, **only if export is on the deployed build** (see
+[Known gaps](#known-gaps)), open it from the scratchpad:
+
+> "And this is the part that closes the loop — my own work, typed, as
+> accessible HTML with real MathML in it. My instructor opens it like any other
+> file, and a blind student can still read and navigate it. That is a hand-in,
+> not a screenshot."
 
 ### 2:30–3:10 · Proof
 
@@ -120,18 +134,24 @@ CSU's 22 campuses → other public universities. Pilot plan in `docs/pilot.md`.
 
 Read these before rehearsing, because two of them change the script.
 
-1. **Export is not built yet.** `DESIGN.md` §25 step 6 ends on "export → typed
-   PDF + accessible HTML". That is #22 and it is not merged. **Do not end the
-   demo on export until it is.** If it lands before Sunday, add it after the
-   low-vision flip and close on the hand-in. If it does not, close on the
-   ambiguity moment instead — it is the stronger beat anyway.
+1. **Export is written but check it is on `main` before you rehearse it.**
+   #96 built it — accessible HTML with real MathML, print-to-PDF, `.tex` and
+   Nemeth — but that pull request merged into a branch that had already been
+   merged, so the work was stranded. #107 brings it onto `main` and is waiting
+   on a review. **Open the deployed link and look for the export control.** If
+   it is there, close the demo on the hand-in as `DESIGN.md` §25 step 6
+   intends, and show the HTML rather than only the PDF — the point is that an
+   instructor opens it and a blind student can still read and navigate the
+   math. If it is not there, close on the ambiguity moment instead.
 2. **Capture and voice need the API key** (#4). Without it those routes are not
    registered. The sample problem, glance, explore and low-vision mode all work
    regardless, so a key failure is survivable: switch to "Try a sample problem"
    and keep going. Know this path cold.
-3. **Step check is not wired into the scratchpad.** `/api/diff` exists, but the
-   scratchpad does not call it, so there is no "this step checks out" yet.
-   Do not promise it in the narration.
+3. **The step check works now** (#92). After you save a line in homework mode
+   you get "This step checks out." In study mode it names the operation. In
+   exam mode it is off — in the interface *and* at the server, which is the
+   thing an instructor is actually relying on. Say that out loud if a judge
+   asks about cheating; it is a stronger answer than a promise.
 4. **Handwriting is out of demo scope** unless the go/no-go test (#5) says
    otherwise. Use typed or clean printed material.
 
