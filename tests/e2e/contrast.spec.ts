@@ -39,3 +39,37 @@ test.describe('@smoke low-vision contrast', () => {
     expect(contrastRatio('#000000', '#000000')).toBeCloseTo(1, 1);
   });
 });
+
+// The primary button is filled rather than outlined, so its label sits on the
+// accent colour instead of the page background — a pairing nothing else in the
+// app uses, and therefore one nothing else would catch.
+//
+// DESIGN.md 13 asks for AA everywhere and AAA only in low-vision mode, so AA is
+// the bar here. These values are read from index.css; if they are changed there
+// without being changed here the test still fails, which is the point.
+test.describe('@smoke primary action contrast', () => {
+  const AA = 4.5;
+  const THEMES = [
+    { name: 'dark', accent: '#7cc4ff', accentFg: '#06121d' },
+    { name: 'light', accent: '#0b5fa5', accentFg: '#ffffff' },
+  ];
+
+  for (const t of THEMES) {
+    test(`${t.name}: the label on the primary button clears AA`, () => {
+      const ratio = contrastRatio(t.accentFg, t.accent);
+      expect(
+        ratio,
+        `${t.name} primary label (${t.accentFg} on ${t.accent}) is ${ratio.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(AA);
+    });
+  }
+
+  test('the tokens in index.css still match what is asserted here', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const css = await readFile('frontend/src/index.css', 'utf8');
+    for (const t of THEMES) {
+      expect(css, `${t.accent} is no longer in index.css`).toContain(t.accent);
+      expect(css, `${t.accentFg} is no longer in index.css`).toContain(t.accentFg);
+    }
+  });
+});

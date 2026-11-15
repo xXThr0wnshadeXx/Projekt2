@@ -11,13 +11,15 @@
 import { useEffect, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { KeyboardHelp } from './components/KeyboardHelp';
-import { speak, setSelfVoicing } from './audio/tts';
+import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
+import { InstallApp } from './components/InstallApp';
 import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
-import { health, apiBase, ApiFailure } from './api';
+import { spokenMath } from './math/sre';
+import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
 import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
@@ -60,7 +62,15 @@ export function App() {
     setSelfVoicing(settings.selfVoicing);
   }, [settings.selfVoicing]);
 
+  // Every size in the app is in rem, so this one number is large print for
+  // all of it — buttons, notes and maths alike.
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${settings.textScale}%`;
+  }, [settings.textScale]);
+
   function updateSettings(next: SettingsData) {
+    // Applied before anything is announced, so switching the voice on is heard.
+    setSelfVoicing(next.selfVoicing);
     setSettings(next);
     saveSettings(next);
   }
@@ -82,7 +92,6 @@ export function App() {
   function showHelp(takeFocus: boolean) {
     const text = helpText(screen);
     announce(text);
-    speak(text); // only when the student has turned self-voicing on
     setHelp({ takeFocus });
   }
 
@@ -105,8 +114,18 @@ export function App() {
         setBackEnd('up');
         setBackEndNote('');
       })
-      .catch((e: unknown) => {
+      .catch(async (e: unknown) => {
         setBackEnd('down');
+        // A server that is up but refusing this origin looks identical to one
+        // that is down, so find out which before telling anyone anything.
+        if (e instanceof ApiFailure && e.code === 'NETWORK') {
+          setBackEndNote(
+            (await diagnoseUnreachable()) === 'blocked'
+              ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
+              : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
+          );
+          return;
+        }
         setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
       });
   }, []);
@@ -134,9 +153,7 @@ export function App() {
     // explorer uses, so the two read the expression identically.
     const spoken: Record<string, string> = {};
     for (const line of problem?.lines ?? []) {
-      const label = document
-        .querySelector(`#${line.id} mjx-container`)
-        ?.getAttribute('aria-label');
+      const label = spokenMath(document.getElementById(line.id));
       if (label) spoken[line.id] = label;
     }
     setSpokenLines(spoken);
@@ -183,7 +200,7 @@ export function App() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Glance</h1>
-            <p className="mt-1 text-[--muted]">Math you can hear and speak.</p>
+            <p className="mt-1 text-[--muted]">Math you can hear, explore and write without seeing the page.</p>
             <div className="mt-2">
               <ModeBadge mode={settings.mode} />
             </div>
@@ -198,6 +215,7 @@ export function App() {
           >
             Keyboard shortcuts
           </button>
+          <InstallApp />
         </div>
       </header>
 
@@ -214,10 +232,11 @@ export function App() {
 
       {screen === 'home' && (
         <Home
-          backEndReachable={backEnd !== 'down'}
           onCapture={() => setScreen('capture')}
           onSample={() => openProblem(sampleProblem())}
           onResume={problem ? () => setScreen('problem') : undefined}
+          settings={settings}
+          onSettingsChange={updateSettings}
           onSettings={openSettings}
         />
       )}
@@ -229,11 +248,13 @@ export function App() {
       {screen === 'problem' && problem && (
         <Problem
           problem={problem}
+          startIndex={lineIndex}
           onLowVision={enterLowVision}
           mode={settings.mode}
           onNewCapture={() => setScreen('capture')}
           onStartWorking={(index) => {
             setWorkingFrom(index);
+            setLineIndex(index);
             setScreen('scratchpad');
           }}
           onExport={() => openExport('problem')}
@@ -264,7 +285,7 @@ export function App() {
 
       {/* Only reachable if storage returned something unusable. */}
       {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
-        <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+        <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
           <h2 className="text-2xl font-semibold">No problem loaded</h2>
           <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
             Back to start
@@ -272,20 +293,32 @@ export function App() {
         </main>
       )}
 
-      <footer className="mx-auto max-w-3xl px-6 pb-10 pt-4 text-sm text-[--muted]">
-        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
-          <dt>Back end</dt>
-          <dd data-testid="backend-status">
-            {backEnd === 'checking' && 'checking'}
-            {backEnd === 'up' && 'reachable'}
-            {backEnd === 'down' && `not reachable — ${backEndNote}`}
-          </dd>
-          <dt>API base</dt>
-          <dd>
-            <code>{apiBase}</code>
-          </dd>
-        </dl>
-      </footer>
+      {/* Nothing is said while everything works. A reachable server and the
+          address it lives at are facts for whoever deployed it, not for the
+          student — and read aloud on every screen they are just noise before
+          the content. When it breaks, this says what still works first, and
+          keeps the technical detail for whoever goes looking. */}
+      {backEnd === 'down' && (
+        <footer className="mx-auto max-w-3xl px-6 pb-10 pt-4">
+          <div
+            role="status"
+            data-testid="backend-status"
+            className="rounded-lg border border-[--warn] bg-[--surface] px-4 py-3 text-sm"
+          >
+            <p>
+              Reading new problems is unavailable right now. The sample problem still
+              works — you can explore it, glance at it, write your own work and hand it in.
+            </p>
+            <details className="mt-2 text-[--muted]">
+              <summary className="cursor-pointer">Why</summary>
+              <p className="mt-2">{backEndNote}</p>
+              <p className="mt-1">
+                Server address: <code>{apiBase}</code>
+              </p>
+            </details>
+          </div>
+        </footer>
+      )}
       </div>
     </>
   );
