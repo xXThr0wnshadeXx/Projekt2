@@ -1,7 +1,8 @@
 // Issue #127 (keyless.spec.ts covers typing with no model; this covers which
-// controls are offered): with no model on the server, or no server, recording and capture
-// are not offered as if they worked. A student moving by Tab must never land
-// on a control whose only outcome is an error.
+// controls are offered): when the server says it has no model, recording and
+// capture are not offered as if they worked. A student moving by Tab must never
+// land on a control whose only outcome is an error. A server that did not
+// answer proves nothing (it may be a cold start), so it is asked again.
 
 import { test, expect, type Page } from '@playwright/test';
 import { stubHealth, stubServerWithModels } from './server';
@@ -17,11 +18,10 @@ async function openScratchpad(page: Page) {
 }
 
 test.describe('@smoke without the model', () => {
-  for (const state of ['no model key', 'no server'] as const) {
+  for (const state of ['no model key'] as const) {
     test.describe(state, () => {
       test.beforeEach(async ({ page }) => {
-        if (state === 'no model key') await stubHealth(page, { ok: true, models: false });
-        else await page.route('**/api/health', (r) => r.abort('connectionrefused'));
+        await stubHealth(page, { ok: true, models: false });
         await page.goto('/');
       });
 
@@ -36,11 +36,7 @@ test.describe('@smoke without the model', () => {
         await expect(button).toBeFocused();
         await button.press('Enter');
         await expect(polite(page)).toContainText('Capture is unavailable right now.');
-        await expect(polite(page)).toContainText(
-          state === 'no server'
-            ? 'The server is not reachable.'
-            : 'The server cannot read images or speech right now.',
-        );
+        await expect(polite(page)).toContainText('The server cannot read images or speech right now.');
         await expect(page.getByRole('heading', { name: /Math for students/ })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Capture a problem' })).toHaveCount(0);
       });
@@ -83,5 +79,52 @@ test.describe('@smoke with the model', () => {
     await openScratchpad(page);
     await expect(polite(page)).toContainText('Record a line, or type one.');
     await expect(page.getByTestId('speech-unavailable')).toHaveCount(0);
+  });
+});
+
+test.describe('@smoke health is asked again', () => {
+  test('a server that did not answer leaves capture and recording offered', async ({ page }) => {
+    await page.route('**/api/health', (r) => r.abort('connectionrefused'));
+    await page.goto('/');
+    await expect(page.getByText('Reading new problems is unavailable right now.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Capture a problem', exact: true })).toBeVisible();
+    await openScratchpad(page);
+    await expect(page.getByTestId('speech-unavailable')).toHaveCount(0);
+  });
+
+  test('a failed first check is retried without a reload', async ({ page }) => {
+    let calls = 0;
+    await page.route('**/api/health', (r) => {
+      calls += 1;
+      if (calls <= 2) return r.abort('connectionrefused');
+      return r.fulfill({ json: { ok: true, models: true } });
+    });
+    await page.goto('/');
+    await expect(page.getByText('Reading new problems is unavailable right now.')).toBeVisible();
+    // Retried on its own after a couple of seconds, and the warning goes.
+    await expect(page.getByText('Reading new problems is unavailable right now.')).toHaveCount(0, { timeout: 10_000 });
+  });
+
+  test('coming back to Home asks again, and capture returns once the model is there', async ({ page }) => {
+    let models = false;
+    await page.route('**/api/health', (r) => r.fulfill({ json: { ok: true, models } }));
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: CAPTURE_UNAVAILABLE })).toBeVisible();
+
+    models = true;
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to the start' }).click();
+    await expect(page.getByRole('button', { name: 'Capture a problem', exact: true })).toBeVisible();
+  });
+
+  test('opening the scratchpad asks again, and recording returns once the model is there', async ({ page }) => {
+    let models = false;
+    await page.route('**/api/health', (r) => r.fulfill({ json: { ok: true, models } }));
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: CAPTURE_UNAVAILABLE })).toBeVisible();
+
+    models = true;
+    await openScratchpad(page);
+    await expect(page.getByTestId('record-button')).toBeVisible();
   });
 });
