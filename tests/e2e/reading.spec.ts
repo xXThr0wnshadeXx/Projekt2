@@ -84,7 +84,9 @@ test.describe('@smoke reading controls', () => {
     for (let i = 0; i < 3; i += 1) await larger.click();
     await expect(page.getByTestId('text-scale')).toHaveText('200%');
 
-    await larger.click();
+    // Safari does not focus buttons on a pointer click. Activate by keyboard
+    // to check that reaching the limit keeps the keyboard user's focus.
+    await larger.press('Enter');
     await expect(polite(page)).toHaveText('This is the largest text size.');
     await expect(larger).toBeFocused();
   });

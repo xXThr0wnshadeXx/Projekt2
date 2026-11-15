@@ -8,11 +8,13 @@
 // routing problem, and every dependency is one more thing that can break a
 // screen reader in a way we would have to discover ourselves.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
+import { ScreenBoundary } from './components/ScreenBoundary';
 import { KeyboardHelp } from './components/KeyboardHelp';
 import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
+import { InstallApp } from './components/InstallApp';
 import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
@@ -27,6 +29,7 @@ import { LowVision } from './screens/LowVision';
 import { Scratchpad } from './screens/Scratchpad';
 import {
   loadProblem,
+  loadWork,
   saveProblem,
   sampleProblem,
   loadSettings,
@@ -45,9 +48,20 @@ type Screen =
   | 'export';
 type BackEnd = 'checking' | 'up' | 'down';
 
+/** How soon an unanswered health check is asked again, doubling up to the cap. */
+const HEALTH_RETRY_FIRST_MS = 2_000;
+const HEALTH_RETRY_MAX_MS = 30_000;
+
 export function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
+  const [initialRestore] = useState(() => {
+    const count = loadWork().length || problem?.lines.length;
+    return count === undefined
+      ? ''
+      : `I restored your work from earlier: ${count} ${count === 1 ? 'line' : 'lines'}.`;
+  });
+  const [lowVisionFailed, setLowVisionFailed] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
@@ -63,6 +77,14 @@ export function App() {
   useEffect(() => {
     setSelfVoicing(settings.selfVoicing);
   }, [settings.selfVoicing]);
+
+  const restored = useRef(initialRestore);
+  const takeRestoredAnnouncement = useCallback(() => {
+    const announcement = restored.current;
+    restored.current = '';
+    return announcement;
+  }, []);
+  const resumeProblem = useCallback(() => setScreen('problem'), []);
 
   // Every size in the app is in rem, so this one number is large print for
   // all of it — buttons, notes and maths alike.
@@ -110,45 +132,70 @@ export function App() {
     });
   }, []);
 
-  useEffect(() => {
+  // Health is asked again, not trusted from one request at load (#127). A
+  // cold start can make the first request fail, and a student told "capture
+  // is unavailable" should not have to reload to find out it came back.
+  const healthRun = useRef(0);
+  const healthRetry = useRef<number | undefined>(undefined);
+  const retryDelay = useRef(HEALTH_RETRY_FIRST_MS);
+  const checkHealth = useCallback(async () => {
     // A deployed build with no server address has nothing to ask (#135).
     if (!apiConnected) {
       setBackEnd('down');
       setBackEndNote(UNCONNECTED_MESSAGE);
       return;
     }
-    health()
-      .then((h) => {
-        setBackEnd('up');
-        setBackEndNote('');
-        setModels(h.models !== false);
-      })
-      .catch(async (e: unknown) => {
-        setBackEnd('down');
-        // A server that is up but refusing this origin looks identical to one
-        // that is down, so find out which before telling anyone anything.
-        if (e instanceof ApiFailure && e.code === 'NETWORK') {
-          setBackEndNote(
-            (await diagnoseUnreachable()) === 'blocked'
-              ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
-              : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
-          );
-          return;
-        }
-        setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
-      });
+    const run = ++healthRun.current;
+    window.clearTimeout(healthRetry.current);
+    try {
+      const h = await health();
+      if (run !== healthRun.current) return;
+      retryDelay.current = HEALTH_RETRY_FIRST_MS;
+      setBackEnd('up');
+      setBackEndNote('');
+      setModels(h.models !== false);
+    } catch (e: unknown) {
+      if (run !== healthRun.current) return;
+      setBackEnd('down');
+      // Try again on its own, further apart each time, until it answers.
+      healthRetry.current = window.setTimeout(() => void checkHealth(), retryDelay.current);
+      retryDelay.current = Math.min(retryDelay.current * 2, HEALTH_RETRY_MAX_MS);
+      // A server that is up but refusing this origin looks identical to one
+      // that is down, so find out which before telling anyone anything.
+      if (e instanceof ApiFailure && e.code === 'NETWORK') {
+        const why = await diagnoseUnreachable();
+        if (run !== healthRun.current) return;
+        setBackEndNote(
+          why === 'blocked'
+            ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
+            : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
+        );
+        return;
+      }
+      setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
+    }
   }, []);
 
-  // Recording and capture need the server and its model. While the first
-  // health check is still out they are offered; it answers in well under a
-  // second, and hiding them until then would make every page load jump.
-  const modelsUsable = backEnd !== 'down' && models;
-  const modelsUnavailableWhy =
-    backEnd === 'down'
-      ? apiConnected
-        ? 'The server is not reachable.'
-        : UNCONNECTED_MESSAGE
-      : 'The server cannot read images or speech right now.';
+  useEffect(() => () => window.clearTimeout(healthRetry.current), []);
+
+  // Asked on load, and again each time Home or the scratchpad is shown: the
+  // two screens whose controls depend on the answer.
+  const healthAsked = useRef(false);
+  useEffect(() => {
+    if (!healthAsked.current || screen === 'home' || screen === 'scratchpad') {
+      healthAsked.current = true;
+      void checkHealth();
+    }
+  }, [screen, checkHealth]);
+
+  // Recording and capture need the server's model. They are hidden only when
+  // a server that answered says it has none, or when this build has no
+  // server at all. An unanswered request proves nothing: it may be a cold
+  // start, and a failed upload explains itself.
+  const modelsUsable = apiConnected && models;
+  const modelsUnavailableWhy = apiConnected
+    ? 'The server cannot read images or speech right now.'
+    : UNCONNECTED_MESSAGE;
 
   function openProblem(next: ProblemData) {
     setProblem(next);
@@ -166,6 +213,22 @@ export function App() {
     }
   }
 
+  /** A capture is a suggestion, not a fact. Keep the student's correction in
+   * their local copy too, so an inaccurate line cannot return after reload. */
+  function discardProblemLine(id: string) {
+    setProblem((current) => {
+      if (!current || !current.lines.some((line) => line.id === id)) return current;
+      const next = { ...current, lines: current.lines.filter((line) => line.id !== id) };
+      saveProblem(next);
+      return next;
+    });
+    setSpokenLines((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
   function enterLowVision(index: number) {
     // Grab MathJax's speech strings while the Problem screen is still mounted.
     // Low-vision mode's optional self-voicing would otherwise fall back to
@@ -177,6 +240,7 @@ export function App() {
       if (label) spoken[line.id] = label;
     }
     setSpokenLines(spoken);
+    setLowVisionFailed(false);
     setLineIndex(index);
     setScreen('lowvision');
   }
@@ -189,12 +253,8 @@ export function App() {
   const lowVision = screen === 'lowvision' && problem
     ? (
         <LowVision
-          lines={problem.lines.map((l, i) => ({
-            id: l.id,
-            latex: l.latex,
-            label: `Line ${i + 1}`,
-            spoken: spokenLines[l.id],
-          }))}
+          lines={problem.lines}
+          spokenLines={spokenLines}
           startIndex={lineIndex}
           onExit={(i) => {
             setLineIndex(i);
@@ -209,117 +269,131 @@ export function App() {
   return (
     <>
       <LiveRegion />
-      {lowVision}
-      <div className="min-h-dvh bg-[--bg] text-[--fg]" hidden={Boolean(lowVision)}>
-      {/* A skip link is the first thing a keyboard user needs. */}
-      <a href="#main" className="skip-link">
-        Skip to main content
-      </a>
+      <div className="min-h-dvh bg-[--bg] text-[--fg]">
+      <div hidden={Boolean(lowVision) && !lowVisionFailed}>
+        {/* A skip link is the first thing a keyboard user needs. */}
+        <a href="#main" className="skip-link">
+          Skip to main content
+        </a>
 
-      <header className="border-b border-[--line] px-6 py-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Glance</h1>
-            <p className="mt-1 text-[--muted]">Math you can hear, explore and write without seeing the page.</p>
-            <div className="mt-2">
-              <ModeBadge mode={settings.mode} />
+        <header className="border-b border-[--line] px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="mono inline-flex min-h-[40px] items-center bg-[--accent] px-3 text-xl font-medium text-[--accent-fg]">Glance</h1>
+              <p className="mt-1 text-[--muted]">Math you can hear, explore and write without seeing the page.</p>
+              <div className="mt-2">
+                <ModeBadge mode={settings.mode} />
+              </div>
             </div>
+            <button
+              type="button"
+              className="btn"
+              aria-expanded={help !== null}
+              aria-controls="keyboard-help"
+              aria-keyshortcuts="?"
+              onClick={() => (help ? setHelp(null) : showHelp(true))}
+            >
+              Keyboard shortcuts
+            </button>
+            <InstallApp />
           </div>
-          <button
-            type="button"
-            className="btn"
-            aria-expanded={help !== null}
-            aria-controls="keyboard-help"
-            aria-keyshortcuts="?"
-            onClick={() => (help ? setHelp(null) : showHelp(true))}
-          >
-            Keyboard shortcuts
-          </button>
-        </div>
-      </header>
+        </header>
 
-      {help && (
-        <KeyboardHelp
-          screen={screen}
-          takeFocus={help.takeFocus}
-          onClose={() => {
-            setHelp(null);
-            announce('Shortcuts closed.');
-          }}
-        />
-      )}
+        {help && (
+          <KeyboardHelp
+            screen={screen}
+            takeFocus={help.takeFocus}
+            onClose={() => {
+              setHelp(null);
+              announce('Shortcuts closed.');
+            }}
+          />
+        )}
 
-      {screen === 'home' && (
-        <Home
-          captureUnavailable={modelsUsable ? undefined : modelsUnavailableWhy}
-          onCapture={() => setScreen('capture')}
-          onSample={() => openProblem(sampleProblem())}
-          onResume={problem ? () => setScreen('problem') : undefined}
-          settings={settings}
-          onSettingsChange={updateSettings}
-          onSettings={openSettings}
-        />
-      )}
+      </div>
 
-      {screen === 'capture' && (
-        <Capture onCaptured={openProblem} onBack={() => setScreen('home')} />
-      )}
+      <ScreenBoundary
+        key={screen}
+        screen={screen}
+        onBackToStart={() => setScreen('home')}
+        onFailure={lowVision ? setLowVisionFailed : undefined}
+      >
+        {lowVision}
+        {screen === 'home' && (
+          <Home
+            captureUnavailable={modelsUsable ? undefined : modelsUnavailableWhy}
+            onCapture={() => setScreen('capture')}
+            onSample={() => openProblem(sampleProblem())}
+            onResume={problem ? resumeProblem : undefined}
+            takeRestoredAnnouncement={takeRestoredAnnouncement}
+            settings={settings}
+            onSettingsChange={updateSettings}
+            onSettings={openSettings}
+          />
+        )}
 
-      {screen === 'problem' && problem && (
-        <Problem
-          problem={problem}
-          startIndex={lineIndex}
-          onLowVision={enterLowVision}
-          mode={settings.mode}
-          onNewCapture={() => setScreen('capture')}
-          onStartWorking={(index) => {
-            setWorkingFrom(index);
-            setLineIndex(index);
-            setScreen('scratchpad');
-          }}
-          onExport={() => openExport('problem')}
-        />
-      )}
+        {screen === 'capture' && (
+          <Capture onCaptured={openProblem} onBack={() => setScreen('home')} />
+        )}
 
-      {screen === 'scratchpad' && problem && (
-        <Scratchpad
-          problem={problem}
-          mode={settings.mode}
-          startLine={workingFrom}
-          speechAvailable={modelsUsable}
-          onBack={() => setScreen('problem')}
-          onExport={() => openExport('scratchpad')}
-        />
-      )}
+        {screen === 'problem' && problem && (
+          <Problem
+            problem={problem}
+            startIndex={lineIndex}
+            onLowVision={enterLowVision}
+            mode={settings.mode}
+            onNewCapture={() => setScreen('capture')}
+            onDiscardLine={discardProblemLine}
+            onStartWorking={(index) => {
+              setWorkingFrom(index);
+              setLineIndex(index);
+              setScreen('scratchpad');
+            }}
+            onExport={() => openExport('problem')}
+          />
+        )}
 
-      {screen === 'export' && problem && (
-        <Export problem={problem} onBack={() => setScreen(exportFrom)} />
-      )}
+        {screen === 'scratchpad' && problem && (
+          <Scratchpad
+            problem={problem}
+            mode={settings.mode}
+            startLine={workingFrom}
+            speechAvailable={modelsUsable}
+            onBack={() => setScreen('problem')}
+            onExport={() => openExport('scratchpad')}
+          />
+        )}
 
-      {screen === 'settings' && (
-        <Settings
-          settings={settings}
-          onChange={updateSettings}
-          onBack={() => setScreen(settingsFrom)}
-        />
-      )}
+        {screen === 'export' && problem && (
+          <Export problem={problem} onBack={() => setScreen(exportFrom)} />
+        )}
 
-      {/* Only reachable if storage returned something unusable. */}
-      {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
-        <main id="main" className="mx-auto max-w-3xl px-6 py-8">
-          <h2 className="text-2xl font-semibold">No problem loaded</h2>
-          <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
-            Back to start
-          </button>
-        </main>
-      )}
+        {screen === 'settings' && (
+          <Settings
+            settings={settings}
+            onChange={updateSettings}
+            onBack={() => setScreen(settingsFrom)}
+          />
+        )}
+
+        {/* Only reachable if storage returned something unusable. */}
+        {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
+          <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
+            <h2 className="text-2xl font-semibold">No problem loaded</h2>
+            <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
+              Back to start
+            </button>
+          </main>
+        )}
+
+      </ScreenBoundary>
 
       {/* Nothing is said while everything works. A reachable server and the
           address it lives at are facts for whoever deployed it, not for the
           student — and read aloud on every screen they are just noise before
           the content. When it breaks, this says what still works first, and
           keeps the technical detail for whoever goes looking. */}
-      {backEnd === 'down' && (
+      {!lowVision && backEnd === 'down' && (
         <footer className="mx-auto max-w-3xl px-6 pb-10 pt-4">
           <div
             role="status"

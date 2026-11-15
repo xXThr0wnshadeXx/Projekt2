@@ -46,8 +46,17 @@ def test_ambiguity_choices_validate_with_real_cas():
 
 
 @pytest.mark.parametrize('phrase', [
-    'x plus one all over two', 'x plus the fraction one over two end fraction',
+    'x plus the fraction one over two end fraction',
     'two x equals eight', 'square root of x plus one', 'x plus one over two equals three',
 ])
 def test_other_phrases_remain_with_model_interpretation(phrase):
+    assert fraction_ambiguity(phrase) is None
+
+
+@pytest.mark.parametrize('phrase', [
+    'x plus one all over two',
+    'X PLUS ONE ALL OVER TWO.',
+    'the square root of x plus one all over two equals five',
+])
+def test_all_over_already_groups_the_numerator(phrase):
     assert fraction_ambiguity(phrase) is None

@@ -1,6 +1,6 @@
 # Glance — System Design
 
-> **Math you can hear and speak.** Bring in any math problem (file, screenshot, photo). Hear its structure, navigate it piece by piece, work it out loud, confirm every line, and hand in clean typed work.
+> **Math for students who are blind or have low vision.** Bring in any math problem (file, screenshot, photo). Hear its structure, navigate it piece by piece, work it out loud, confirm every line, and hand in clean typed work.
 
 Repo: `xXThr0wnshadeXx/Projekt2` · Team of 4 · Build window: Fri Nov 13, 5 PM → Sun Nov 15, 12 PM
 
@@ -416,7 +416,14 @@ Rules:
 | `X` | Export |
 | `?` | Speak help |
 
-Shortcuts are disabled while focus is in a text field.
+Shortcuts are scoped to the current screen. On Capture, `U` uploads and `C`
+opens the camera; on Problem, `N` / `P` move between lines and `U` returns to
+Capture. In the Scratchpad, `U` undoes a deletion and `P` shows or hides the
+source problem. These Scratchpad meanings are intentional: editing the
+student's work is the active task there. `?` describes the keys for the
+current screen, matching `frontend/src/shortcuts.ts`.
+
+Shortcuts are disabled while focus is in a text field or the MathJax explorer.
 
 ### Components
 `LiveRegion`, `MathLine`, `RecordButton`, `ReadbackBar`, `ClarifyDialog`, `ModeBadge`, `ExportPreview`, `ThemeProvider`.

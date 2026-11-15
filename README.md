@@ -1,6 +1,23 @@
 # Glance
 
-**Math you can hear and speak.** Bring in any math problem — a file, a screenshot, a photo of a whiteboard — hear its structure, navigate it piece by piece, work it out loud, confirm every line, and hand in clean typed work.
+Glance lets blind and low-vision students understand any page of maths by voice, on their own. It reads the page, helps them grasp its shape and parts, and writes down their work. It never does the work for them.
+
+Our focus is algebra-level maths, for blind and low-vision students and the disability-services offices and teachers of students with visual impairments who support them. The goal is independent access: photograph a worksheet, hear its shape, ask about its parts, dictate your own work, and hand in typed maths.
+
+That full voice flow is the target in [#197](https://github.com/xXThr0wnshadeXx/Projekt2/issues/197), not a claim that every page or device has been validated. See the [demo release gates](docs/demo-script.md#before-calling-the-demo-ready), [pitch and comparison](docs/pitch.md), and [judge Q&A](docs/qa-sheet.md) for evidence and open TODOs. Exam permission depends on the institution and the approved configuration.
+
+Try it: **https://glance-shreev2703.vercel.app** · Code: **https://github.com/xXThr0wnshadeXx/Projekt2**
+
+### Try it in one minute
+
+1. Open the link and press **Try a sample problem**.
+2. Press **S** to start working.
+3. Type `two x equals eight` and press Enter. Glance reads the line back.
+4. Press Enter again to save it. Glance says whether the step checks out.
+5. Type `what does coefficient mean` and press Enter.
+6. Type `what is x` and press Enter. Glance declines, because the work is the student's.
+
+No mouse is needed for any of it.
 
 ---
 
@@ -10,7 +27,7 @@ Math assumes you can see it and write it.
 
 A screen reader reads an equation one token at a time, left to right. A sighted reader glances at it and immediately knows its shape — "a fraction with a root on top." A blind reader has to hold the whole expression in working memory. The barrier is access and cognitive load, not ability.
 
-Most real course math is a picture: slide screenshots, scanned PDFs, whiteboard photos, photographed worksheets. The excellent open-source engines that make math accessible — MathJax, Speech Rule Engine, MathCAT — all need *structured* math (MathML or LaTeX) to work. Converted and braille materials take days to weeks to produce, and historically cost thousands of dollars per textbook.
+Course maths can arrive as slide screenshots, scanned PDFs, whiteboard photos or photographed worksheets. Glance converts those images into structured maths for reading and exploration. Conversion also takes planning: [Stanford's accessible-format guidance](https://oae.stanford.edu/faculty-staff/accessible-format-remediation-alternate-format/accessible-format-remediation) asks for materials at least **4–5 business days** before they are needed. That is one institution's submission lead time, not a measured wait for every student or a cost per worksheet. TODO: measure Glance's end-to-end time on real student materials before claiming a speed advantage.
 
 Doing the work is its own barrier: no pencil, no scratch paper, and work written in braille isn't readable by most instructors.
 
@@ -35,7 +52,7 @@ Picture → structured math → navigable audio, large print and braille → the
 
 ### It never solves anything
 
-No answers, no hints, no next steps, in any mode. Study, homework and exam modes change what's available, and exam mode is transcription only. This is enforced in the interface *and* in the API, so an instructor can rely on it.
+The contract is no answers, no hints and no next steps. Explicit exam-mode requests cannot use the step-checking API. That does not establish that a student cannot change modes or that all model output is safe: the [integrity work](https://github.com/xXThr0wnshadeXx/Projekt2/pull/228) records unresolved output channels, and [#189](https://github.com/xXThr0wnshadeXx/Projekt2/issues/189) tracks an instructor-controlled lock. TODO: validate the deployed lock and obtain institutional approval before describing an exam deployment as approved.
 
 ## How it's built
 
@@ -65,7 +82,7 @@ Accessibility is the product, not a feature of it.
 - Touch targets at least 48 px, no gestures that conflict with VoiceOver or TalkBack
 - WCAG AA contrast throughout, AAA in low-vision mode, usable at 400% zoom
 - Exported HTML is accessible: MathML, headings, language attributes
-- Verified with VoiceOver (macOS and iOS, Screen Curtain on), NVDA with its Braille Viewer, and axe-core
+- Automated coverage uses Playwright and axe-core; manual assistive-technology evidence and outstanding checks belong in [the screen-reader record](docs/screen-reader-pass.md). TODO: record the complete voice demo with Screen Curtain on and a real participant before claiming it is validated.
 
 ## Running it locally
 
@@ -110,6 +127,17 @@ Workflow, branch naming and review rules are in [`DESIGN.md`](DESIGN.md) §18.
 ## Privacy
 
 No accounts and no database. Images and audio are sent to the OpenAI API for processing and are not stored by Glance. Session state lives in the browser. In user research we record roles, not names, and no disability details without explicit consent.
+
+## Team
+
+| Who | Role |
+|---|---|
+| Shreevatson Babu Sreegeetha (`shreev2703`), lead | Front end, accessibility, product, export, user research, pitch, submission |
+| Nicolas Lam (`nicolashlam`) | Back end and math: FastAPI app and deploy, step checking (SymPy), timeouts, mode enforcement in the API, latency, CI, request guards |
+| Shaswath (`xXThr0wnshadeXx`) | Capture and interpretation: `/api/capture`, `/api/transcribe`, `/api/spoken-to-latex`, `/api/command`, prompts, JSON schemas, both eval sets |
+| `tuffling` | Board visibility; not assigned implementation work |
+
+Roles follow [`docs/owners.md`](docs/owners.md).
 
 ## Credits and licences
 
