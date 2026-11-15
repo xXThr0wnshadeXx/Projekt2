@@ -42,6 +42,9 @@ test('@smoke each arrow press cuts off the line before it', async ({ page }) => 
   });
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
+  // The welcome is announced on a timer after load. Let it be spoken before
+  // clearing the log, or it lands among the arrow presses.
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __log: string[] }).__log.length)).toBeGreaterThan(0);
   await page.evaluate(() => (window as unknown as { __log: string[] }).__log.splice(0));
 
   // Three quick presses, well inside the follow-up window that used to queue.
