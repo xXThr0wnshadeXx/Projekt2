@@ -12,6 +12,7 @@ PDFium is not thread-safe, so every call holds one lock.
 import asyncio
 import io
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from .errors import ApiError
 
@@ -21,6 +22,8 @@ RENDER_TIMEOUT_S = 10.0
 _PASSWORD_ERROR = 4  # FPDF_ERR_PASSWORD
 
 _lock = threading.Lock()
+_worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix="pdf")
+_worker_slot = threading.BoundedSemaphore()
 
 
 def _open(data: bytes):
@@ -81,9 +84,24 @@ def render_page(data: bytes, page_number: int) -> tuple[bytes, int]:
     return out.getvalue(), count
 
 
+async def _run_on_pdf_worker(fn, *args):
+    # Wait in the request, where its deadline can cancel it before submission.
+    while not _worker_slot.acquire(blocking=False):
+        await asyncio.sleep(0.05)
+    try:
+        job = _worker.submit(fn, *args)
+    except BaseException:
+        _worker_slot.release()
+        raise
+    # The caller can time out while PDFium is still running. Release the slot
+    # when the thread finishes or the submitted job is cancelled.
+    job.add_done_callback(lambda _: _worker_slot.release())
+    return await asyncio.wrap_future(job)
+
+
 async def _in_thread(fn, *args):
     try:
-        return await asyncio.wait_for(asyncio.to_thread(fn, *args), RENDER_TIMEOUT_S)
+        return await asyncio.wait_for(_run_on_pdf_worker(fn, *args), RENDER_TIMEOUT_S)
     except asyncio.TimeoutError:
         raise ApiError("TIMEOUT", "That PDF took too long to open. Try a smaller file.", 504) from None
 
