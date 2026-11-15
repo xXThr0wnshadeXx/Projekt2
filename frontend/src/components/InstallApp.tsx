@@ -39,6 +39,7 @@ export function InstallApp() {
     await deferredPrompt.prompt();
     const choice = await deferredPrompt.userChoice;
     setDeferredPrompt(null);
+    if (choice.outcome === 'accepted') announce('Glance is being installed. It will open in its own window.');
     if (choice.outcome === 'dismissed') announce('Glance was not installed. You can choose Install Glance whenever it is available.');
   }
 
@@ -56,7 +57,8 @@ export function InstallApp() {
 
   return (
     <p className="text-sm text-[--muted]" data-testid="install-status">
-      To open Glance in its own window, use your browser&apos;s Install app option.
+      To open Glance in its own window, use your browser&apos;s Install app option, or Add to
+      Home Screen from the Share button in Safari on an iPhone or iPad.
     </p>
   );
 }

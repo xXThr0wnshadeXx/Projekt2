@@ -40,6 +40,16 @@ function utter(text: string, rate: number): void {
   window.speechSynthesis.speak(u);
 }
 
+/** Speak `text` now, whatever the Read aloud setting (#236). For the one
+ *  thing a student explicitly asked to hear by tapping Space. */
+export function speakNow(text: string, rate = 1): boolean {
+  if (!isSupported() || !text.trim()) return false;
+  cancel();
+  lastStarted = Date.now();
+  utter(text, rate);
+  return true;
+}
+
 /** Speak `text`, replacing anything in progress. No-op unless switched on. */
 export function speak(text: string, rate = 1): void {
   if (!enabled || !isSupported() || !text.trim()) return;
