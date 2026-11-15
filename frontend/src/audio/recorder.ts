@@ -85,7 +85,9 @@ export class Recorder {
     } catch {
       if (this.startRequest !== request) return false;
       this.startRequest = null;
-      throw new Error('I could not use the microphone. Check the permission, or type your line.');
+      throw new Error(
+        'I could not use the microphone. To allow it, open this site\'s settings in your browser, turn the microphone on, and try again. Or type your line instead.',
+      );
     }
     if (this.startRequest !== request) {
       // Permission can resolve after release or navigation. The browser still

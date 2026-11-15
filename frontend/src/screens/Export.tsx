@@ -4,6 +4,7 @@
 // with MathML, or a printed / PDF copy through the browser's print dialog.
 // Everything happens in the browser; nothing is uploaded or stored.
 
+import { spokenMath } from '../math/sre';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
 import { ExportPreview } from '../components/ExportPreview';
@@ -46,9 +47,7 @@ export function Export({ problem, onBack }: ExportProps) {
 
   /** The spoken form of each problem line, taken from the rendered preview. */
   function spokenFor(id: string, fallback: string): string {
-    return (
-      document.querySelector(`#exp-${id} mjx-container`)?.getAttribute('aria-label') ?? fallback
-    );
+    return spokenMath(document.getElementById(`exp-${id}`)) || fallback;
   }
 
   async function downloadHtml() {
@@ -84,11 +83,11 @@ export function Export({ problem, onBack }: ExportProps) {
   useShortcuts({ d: () => void downloadHtml() }, !busy);
 
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}
-        className="no-print text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="no-print text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Hand in your work
       </h2>

@@ -5,6 +5,7 @@
 
 import { useEffect, useRef } from 'react';
 import { announce } from '../components/LiveRegion';
+import { ReadingControls } from '../components/ReadingControls';
 import type { Mode, Settings as SettingsData } from '../state';
 
 export interface SettingsProps {
@@ -46,17 +47,12 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
     announce(`${MODE_INFO[mode].name} mode. ${MODE_INFO[mode].detail}`);
   }
 
-  function setSelfVoicing(on: boolean) {
-    onChange({ ...settings, selfVoicing: on });
-    announce(on ? 'The app will read aloud.' : 'The app will not read aloud.');
-  }
-
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Settings
       </h2>
@@ -92,28 +88,19 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
         </div>
       </fieldset>
 
-      <fieldset className="mt-8">
-        <legend className="text-lg font-semibold">Speech</legend>
-        <label className="mt-3 flex min-h-[48px] cursor-pointer items-start gap-3 rounded-lg border border-[--line] px-4 py-3">
-          <input
-            type="checkbox"
-            checked={settings.selfVoicing}
-            onChange={(e) => setSelfVoicing(e.target.checked)}
-            aria-describedby="self-voicing-detail"
-            className="mt-1 h-5 w-5"
-          />
-          <span>
-            <span className="font-medium">Read aloud with the app's own voice</span>
-            <span id="self-voicing-detail" className="mt-1 block text-sm text-[--muted]">
-              Leave this off if you use a screen reader — it already reads
-              everything, and two voices at once is hard to follow.
-            </span>
-          </span>
-        </label>
-      </fieldset>
+      <section aria-labelledby="reading-heading" className="mt-8">
+        <h3 id="reading-heading" className="text-lg font-semibold">
+          Reading
+        </h3>
+        <div className="mt-3">
+          <ReadingControls settings={settings} onChange={onChange} />
+        </div>
+      </section>
 
+      {/* "Back" alone says nothing when it is read out with no screen to look
+          at. Every way out of a screen now names where it goes. */}
       <button type="button" className="btn mt-8" onClick={onBack}>
-        Back
+        Back to the start
       </button>
     </main>
   );

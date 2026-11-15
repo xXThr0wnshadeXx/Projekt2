@@ -67,11 +67,20 @@ function list(parts: [number, string, string][]): string {
 
 /** Find the top-level relation symbol, if there is one. */
 function topLevelRelation(root: Element): string | null {
-  // Only direct children of the row count: an `=` inside a fraction is not
+  // Only direct children of the top row count: an `=` inside a fraction is not
   // what makes the whole thing an equation.
-  const row = root.localName === 'math' ? (root.firstElementChild ?? root) : root;
-  const scan = row.localName === 'mrow' ? row : root;
-  for (const child of Array.from(scan.children)) {
+  //
+  // MathJax wraps the row in an <mrow> only some of the time. With semantic
+  // enrichment on, `2x + 3 = 11` comes back as <math><mrow>2x+3</mrow><mo>=</mo>
+  // <mn>11</mn></math> — the `=` is a child of <math> itself, and the first
+  // <mrow> is just the left side. Stepping into that first child reported every
+  // such equation as "an expression". Step in only while a row is the sole
+  // child, which unwraps a whole line however deeply it is wrapped.
+  let row = root;
+  while (row.childElementCount === 1 && row.firstElementChild?.localName === 'mrow') {
+    row = row.firstElementChild;
+  }
+  for (const child of Array.from(row.children)) {
     if (child.localName === 'mo') {
       const op = (child.textContent ?? '').trim();
       if (op in RELATIONS) return op;
@@ -121,6 +130,46 @@ export async function structureSummary(latex: string): Promise<string> {
   }
 
   return sentences.join(' ');
+}
+
+/** What the speech engine says for the math rendered inside `scope`.
+ *
+ *  MathJax 4 does not put the speech on the container's `aria-label`. The plain
+ *  string is in `data-semantic-speech-none`, and the label a screen reader
+ *  hears is on the <mjx-speech> child, with ", math" appended. Reading
+ *  `aria-label` off the container returns nothing, and every caller then fell
+ *  back to reading raw LaTeX aloud — "backslash frac" — which is the exact
+ *  thing this app exists to replace.
+ */
+export function spokenMath(scope: ParentNode | null | undefined): string {
+  const container = scope?.querySelector('mjx-container');
+  if (!container) return '';
+  const plain = container.getAttribute('data-semantic-speech-none')?.trim();
+  if (plain) return plain;
+  const label =
+    container.querySelector('mjx-speech')?.getAttribute('aria-label') ??
+    container.getAttribute('aria-label') ??
+    '';
+  return label.replace(/,\s*math\b.*$/, '').trim();
+}
+
+/** How a line of LaTeX is spoken, without putting it on the page.
+ *
+ *  Null when MathJax cannot typeset it at all — a line with unbalanced braces,
+ *  say — so the caller can refuse it instead of saving something unreadable.
+ *  An empty string means it rendered but the speech engine had nothing to say.
+ */
+export async function speechFor(latex: string): Promise<string | null> {
+  try {
+    await loadMathJax();
+    const mj = window.MathJax;
+    if (!mj?.tex2chtmlPromise) return '';
+    const node: Element | null = await mj.tex2chtmlPromise(latex, { display: true });
+    if (!node || node.querySelector('mjx-merror')) return null;
+    return node.getAttribute('data-semantic-speech-none')?.trim() ?? '';
+  } catch {
+    return null;
+  }
 }
 
 /** Nemeth braille for a line, when MathJax's braille output is available.
