@@ -108,7 +108,9 @@ test.describe('@smoke talking to Glance', () => {
 
     await say(page, 'can you read the problem again');
     await expect(polite(page)).toContainText('The problem.');
-    await expect(polite(page)).toContainText('Line 1. 2 x plus 3 equals 11');
+    await expect(polite(page)).toContainText(
+      'Line 1. the fraction with numerator the square root of x plus 1 and denominator 2 equals 5',
+    );
     const problem = await polite(page).textContent();
 
     await say(page, 'say that again');
