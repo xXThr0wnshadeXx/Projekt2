@@ -19,6 +19,7 @@ export STATS_TOKEN=<from the host's variables, never pasted anywhere shared>
   ```bash
   bash scripts/preflight.sh
   ```
+  See the [recorded live preflight results on #34](https://github.com/xXThr0wnshadeXx/Projekt2/issues/34#issuecomment-6891479938).
 - [ ] Start keep-warm in its own terminal tab and leave it running:
   ```bash
   bash scripts/keep_warm.sh
@@ -49,10 +50,16 @@ Go down this list; don't debug live.
 
 | Job | Person |
 |---|---|
-| Drives the demo | |
-| Runs pre-flight and watches keep-warm / logs | |
-| Holds the hotspot phone | |
-| Starts the backup video if called | |
+| Drives the demo | Unassigned (decide at standup) |
+| Runs pre-flight and watches keep-warm / logs | Nicolas for pre-flight ([#110](https://github.com/xXThr0wnshadeXx/Projekt2/issues/110)). Keep-warm and logs: Unassigned (decide at standup) |
+| Holds the hotspot phone | Unassigned (decide at standup) |
+| Starts the backup video if called | Unassigned (decide at standup) |
+| Tests the hotspot and opens the backup-video tab before the demo ([#111](https://github.com/xXThr0wnshadeXx/Projekt2/issues/111)) | Unassigned (decide at standup) |
+| Confirms the deployed demo end to end ([#155](https://github.com/xXThr0wnshadeXx/Projekt2/issues/155)) | Shaswath |
+| Rehearses Flow A on a clean machine using venue Wi-Fi and hotspot, after #155 passes ([#55](https://github.com/xXThr0wnshadeXx/Projekt2/issues/55)) | tuffling |
+| Runs the manual screen-reader pass and checks for repeated line numbers in the same session ([#32](https://github.com/xXThr0wnshadeXx/Projekt2/issues/32), [#133](https://github.com/xXThr0wnshadeXx/Projekt2/issues/133)) | tuffling |
+| Tests live voice input with a microphone ([#150](https://github.com/xXThr0wnshadeXx/Projekt2/issues/150)) | tuffling |
+| Checks read-aloud and typed lines on a real iPhone with VoiceOver ([#154](https://github.com/xXThr0wnshadeXx/Projekt2/issues/154)) | Shreev |
 
 ## Afterwards
 
