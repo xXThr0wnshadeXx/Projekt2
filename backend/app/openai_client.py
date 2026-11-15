@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from openai import APIStatusError, AsyncOpenAI, OpenAIError
+from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI, OpenAIError
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import SecretStr, StringConstraints
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,14 +31,19 @@ _SAFE_ERROR_CODES = {
 
 
 def _log_provider_failure(task: str, error: Exception) -> None:
+    details: dict[str, str | int] = {"evt": "model_error", "task": task}
     if isinstance(error, APIStatusError):
         code = error.code
         if not isinstance(code, str) or code not in _SAFE_ERROR_CODES:
             code = "unknown"
-        log.warning("model request failed task=%s status=%d code=%s", task, error.status_code, code)
+        details.update(status=error.status_code, code=code)
+    elif isinstance(error, (TimeoutError, APITimeoutError)):
+        details["category"] = "timeout"
+    elif isinstance(error, APIConnectionError):
+        details["category"] = "connection"
     else:
-        category = "timeout" if isinstance(error, TimeoutError) else "client_error"
-        log.warning("model request failed task=%s category=%s", task, category)
+        details["category"] = "client_error"
+    log.warning(json.dumps(details, separators=(",", ":")))
 
 
 class ModelError(RuntimeError):

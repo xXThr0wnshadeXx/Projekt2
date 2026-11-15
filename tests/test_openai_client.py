@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import httpx
 import pytest
-from openai import AsyncOpenAI, RateLimitError
+from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, RateLimitError
 
 from backend.app.openai_client import ModelClient, ModelError, ModelSettings
 
@@ -165,5 +165,28 @@ async def test_provider_failure_logs_only_safe_metadata(model_client, monkeypatc
             await model_client.interpret("spoken", [{"role": "user", "content": "private-data"}])
     finally:
         await model_client.close()
-    assert f"task=spoken status=429 code={logged}" in caplog.text
+    assert json.loads(caplog.records[-1].getMessage()) == {
+        "evt": "model_error", "task": "spoken", "status": 429, "code": logged,
+    }
     assert "private-data" not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_type,expected", [
+    (APITimeoutError, "timeout"), (APIConnectionError, "connection"),
+])
+async def test_transcription_logs_transport_failure_category(
+    model_client, monkeypatch, caplog, error_type, expected,
+):
+    error = error_type(request=httpx.Request("POST", "https://api.openai.com"))
+    monkeypatch.setattr(
+        model_client.client.audio.transcriptions, "create", AsyncMock(side_effect=error)
+    )
+    try:
+        with pytest.raises(ModelError):
+            await model_client.transcribe("sample.mp4", b"audio", "audio/mp4")
+    finally:
+        await model_client.close()
+    assert json.loads(caplog.records[-1].getMessage()) == {
+        "evt": "model_error", "task": "transcribe", "category": expected,
+    }
