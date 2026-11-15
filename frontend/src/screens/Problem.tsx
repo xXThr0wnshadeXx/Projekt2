@@ -20,6 +20,8 @@ export interface ProblemProps {
   problem: ProblemData;
   onLowVision: (index: number) => void;
   onNewCapture: () => void;
+  /** Removes a line the capture got wrong; capture output is never immutable. */
+  onDiscardLine: (id: string) => void;
   /** Called with the line the student was on, which their first step follows. */
   onStartWorking: (index: number) => void;
   mode: Mode;
@@ -34,6 +36,7 @@ export function Problem({
   problem,
   onLowVision,
   onNewCapture,
+  onDiscardLine,
   onStartWorking,
   mode,
   onExport,
@@ -95,6 +98,23 @@ export function Problem({
       })
       .join(' ');
     announce(`${problem.instructions} ${body}`.trim());
+  }
+
+  function discardLine(lineIndex: number) {
+    const line = lines[lineIndex];
+    if (!line) return;
+    const remaining = lines.length - 1;
+    // Work out the focus target before removing the line from the DOM.
+    const next = lines[lineIndex + 1] ?? lines[lineIndex - 1];
+    setIndex(Math.max(0, Math.min(lineIndex, remaining - 1)));
+    setSummary('');
+    onDiscardLine(line.id);
+    announce(
+      remaining
+        ? `Discarded line ${lineIndex + 1}. ${remaining} ${remaining === 1 ? 'line remains.' : 'lines remain.'}`
+        : 'Discarded the only line. Capture another problem when you are ready.',
+    );
+    window.setTimeout(() => focusFirst(next ? `#${next.id}` : '#no-problem-lines'), 80);
   }
 
   /** "What changed?" on the source (DESIGN.md 14): how this line follows from
@@ -175,18 +195,34 @@ export function Problem({
         </p>
       )}
 
-      <ul className="mt-6 space-y-4" aria-label="Problem lines">
-        {lines.map((l, i) => (
-          <li key={l.id} onFocus={() => setIndex(i)}>
-            <MathLine
-              id={l.id}
-              latex={l.latex}
-              label={`Line ${i + 1}`}
-              unsure={!l.valid}
-            />
-          </li>
-        ))}
-      </ul>
+      {lines.length ? (
+        <ul className="mt-6 space-y-4" aria-label="Problem lines">
+          {lines.map((l, i) => (
+            <li key={l.id} className="flex items-start gap-3" onFocus={() => setIndex(i)}>
+              <div className="min-w-0 flex-1">
+                <MathLine
+                  id={l.id}
+                  latex={l.latex}
+                  label={`Line ${i + 1}`}
+                  unsure={!l.valid}
+                />
+              </div>
+              <button
+                type="button"
+                className="btn mt-1"
+                onClick={() => discardLine(i)}
+                aria-label={`Discard problem line ${i + 1}`}
+              >
+                Discard
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <section id="no-problem-lines" tabIndex={-1} className="mt-6 rounded-lg border border-[--warn] px-4 py-3">
+          No problem lines remain. Capture another photo, scan or file.
+        </section>
+      )}
 
       {problem.diagrams.length > 0 && (
         <section aria-label="Diagrams" className="mt-8">
@@ -216,6 +252,7 @@ export function Problem({
           contents, and "Capture another" is left out of that group because it
           leaves the problem rather than reading it. */}
       <div className="mt-8">
+        {lines.length > 0 && <>
         <button
           type="button"
           className="btn-primary"
@@ -245,6 +282,7 @@ export function Problem({
             )}
           </div>
         </section>
+        </>}
 
         <div className="mt-6 border-t border-[--line] pt-4">
           <button type="button" className="btn-quiet" onClick={onNewCapture}>
