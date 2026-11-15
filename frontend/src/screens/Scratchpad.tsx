@@ -32,7 +32,7 @@ import { speechFor } from '../math/sre';
 import { applyEdit, lineNumber, looksLikeCommand } from '../commands';
 import { SAYS, stripFiller, understandTalk, type Talk } from '../talk';
 import { helpText, useShortcuts } from '../shortcuts';
-import { readAloud, useLineKeys } from '../lineKeys';
+import { activate } from '../traverse';
 import type { Recording } from '../audio/recorder';
 import { HandsFree } from '../audio/handsFree';
 import { cancel as stopSpeaking } from '../audio/tts';
@@ -556,47 +556,6 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     announce(lines.map((l, i) => `Line ${i + 1}. ${l.readback}.`).join(' '));
   }
 
-  // Arrows move through your own lines and a tap of Space reads one (#236).
-  function moveWork(delta: number) {
-    if (lines.length === 0) {
-      announce('You have not written any lines yet.');
-      return;
-    }
-    const from = current ?? (delta > 0 ? -1 : lines.length);
-    const to = from + delta;
-    if (to < 0) {
-      announce('This is your first line.');
-      return;
-    }
-    if (to >= lines.length) {
-      announce('This is your last line.');
-      return;
-    }
-    setCurrent(to);
-    focusFirst(`#${lines[to].id}`);
-    announce(`Your line ${to + 1} of ${lines.length}.`);
-  }
-
-  async function readCurrent() {
-    if (lines.length === 0) {
-      const followed = problem.lines[startLine] ?? problem.lines[0];
-      const spoken = followed ? await speechFor(followed.latex) : null;
-      readAloud(
-        followed
-          ? `You have not written any lines yet. Problem line ${startLine + 1}. ${spoken || followed.latex}.`
-          : 'You have not written any lines yet.',
-      );
-      return;
-    }
-    const i = current ?? lines.length - 1;
-    readAloud(`Your line ${i + 1}. ${lines[i].readback}.`);
-  }
-
-  useLineKeys(
-    { previous: () => moveWork(-1), next: () => moveWork(1), read: () => void readCurrent() },
-    !clarify && !pending,
-  );
-
   // Shortcuts are suspended while a dialog or the readback bar owns the
   // keyboard, so Enter and the number keys mean what they say there.
   useShortcuts(
@@ -736,7 +695,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
 
       {!pending && (
         <section aria-label="Add a line" className="mt-8 border-t border-[--line] pt-6">
-          <RecordButton onResult={onRecording} onError={fail} disabled={busy} onTap={() => void readCurrent()} />
+          <RecordButton onResult={onRecording} onError={fail} disabled={busy} onTap={activate} />
 
           <form
             className="mt-5"
