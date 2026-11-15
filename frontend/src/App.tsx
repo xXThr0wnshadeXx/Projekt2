@@ -28,8 +28,11 @@ import { LowVision } from './screens/LowVision';
 import { Scratchpad } from './screens/Scratchpad';
 import {
   loadProblem,
-  loadWork,
   saveProblem,
+  clearProblem,
+  loadWork,
+  loadPlace,
+  savePlace,
   sampleProblem,
   loadSettings,
   saveSettings,
@@ -47,17 +50,38 @@ type Screen =
   | 'export';
 type BackEnd = 'checking' | 'up' | 'down';
 
+// Screens a reload or the Back button may return to. Each needs the saved
+// problem; anything else falls back to Home rather than showing an empty page.
+const RESTORABLE: Screen[] = ['problem', 'scratchpad', 'export'];
+const SCREENS: Screen[] = ['home', 'capture', 'problem', 'lowvision', 'scratchpad', 'settings', 'export'];
+
+/** Where this load starts: the saved place if its data is still there. */
+function startingPlace() {
+  const problem = loadProblem();
+  const place = loadPlace();
+  if (!problem || !place || !RESTORABLE.includes(place.screen as Screen)) return null;
+  const last = Math.max(0, problem.lines.length - 1);
+  return {
+    screen: place.screen as Screen,
+    lineIndex: Math.min(place.lineIndex, last),
+    workingFrom: Math.min(place.workingFrom, last),
+  };
+}
+
 export function App() {
-  const [screen, setScreen] = useState<Screen>('home');
+  const restored = useRef(startingPlace()).current;
+  const [screen, setScreen] = useState<Screen>(restored?.screen ?? 'home');
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
+  // Home's own "I restored..." line. Only said when the student lands on Home;
+  // a restored screen announces itself below instead, so never both.
   const [initialRestore] = useState(() => {
-    const count = loadWork().length || problem?.lines.length;
-    return count === undefined
-      ? ''
-      : `I restored your work from earlier: ${count} ${count === 1 ? 'line' : 'lines'}.`;
+    if (restored) return '';
+    const work = loadWork().length;
+    if (work > 0) return `I restored your work from earlier: ${work} ${work === 1 ? 'line' : 'lines'}.`;
+    return problem ? 'I restored your problem from earlier.' : '';
   });
   const [lowVisionFailed, setLowVisionFailed] = useState(false);
-  const [lineIndex, setLineIndex] = useState(0);
+  const [lineIndex, setLineIndex] = useState(restored?.lineIndex ?? 0);
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
   const [backEndNote, setBackEndNote] = useState('');
@@ -65,16 +89,68 @@ export function App() {
   // Where to go back to from Settings, and which problem line the student was
   // on when they started working (their first step is checked against it).
   const [settingsFrom, setSettingsFrom] = useState<Screen>('home');
-  const [workingFrom, setWorkingFrom] = useState(0);
+  const [workingFrom, setWorkingFrom] = useState(restored?.workingFrom ?? 0);
+  // A problem waiting on the student's answer to "keep your work, or start fresh?".
+  const [pendingProblem, setPendingProblem] = useState<ProblemData | null>(null);
+
+  // Remember the place, so a reload does not send the student back to Home.
+  useEffect(() => {
+    if (problem) savePlace({ screen, lineIndex, workingFrom });
+  }, [screen, lineIndex, workingFrom, problem]);
+
+  // Say where they are after a reload. Delayed so it follows the screen's own
+  // opening announcement instead of being replaced by it.
+  useEffect(() => {
+    if (!restored) return;
+    const line = restored.screen === 'problem' ? restored.lineIndex : restored.workingFrom;
+    const what = restored.screen === 'problem' ? 'your problem' : restored.screen === 'export' ? 'your hand-in' : 'your work';
+    const t = window.setTimeout(() => announce(`Back on ${what}. Line ${line + 1}.`), 400);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Browser Back moves between Glance's own screens. The address only ever
+  // carries the screen name, never maths or anything personal.
+  const fromPop = useRef(false);
+  const shown = useRef<Screen | null>(null);
+  useEffect(() => {
+    if (shown.current === null) {
+      window.history.replaceState({ glance: screen }, '', `#${screen}`);
+    } else if (fromPop.current) {
+      window.history.replaceState({ glance: screen }, '', `#${screen}`);
+    } else if (shown.current !== screen) {
+      window.history.pushState({ glance: screen }, '', `#${screen}`);
+    }
+    fromPop.current = false;
+    shown.current = screen;
+  }, [screen]);
+
+  useEffect(() => {
+    function onPop(event: PopStateEvent) {
+      const target = (event.state as { glance?: string } | null)?.glance as Screen | undefined;
+      if (!target || !SCREENS.includes(target)) return;
+      fromPop.current = true;
+      setPendingProblem(null);
+      // Never land on a screen whose data is gone.
+      const needsProblem = RESTORABLE.includes(target) || target === 'lowvision';
+      const next: Screen = target === 'lowvision' ? 'problem' : needsProblem && !loadProblem() ? 'home' : target;
+      setScreen((current) => {
+        // If nothing changes, no effect runs to reset the flag.
+        if (current === next) fromPop.current = false;
+        return next;
+      });
+    }
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   useEffect(() => {
     setSelfVoicing(settings.selfVoicing);
   }, [settings.selfVoicing]);
 
-  const restored = useRef(initialRestore);
+  const restoredNote = useRef(initialRestore);
   const takeRestoredAnnouncement = useCallback(() => {
-    const announcement = restored.current;
-    restored.current = '';
+    const announcement = restoredNote.current;
+    restoredNote.current = '';
     return announcement;
   }, []);
   const resumeProblem = useCallback(() => setScreen('problem'), []);
@@ -148,9 +224,33 @@ export function App() {
   }, []);
 
   function openProblem(next: ProblemData) {
+    // Unfinished work on the last problem is never dropped without asking.
+    const saved = loadWork().length;
+    if (saved > 0) {
+      setPendingProblem(next);
+      announce(
+        `You have ${saved} ${saved === 1 ? 'line' : 'lines'} of work on the last problem. Keep them, or start fresh?`,
+        'assertive',
+      );
+      return;
+    }
+    showProblem(next);
+  }
+
+  function answerPending(startFresh: boolean) {
+    const next = pendingProblem;
+    setPendingProblem(null);
+    if (!next) return;
+    if (startFresh) clearProblem();
+    showProblem(next);
+  }
+
+  function showProblem(next: ProblemData) {
     setProblem(next);
     saveProblem(next);
     setLineIndex(0);
+    setWorkingFrom(0);
+    setSpokenLines({});
     setScreen('problem');
 
     // A capture announces its own result, in more detail than is possible here
@@ -219,7 +319,14 @@ export function App() {
   return (
     <>
       <LiveRegion />
-      <div className="min-h-dvh bg-[--bg] text-[--fg]">
+      {pendingProblem && (
+        <KeepOrFresh
+          lines={loadWork().length}
+          onFresh={() => answerPending(true)}
+          onKeep={() => answerPending(false)}
+        />
+      )}
+      <div className="min-h-dvh bg-[--bg] text-[--fg]" hidden={Boolean(pendingProblem)}>
       <div hidden={Boolean(lowVision) && !lowVisionFailed}>
         {/* A skip link is the first thing a keyboard user needs. */}
         <a href="#main" className="skip-link">
@@ -364,5 +471,37 @@ export function App() {
       )}
       </div>
     </>
+  );
+}
+
+/** The question asked before a new problem replaces one with work on it. */
+function KeepOrFresh({ lines, onFresh, onKeep }: { lines: number; onFresh: () => void; onKeep: () => void }) {
+  const fresh = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    fresh.current?.focus();
+  }, []);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="keep-fresh-title"
+      className="mx-auto max-w-3xl px-6 py-8"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onKeep();
+      }}
+    >
+      <h2 id="keep-fresh-title" className="text-2xl font-semibold">
+        You have {lines} {lines === 1 ? 'line' : 'lines'} of work on the last problem
+      </h2>
+      <p className="mt-2 text-[--muted]">Keep them, or start fresh?</p>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button ref={fresh} type="button" className="btn-primary" onClick={onFresh}>
+          Start fresh
+        </button>
+        <button type="button" className="btn" onClick={onKeep}>
+          Keep my work
+        </button>
+      </div>
+    </div>
   );
 }

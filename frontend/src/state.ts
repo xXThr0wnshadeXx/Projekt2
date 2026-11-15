@@ -65,6 +65,7 @@ export const defaultSettings: Settings = {
 const PROBLEM_KEY = 'glance.problem.v1';
 const WORK_KEY = 'glance.work.v1';
 const SETTINGS_KEY = 'glance.settings.v1';
+const PLACE_KEY = 'glance.place.v1';
 
 // Every access is wrapped: localStorage throws in private windows and in some
 // embedded webviews, and a storage failure must never take the app down.
@@ -108,6 +109,7 @@ export function clearProblem(): void {
   remove(PROBLEM_KEY);
   // A new problem means the old work no longer belongs to anything.
   remove(WORK_KEY);
+  remove(PLACE_KEY);
 }
 
 export function loadWork(): WorkLine[] {
@@ -117,6 +119,26 @@ export function loadWork(): WorkLine[] {
 
 export function saveWork(lines: WorkLine[]): void {
   write(WORK_KEY, lines);
+}
+
+/** Where the student was, so a reload puts them back (issue #208). Screen
+ *  names and line numbers only — no maths, nothing personal. */
+export interface Place {
+  screen: string;
+  lineIndex: number;
+  /** The problem line the work follows from (the scratchpad's comparison line). */
+  workingFrom: number;
+}
+
+export function loadPlace(): Place | null {
+  const p = read<Place>(PLACE_KEY);
+  if (!p || typeof p.screen !== 'string') return null;
+  const whole = (n: unknown) => (typeof n === 'number' && n >= 0 ? Math.floor(n) : 0);
+  return { screen: p.screen, lineIndex: whole(p.lineIndex), workingFrom: whole(p.workingFrom) };
+}
+
+export function savePlace(place: Place): void {
+  write(PLACE_KEY, place);
 }
 
 export function loadSettings(): Settings {

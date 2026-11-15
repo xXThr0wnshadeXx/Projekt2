@@ -9,6 +9,8 @@ async function openWork(page: Page, latex: string) {
   }, latex);
   await page.goto('/');
   await page.getByRole('button', { name: 'Try a sample problem' }).click();
+  // Saved work exists, so Glance asks before opening a new problem (#208).
+  await page.getByRole('button', { name: 'Keep my work' }).click();
   await page.getByRole('button', { name: 'Start working' }).click();
 }
 
