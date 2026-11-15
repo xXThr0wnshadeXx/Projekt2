@@ -24,6 +24,7 @@ from .routes.diff import diff_router
 from .routes.pdf import pdf_router
 from .routes.spoken import spoken_router
 from .routes.transcribe import transcribe_router
+from .routes.validate import validate_router
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -94,6 +95,9 @@ def create_app(
     app.include_router(command_router(models))
     # PDFs need no model: page count and page render work without keys (issue #26).
     app.include_router(pdf_router(settings.max_image_bytes))
+    # Typed lines are read in the browser; this only says whether SymPy can
+    # parse the result, so they can be step checked with no model at all.
+    app.include_router(validate_router(validate_latex))
     if models is not None:
         app.include_router(capture_router(models, validate_latex, settings.max_image_bytes))
         app.include_router(spoken_router(models, validate_latex))

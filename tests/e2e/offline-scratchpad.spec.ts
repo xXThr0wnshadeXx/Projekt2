@@ -51,7 +51,7 @@ test.describe('@smoke offline commands (#128)', () => {
     await expect(workLines(page)).toHaveCount(2);
 
     await type(page, 'undo');
-    await expect(polite(page)).toHaveText('Put the line back.');
+    await expect(polite(page)).toHaveText(/^Put line \d+ back\.$/);
     await expect(workLines(page)).toHaveCount(3);
 
     await type(page, 'read line three');

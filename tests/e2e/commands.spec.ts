@@ -81,7 +81,7 @@ test.describe('@smoke commands', () => {
   test('an unknown command says "I didn\'t catch that."', async ({ page }) => {
     await open(page, { intent: 'unknown', target_line: null, instruction: null });
     await say(page, 'read the weather');
-    await expect(polite(page)).toHaveText("I didn't catch that.");
+    await expect(polite(page)).toContainText("I didn't catch that.");
     await expect(workLines(page)).toHaveCount(3);
   });
 

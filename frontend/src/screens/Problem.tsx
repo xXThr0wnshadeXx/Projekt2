@@ -11,9 +11,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { announce, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
-import { structureSummary } from '../math/sre';
+import { spokenMath, structureSummary } from '../math/sre';
 import { useShortcuts } from '../shortcuts';
-import { checkStep, stepChecksAllowed } from '../stepCheck';
+import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
 import type { Mode, Problem as ProblemData } from '../state';
 
 export interface ProblemProps {
@@ -24,6 +24,10 @@ export interface ProblemProps {
   onStartWorking: (index: number) => void;
   mode: Mode;
   onExport: () => void;
+  /** The line to land on. Coming back from low-vision mode or from the
+   *  scratchpad, that is the line the student left from — not line 1 again,
+   *  which silently lost their place every time. */
+  startIndex?: number;
 }
 
 export function Problem({
@@ -33,8 +37,11 @@ export function Problem({
   onStartWorking,
   mode,
   onExport,
+  startIndex = 0,
 }: ProblemProps) {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() =>
+    Math.max(0, Math.min(problem.lines.length - 1, startIndex)),
+  );
   const [summary, setSummary] = useState('');
   const announced = useRef(false);
 
@@ -47,7 +54,7 @@ export function Problem({
   useEffect(() => {
     if (announced.current || lines.length === 0) return;
     announced.current = true;
-    window.setTimeout(() => focusFirst(`#${lines[0].id}`), 80);
+    window.setTimeout(() => focusFirst(`#${(lines[index] ?? lines[0]).id}`), 80);
   }, [lines]);
 
   function goTo(next: number, label: string) {
@@ -75,19 +82,15 @@ export function Problem({
   /** Read the current line the way the explorer would say it. */
   function readLine() {
     if (!current) return;
-    const spoken = document
-      .querySelector(`#${current.id} mjx-container`)
-      ?.getAttribute('aria-label');
-    announce(spoken || `Line ${index + 1}. ${current.latex}`);
+    const spoken = spokenMath(document.getElementById(current.id));
+    announce(spoken ? `Line ${index + 1}. ${spoken}` : `Line ${index + 1} is not ready to read yet. Try again in a moment.`);
   }
 
   function readAll() {
     if (lines.length === 0) return;
     const body = lines
       .map((l, i) => {
-        const spoken = document
-          .querySelector(`#${l.id} mjx-container`)
-          ?.getAttribute('aria-label');
+        const spoken = spokenMath(document.getElementById(l.id));
         return `Line ${i + 1}. ${spoken || l.latex}.`;
       })
       .join(' ');
@@ -114,7 +117,11 @@ export function Problem({
     }
     announce('Checking…');
     const message = await checkStep(before.latex, current.latex, mode);
-    announce(message ?? 'I couldn\'t check that right now. Try again in a moment.');
+    announce(
+      message
+        ? withBasis(message, `line ${index}`)
+        : 'I couldn\'t check that right now. Try again in a moment.',
+    );
   }
 
   useShortcuts({
@@ -143,14 +150,23 @@ export function Problem({
         </p>
       )}
 
+      {/* Five shortcuts spelled out here were read aloud in full on every
+          visit, before the student reached the maths. The two that matter on
+          arrival are how to look inside a line and how to begin; the rest live
+          behind "?" where they can be asked for. The full list stays on screen
+          for a sighted keyboard user, but is hidden from screen readers so it
+          is not recited — "?" announces it properly. */}
       <p className="mt-2 text-sm text-[--muted]">
         {lines.length} {lines.length === 1 ? 'line' : 'lines'}
         {unsure > 0 && `, ${unsure} unsure`}. Press{' '}
-        <kbd className="kbd">G</kbd> for the structure of a line,{' '}
-        <kbd className="kbd">Enter</kbd> to explore inside it,{' '}
-        <kbd className="kbd">N</kbd> and <kbd className="kbd">P</kbd> to move
-        between lines, <kbd className="kbd">L</kbd> for low-vision mode,{' '}
+        <kbd className="kbd">Enter</kbd> on a line to explore it,{' '}
         <kbd className="kbd">S</kbd> to start working.
+        <span aria-hidden="true">
+          {' '}
+          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">N</kbd>{' '}
+          and <kbd className="kbd">P</kbd> to move, <kbd className="kbd">L</kbd>{' '}
+          large print, <kbd className="kbd">?</kbd> for all shortcuts.
+        </span>
       </p>
 
       {problem.warnings.length > 0 && (
@@ -192,27 +208,49 @@ export function Problem({
         </section>
       )}
 
-      <div className="mt-8 flex flex-wrap gap-3">
-        <button type="button" className="btn" onClick={glance}>
-          Glance
-        </button>
-        <button type="button" className="btn" onClick={readAll}>
-          Read all
-        </button>
-        <button type="button" className="btn" onClick={() => onStartWorking(index)}>
+      {/* Six equal buttons in a row is six decisions before doing anything,
+          and nothing says which one matters. There is one thing a student
+          came here to do — start working — so that is the only primary
+          control. Everything else is a way of reading this problem, grouped
+          and named so a screen reader announces the group before its
+          contents, and "Capture another" is left out of that group because it
+          leaves the problem rather than reading it. */}
+      <div className="mt-8">
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={() => onStartWorking(index)}
+        >
           Start working
         </button>
-        {stepChecksAllowed(mode) && lines.length > 1 && (
-          <button type="button" className="btn" onClick={() => void whatChanged()}>
-            What changed?
+
+        <section aria-label="Ways to read this problem" className="mt-6">
+          <h3 className="text-sm font-medium uppercase tracking-wide text-[--muted]">
+            Ways to read this
+          </h3>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button type="button" className="btn" onClick={glance}>
+              Glance
+            </button>
+            <button type="button" className="btn" onClick={readAll}>
+              Read all
+            </button>
+            <button type="button" className="btn" onClick={() => onLowVision(index)}>
+              Low-vision mode
+            </button>
+            {stepChecksAllowed(mode) && lines.length > 1 && (
+              <button type="button" className="btn" onClick={() => void whatChanged()}>
+                What changed?
+              </button>
+            )}
+          </div>
+        </section>
+
+        <div className="mt-6 border-t border-[--line] pt-4">
+          <button type="button" className="btn-quiet" onClick={onNewCapture}>
+            Capture another problem
           </button>
-        )}
-        <button type="button" className="btn" onClick={() => onLowVision(index)}>
-          Low-vision mode
-        </button>
-        <button type="button" className="btn" onClick={onNewCapture}>
-          Capture another
-        </button>
+        </div>
       </div>
     </main>
   );
