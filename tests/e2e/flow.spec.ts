@@ -232,7 +232,7 @@ test.describe('@smoke critical path', () => {
     await expect(choices.getByRole('button', { name: 'Live board' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Back to the start' }).click();
+    await page.getByRole('button', { name: 'Back to the start' }).press('Enter');
     await expect(page.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
   });
 
