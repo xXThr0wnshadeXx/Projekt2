@@ -36,8 +36,11 @@ in front of judges.
 > barrier — not ability. This is Glance: bring in any math problem, hear its
 > shape, work it out loud, hand in typed work."
 
-Nothing on screen but the app's Home. Let VoiceOver read it: *"Glance. Capture
-a problem, or try the sample."*
+Nothing on screen but the app's Home. Let VoiceOver read it: *"Glance. Math
+for students who are blind or have low vision. It reads a problem aloud and
+writes down your own work as you say it. It never solves it for you. Capture a
+problem, or try the sample."* Let it finish: the last sentence before the
+choices is the promise the rest of the demo keeps.
 
 ### 0:25–0:45 · The cost of today
 
