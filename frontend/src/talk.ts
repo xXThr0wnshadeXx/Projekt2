@@ -26,6 +26,8 @@ export type Talk =
   | { kind: 'capabilities' }
   | { kind: 'readProblem' }
   | { kind: 'status' }
+  | { kind: 'handIn' }
+  | { kind: 'readHandIn' }
   | { kind: 'define'; term: string; meaning: string }
   | { kind: 'unknownTerm'; term: string };
 
@@ -153,6 +155,13 @@ const ASKS_STATUS =
 const ASKS_CAPABILITIES =
   /\b(?:what can you do|what do you do|what is this|what's this|how does (?:this|it) work|how do i use|who are you|what are you)\b/i;
 
+// Handing in and hearing the hand-in first. Decided here, with no server, so
+// they work when the model is not reachable.
+const ASKS_HAND_IN =
+  /^(?:(?:please|okay|ok|glance|can you|could you) )*(?:hand in(?: it| this| my (?:work|homework|answers?))?|hand (?:it|this|my work|my homework) in|submit my work|send my work)(?: now| please)?$/i;
+const ASKS_READ_HAND_IN =
+  /^(?:(?:please|okay|ok|glance|can you|could you) )*(?:read|hear|play|preview)(?: me| out)?(?: back)?(?: to me)? (?:my |the )?hand[ -]?in(?: file| back)?(?: first| please)?$/i;
+
 const GREETS = /^(?:hi|hello|hey|good (?:morning|afternoon|evening))(?: there| glance)?$/i;
 const THANKS = /^(?:thanks|thank you|cheers|great|perfect|nice|cool|got it)(?: very much| a lot| glance)?$/i;
 const ASKS_REPEAT =
@@ -189,6 +198,8 @@ export function understandTalk(text: string): Talk | null {
       unknownTerm = requestedTerm;
     }
   }
+  if (ASKS_READ_HAND_IN.test(lower)) return { kind: 'readHandIn' };
+  if (ASKS_HAND_IN.test(lower)) return { kind: 'handIn' };
   if (asksToSolve(said)) return { kind: 'refuse' };
   if (DESCRIBES_A_STEP.test(lower)) return { kind: 'describes' };
   if (ASKS_CAPABILITIES.test(lower)) return { kind: 'capabilities' };

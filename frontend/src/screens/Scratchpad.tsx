@@ -37,6 +37,7 @@ import type { Recording } from '../audio/recorder';
 import { HandsFree } from '../audio/handsFree';
 import { cancel as stopSpeaking } from '../audio/tts';
 import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
+import type { ExportAction } from './Export';
 import { loadWork, saveWork, type Mode, type Problem, type WorkLine } from '../state';
 
 export interface ScratchpadProps {
@@ -46,7 +47,7 @@ export interface ScratchpadProps {
   mode: Mode;
   /** The problem line the student was on; their first step follows from it. */
   startLine: number;
-  onExport: () => void;
+  onExport: (action?: ExportAction) => void;
 }
 
 interface Pending {
@@ -302,7 +303,8 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   useEffect(() => () => listener.current?.stop(), []);
 
   async function savePending(line: Pending) {
-    const entry: WorkLine = { id: newId(), ...line };
+    // Only reached from the readback bar's Save, so the student has heard it.
+    const entry: WorkLine = { id: newId(), ...line, confirmed: true };
     // An edit (#24) replaces its line in place; anything else is appended.
     const editIndex = editTarget ? lines.findIndex((l) => l.id === editTarget) : -1;
     const index = editIndex >= 0 ? editIndex : lines.length;
@@ -445,6 +447,12 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         );
         return;
       }
+      case 'handIn':
+        onExport('handIn');
+        return;
+      case 'readHandIn':
+        onExport('read');
+        return;
       case 'readProblem': {
         const spoken = await Promise.all(problem.lines.map((l) => speechFor(l.latex)));
         const body = problem.lines
@@ -538,7 +546,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         return;
       }
       case 'export':
-        onExport();
+        onExport('handIn');
         return;
       case 'help': {
         const help = helpText('scratchpad');
@@ -577,7 +585,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       u: undo,
       h: () => void toggleHandsFree(),
       'shift+r': readAll,
-      x: onExport,
+      x: () => onExport(),
       p: () => {
         setShowProblem((v) => !v);
         announce(showProblem ? 'Problem hidden.' : 'Problem shown.');
@@ -769,7 +777,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
           as a real control. They appear as the work does. */}
       <div className="mt-8">
         {lines.length > 0 && (
-          <button type="button" className="btn-primary" onClick={onExport}>
+          <button type="button" className="btn-primary" onClick={() => onExport()}>
             Hand in my work
           </button>
         )}

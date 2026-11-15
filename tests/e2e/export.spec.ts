@@ -23,14 +23,49 @@ const WORK = [
 ];
 
 /** Start with a saved problem and saved work, as after a reload. */
-async function seed(page: Page, work: unknown[] = WORK) {
+async function seed(page: Page, work: unknown[] = WORK, problem: unknown = PROBLEM) {
   await page.addInitScript(
     ([problem, lines]) => {
       localStorage.setItem('glance.problem.v1', JSON.stringify(problem));
       localStorage.setItem('glance.work.v1', JSON.stringify(lines));
     },
-    [PROBLEM, work] as const,
+    [problem, work] as const,
   );
+}
+
+type ShareCall = { title: string; saidBefore: string; files: { name: string; type: string; text: string }[] };
+
+/** Stand in for the phone's share sheet. 'ok' resolves, 'cancel' rejects as
+ *  the browser does when the sheet is dismissed, 'none' removes sharing. */
+async function stubShare(page: Page, behaviour: 'ok' | 'cancel' | 'none') {
+  await page.addInitScript((b) => {
+    const w = window as unknown as { shared: unknown[] };
+    w.shared = [];
+    if (b === 'none') {
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+      Object.defineProperty(navigator, 'canShare', { value: undefined, configurable: true });
+      return;
+    }
+    Object.defineProperty(navigator, 'canShare', {
+      value: (data?: { files?: File[] }) => !!data?.files?.length,
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'share', {
+      value: async (data: { title: string; files: File[] }) => {
+        const saidBefore = document.querySelector('[data-testid="live-polite"]')?.textContent ?? '';
+        const files = await Promise.all(
+          data.files.map(async (f) => ({ name: f.name, type: f.type, text: await f.text() })),
+        );
+        w.shared.push({ title: data.title, saidBefore, files });
+        if (b === 'cancel') throw new DOMException('Share canceled', 'AbortError');
+      },
+      configurable: true,
+    });
+  }, behaviour);
+}
+
+function shareCalls(page: Page): Promise<ShareCall[]> {
+  return page.evaluate(() => (window as unknown as { shared: ShareCall[] }).shared ?? []);
 }
 
 async function openExport(page: Page) {
@@ -116,12 +151,59 @@ test.describe('@smoke export', () => {
     expect(html).toContain('<math');
   });
 
-  test('a line that could not be checked is kept and marked, never dropped', async ({ page }) => {
-    await seed(page, [{ id: 'W1', latex: 'x \\to 2', readback: 'x goes to 2', valid: false }]);
+  test('the file contains no wording that judges the student\'s lines', async ({ page }) => {
+    await seed(page, [
+      { id: 'W1', latex: 'x \\to 2', readback: 'x goes to 2', valid: false, confirmed: true },
+      { id: 'W2', latex: 'x = 4', readback: 'x equals 4', valid: true },
+    ]);
     await openExport(page);
     const html = await downloadHtml(page);
-    expect(html).toContain('(could not be checked)');
-    expect(html.match(/<math /g)).toHaveLength(2);
+    // Lines are kept, never dropped, and nothing marks them.
+    expect(html.match(/<math /g)).toHaveLength(3);
+    const words = /checks? out|verified|correct|couldn.?t confirm|could not be (?:checked|confirmed)|not confirmed|wrong|incorrect|unsure|error/i;
+    expect(html.replace(/<style[\s\S]*?<\/style>/, '')).not.toMatch(words);
+  });
+
+  test('the file says only what happened: how many lines were confirmed', async ({ page }) => {
+    await seed(page, [
+      { id: 'W1', latex: '2x = 8', readback: '2 x equals 8', valid: true, confirmed: true },
+      { id: 'W2', latex: 'x = 4', readback: 'x equals 4', valid: true },
+    ]);
+    await openExport(page);
+    const html = await downloadHtml(page);
+    expect(html).toContain('1 of 2 lines were read back and confirmed by the student.');
+    expect(html).not.toContain('All 2 lines');
+
+  });
+
+  test('when every line was confirmed the file says all of them were', async ({ page }) => {
+    await seed(page, [
+      { id: 'W1', latex: '2x = 8', readback: '2 x equals 8', valid: true, confirmed: true },
+      { id: 'W2', latex: 'x = 4', readback: 'x equals 4', valid: true, confirmed: true },
+    ]);
+    await openExport(page);
+    const html = await downloadHtml(page);
+    expect(html).toContain('All 2 lines were read back and confirmed by the student.');
+  });
+
+  test('lines saved in the scratchpad are recorded as confirmed', async ({ page }) => {
+    await seed(page, []);
+    await page.route('**/api/validate', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '{"valid":true}' }),
+    );
+    await page.route('**/api/spoken-to-latex', (route) => route.abort());
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Back to your problem' }).click();
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('s');
+    await page.getByLabel('Or type your line').fill('2x = 8');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('readback-bar')).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('live-polite')).toContainText('Saved as line 1');
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('glance.work.v1')!));
+    expect(saved).toHaveLength(1);
+    expect(saved[0].confirmed).toBe(true);
   });
 
   test('with no work yet, the file still says so plainly', async ({ page }) => {
@@ -130,6 +212,111 @@ test.describe('@smoke export', () => {
     await expect(page.getByTestId('live-polite')).toContainText('0 lines of your work');
     const html = await downloadHtml(page);
     expect(html).toContain('No lines written yet.');
+    expect(html).not.toMatch(/read back and confirmed/);
+  });
+
+  test('hand in announces a summary, then shares the HTML file', async ({ page }) => {
+    await stubShare(page, 'ok');
+    await seed(page);
+    await openExport(page);
+    await page.getByRole('button', { name: 'Hand in my work' }).click();
+    await expect.poll(() => shareCalls(page)).toHaveLength(1);
+    const [call] = await shareCalls(page);
+    expect(call.files).toHaveLength(1);
+    expect(call.files[0].name).toMatch(/^math-work-\d{4}-\d{2}-\d{2}\.html$/);
+    expect(call.files[0].type).toBe('text/html');
+    expect(call.files[0].text).toContain('<h2>My work</h2>');
+    expect(call.title).toBe('Math work');
+    // The summary was said before the sheet opened.
+    expect(call.saidBefore).toBe('Handing in. 2 lines of work, for the sample problem.');
+    await expect(page.getByTestId('live-polite')).toContainText(/Shared math-work-.*\.html/);
+  });
+
+  test('the summary names the problem, trimmed, when it is not the sample', async ({ page }) => {
+    await stubShare(page, 'ok');
+    const long = 'Find the values of x and y that satisfy both of these equations at the same time, showing all of your steps.';
+    await seed(page, WORK, { ...PROBLEM, source: 'upload', instructions: long });
+    await openExport(page);
+    await page.getByRole('button', { name: 'Hand in my work' }).click();
+    await expect.poll(() => shareCalls(page)).toHaveLength(1);
+    const [call] = await shareCalls(page);
+    expect(call.saidBefore).toBe(`Handing in. 2 lines of work, for problem: ${long.slice(0, 60).trimEnd()}….`);
+  });
+
+  test('a cancelled share says nothing was sent and keeps the work', async ({ page }) => {
+    await stubShare(page, 'cancel');
+    await seed(page);
+    await openExport(page);
+    await page.getByRole('button', { name: 'Hand in my work' }).click();
+    await expect(page.getByTestId('live-polite')).toHaveText('Not sent. Your work is still here.');
+    await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeVisible();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('glance.work.v1')!))).toHaveLength(2);
+  });
+
+  test('without share support it downloads and says the file name and where it is', async ({ page }) => {
+    await stubShare(page, 'none');
+    await seed(page);
+    await openExport(page);
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Hand in my work' }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toMatch(/^math-work-\d{4}-\d{2}-\d{2}\.html$/);
+    await expect(page.getByTestId('live-polite')).toContainText(
+      `Downloaded ${file.suggestedFilename()}. It is in your browser's Downloads folder.`,
+    );
+  });
+
+  test('saying "hand in" in the scratchpad shares the file', async ({ page }) => {
+    await stubShare(page, 'ok');
+    await seed(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Back to your problem' }).click();
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('s');
+    await page.getByLabel('Or type your line').fill('hand in');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => shareCalls(page)).toHaveLength(1);
+    const [call] = await shareCalls(page);
+    expect(call.saidBefore).toContain('Handing in. 2 lines of work');
+  });
+
+  test('"Read my hand-in" reads the same lines the file has', async ({ page }) => {
+    await seed(page, [
+      { id: 'W1', latex: '2x = 8', readback: '2 x equals 8', valid: true, confirmed: true },
+      { id: 'W2', latex: 'x = 4', readback: 'x equals 4', valid: true },
+    ]);
+    await openExport(page);
+    await page.getByLabel(/Your name/).fill('Sam Example');
+    const html = await downloadHtml(page);
+    await page.getByRole('button', { name: 'Read my hand-in' }).click();
+    await expect(page.getByTestId('live-polite')).toContainText('Math work — Sam Example.');
+    const said = (await page.getByTestId('live-polite').textContent()) ?? '';
+
+    const meta = /<p class="meta">(.*?)<\/p>/.exec(html)![1];
+    const alts = [...html.matchAll(/alttext="([^"]*)"/g)].map((m) => m[1]);
+    expect(said).toContain('Math work — Sam Example.');
+    expect(said).toContain(meta);
+    expect(said).toContain('Solve for x.');
+    // Every line in the file, in the same order, as the read-out has it.
+    let at = 0;
+    for (const alt of alts) {
+      const found = said.indexOf(alt, at);
+      expect(found, `"${alt}" in the read-out`).toBeGreaterThanOrEqual(at);
+      at = found + alt.length;
+    }
+    expect(said).toContain('Line 1. 2 x equals 8.');
+    expect(said).toContain('Line 2. x equals 4.');
+  });
+
+  test('saying "read my hand-in" in the scratchpad reads it', async ({ page }) => {
+    await seed(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Back to your problem' }).click();
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('s');
+    await page.getByLabel('Or type your line').fill('read my hand-in');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('live-polite')).toContainText('Line 2. x equals 4.');
   });
 
   test('print opens the print dialog and prints only the hand-in', async ({ page }) => {

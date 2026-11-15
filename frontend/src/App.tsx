@@ -17,7 +17,7 @@ import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
 import { InstallApp } from './components/InstallApp';
 import { Settings } from './screens/Settings';
-import { Export } from './screens/Export';
+import { Export, type ExportAction } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { spokenMath } from './math/sre';
@@ -94,8 +94,10 @@ export function App() {
   }
 
   const [exportFrom, setExportFrom] = useState<Screen>('scratchpad');
-  function openExport(from: Screen) {
+  const [exportAction, setExportAction] = useState<ExportAction | undefined>();
+  function openExport(from: Screen, action?: ExportAction) {
     setExportFrom(from);
+    setExportAction(action);
     setScreen('export');
   }
 
@@ -313,12 +315,12 @@ export function App() {
             mode={settings.mode}
             startLine={workingFrom}
             onBack={() => setScreen('problem')}
-            onExport={() => openExport('scratchpad')}
+            onExport={(action) => openExport('scratchpad', action)}
           />
         )}
 
         {screen === 'export' && problem && (
-          <Export problem={problem} onBack={() => setScreen(exportFrom)} />
+          <Export problem={problem} autoRun={exportAction} onBack={() => setScreen(exportFrom)} />
         )}
 
         {screen === 'settings' && (

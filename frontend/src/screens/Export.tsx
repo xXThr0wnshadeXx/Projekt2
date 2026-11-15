@@ -8,14 +8,25 @@ import { spokenMath } from '../math/sre';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
 import { ExportPreview } from '../components/ExportPreview';
-import { buildExportHtml, downloadFile } from '../export';
+import {
+  buildExportHtml,
+  downloadFile,
+  handInReadout,
+  handInSummary,
+  shareFile,
+  type ExportInput,
+} from '../export';
 import { useShortcuts } from '../shortcuts';
 import { loadWork, type Problem } from '../state';
 
 export interface ExportProps {
   problem: Problem;
   onBack: () => void;
+  /** Set when the student said "hand in" or "read my hand-in": do it on arrival. */
+  autoRun?: ExportAction;
 }
+
+export type ExportAction = 'handIn' | 'read';
 
 /** "math-work-2026-11-15.html", or with the student's name if they gave one. */
 export function exportFilename(name: string, date: Date): string {
@@ -32,17 +43,25 @@ export function exportFilename(name: string, date: Date): string {
   return slug ? `math-work-${slug}-${day}.html` : `math-work-${day}.html`;
 }
 
-export function Export({ problem, onBack }: ExportProps) {
+export function Export({ problem, onBack, autoRun }: ExportProps) {
   const work = useMemo(() => loadWork(), []);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const date = useMemo(() => new Date(), []);
   const heading = useRef<HTMLHeadingElement>(null);
+  const ranAuto = useRef(false);
 
   useEffect(() => {
     heading.current?.focus();
+    if (autoRun) {
+      // StrictMode runs effects twice in development; do it once.
+      if (ranAuto.current) return;
+      ranAuto.current = true;
+      void (autoRun === 'handIn' ? handIn() : readHandIn());
+      return;
+    }
     const count = `${work.length} ${work.length === 1 ? 'line' : 'lines'} of your work`;
-    announce(`Hand in your work. ${count}. Download a file, or print it.`);
+    announce(`Hand in your work. ${count}. Hand it in, hear it first, download a file, or print it.`);
   }, [work.length]);
 
   /** The spoken form of each problem line, taken from the rendered preview. */
@@ -50,28 +69,91 @@ export function Export({ problem, onBack }: ExportProps) {
     return spokenMath(document.getElementById(`exp-${id}`)) || fallback;
   }
 
+  /** Wait until the preview's math has been typeset, so the spoken forms
+   *  read from it are the real ones and not the LaTeX fallback. */
+  async function previewReady() {
+    const wanted = problem.lines.length + work.length;
+    for (let i = 0; i < 100; i++) {
+      if (document.querySelectorAll('#export-preview mjx-container').length >= wanted) return;
+      await new Promise((r) => window.setTimeout(r, 50));
+    }
+  }
+
+  function inputFor(): ExportInput {
+    return {
+      name,
+      instructions: problem.instructions,
+      problem: problem.lines.map((l) => ({
+        latex: l.latex,
+        spoken: spokenFor(l.id, l.latex),
+        valid: l.valid,
+      })),
+      work: work.map((l) => ({
+        latex: l.latex,
+        spoken: l.readback,
+        valid: l.valid,
+        confirmed: l.confirmed,
+      })),
+      date,
+    };
+  }
+
+  async function makeFile() {
+    await previewReady();
+    const input = inputFor();
+    const html = await buildExportHtml(input);
+    return { html, filename: exportFilename(name, date), title: handInReadout(input)[0].replace(/\.$/, '') };
+  }
+
+  function saveToDownloads(filename: string, html: string) {
+    downloadFile(filename, html, 'text/html;charset=utf-8');
+    announce(`Downloaded ${filename}. It is in your browser's Downloads folder.`);
+  }
+
   async function downloadHtml() {
     setBusy(true);
     try {
-      const html = await buildExportHtml({
-        name,
-        instructions: problem.instructions,
-        problem: problem.lines.map((l) => ({
-          latex: l.latex,
-          spoken: spokenFor(l.id, l.latex),
-          valid: l.valid,
-        })),
-        work: work.map((l) => ({ latex: l.latex, spoken: l.readback, valid: l.valid })),
-        date,
-      });
-      const filename = exportFilename(name, date);
-      downloadFile(filename, html, 'text/html;charset=utf-8');
-      announce(`Downloaded ${filename}.`);
+      const { html, filename } = await makeFile();
+      saveToDownloads(filename, html);
     } catch {
       announce('The file could not be made. Try again, or print instead.', 'assertive');
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Say what is going, then open the share sheet with the file attached. */
+  async function handIn() {
+    if (work.length === 0) {
+      announce('You have no lines of work to hand in yet.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { html, filename, title } = await makeFile();
+      const summary = handInSummary(work.length, problem.instructions, problem.source === 'sample');
+      announce(`Handing in. ${summary}`);
+      // Let the summary start before the share sheet takes over the screen.
+      await new Promise((r) => window.setTimeout(r, 400));
+      const file = new File([html], filename, { type: 'text/html' });
+      const result = await shareFile(file, title);
+      if (result === 'shared') announce(`Shared ${filename}.`);
+      else if (result === 'cancelled') announce('Not sent. Your work is still here.');
+      else if (result === 'blocked') {
+        announce('Your browser needs a tap before it can open sharing. Press Hand in my work.');
+        document.getElementById('hand-in-button')?.focus();
+      } else saveToDownloads(filename, html);
+    } catch {
+      announce('The file could not be made. Try again, or print instead.', 'assertive');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Read, line by line, exactly what the instructor's file will contain. */
+  async function readHandIn() {
+    await previewReady();
+    announce(handInReadout(inputFor()).join(' '));
   }
 
   function print() {
@@ -112,6 +194,18 @@ export function Export({ problem, onBack }: ExportProps) {
       </div>
 
       <div className="no-print mt-6 flex flex-wrap gap-3">
+        <button
+          id="hand-in-button"
+          type="button"
+          className="btn-primary"
+          disabled={busy}
+          onClick={() => void handIn()}
+        >
+          Hand in my work
+        </button>
+        <button type="button" className="btn" onClick={() => void readHandIn()}>
+          Read my hand-in
+        </button>
         <button type="button" className="btn" disabled={busy} onClick={() => void downloadHtml()}>
           Download accessible HTML
         </button>
