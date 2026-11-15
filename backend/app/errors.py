@@ -76,11 +76,31 @@ async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
 
 
 async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
-    log.error("unhandled %s on %s", type(exc).__name__, request.url.path, exc_info=exc)
+    # Type only. The message and traceback values can hold a student's LaTeX (#209).
+    log.error("unhandled %s on %s", type(exc).__name__, request.url.path)
     return error_response("INTERNAL", "Something went wrong on our side. Try again.", 500)
 
 
+class _NoTracebacks(logging.Filter):
+    """Strip exception details from server-level error records (#209).
+
+    After our handler answers, Starlette re-raises the error and uvicorn logs
+    it with a traceback whose values can hold a student's LaTeX.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.exc_info:
+            name = record.exc_info[0].__name__ if record.exc_info[0] else "Exception"
+            record.msg, record.args = f"unhandled {name}", None
+            record.exc_info = record.exc_text = record.stack_info = None
+        return True
+
+
 def install_error_handlers(app: FastAPI) -> None:
+    for name in ("uvicorn.error", "uvicorn"):
+        target = logging.getLogger(name)
+        if not any(isinstance(f, _NoTracebacks) for f in target.filters):
+            target.addFilter(_NoTracebacks())
     app.add_exception_handler(ApiError, _api_error)
     app.add_exception_handler(RequestValidationError, _validation_error)
     app.add_exception_handler(StarletteHTTPException, _http_error)
