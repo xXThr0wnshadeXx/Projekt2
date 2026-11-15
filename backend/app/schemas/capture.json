@@ -2,10 +2,12 @@
   "type": "object",
   "properties": {
     "instructions": {
-      "type": "string"
+      "type": "string",
+      "description": "Task instructions visibly printed in the image, copied verbatim; empty string when absent. Never invent or paraphrase instructions or include the transcription request or supplied context."
     },
     "lines": {
       "type": "array",
+      "description": "Only source math lines in reading order, transcribed exactly without correcting, completing, simplifying or solving. Exclude prose headings and task instructions, even if they contain variables; preserve text within actual math expressions.",
       "items": {
         "type": "object",
         "properties": {

@@ -82,7 +82,7 @@ export const GLOSSARY: [RegExp, string, string][] = [
   [/\bmonomials?\b/, 'monomial', 'A monomial is a polynomial with one term.'],
   [/\bbinomials?\b/, 'binomial', 'A binomial is a polynomial with two terms.'],
   [/\btrinomials?\b/, 'trinomial', 'A trinomial is a polynomial with three terms.'],
-  [/\bdegrees?\b/, 'degree', 'The degree of a polynomial is the largest exponent on a variable in any one of its terms.'],
+  [/\bdegrees?\b/, 'degree', 'A degree is the unit angles are measured in. A full turn is three hundred and sixty degrees. The degree of a polynomial is its largest exponent on a variable in any one term.'],
   [/\broots?\b/, 'root', 'A root of an equation is a value that makes the equation true.'],
   [/\bsolutions?\b/, 'solution', 'A solution is a value that makes an equation or inequality true.'],
   [/\bidentit(?:y|ies)\b/, 'identity', 'An identity is an equation that is true for every allowed value of its variables.'],
@@ -129,7 +129,7 @@ export const GLOSSARY: [RegExp, string, string][] = [
   [/\breciprocals?\b/, 'reciprocal', 'The reciprocal of a number is one divided by that number.'],
   [/\babsolute values?\b/, 'absolute value', 'The absolute value of a number is its size, ignoring whether it is negative.'],
   [/\b(?:parenthes[ie]s|brackets?)\b/, 'parentheses', 'Parentheses group part of a line so it is treated as one thing.'],
-  [/\bsolve\b/, 'solve', 'To solve for a letter means to find the value of the letter that makes the equation true. That part is yours to do.'],
+  [/\bsolve\b/, 'solve', 'Solving for a letter means working out which value of the letter makes the equation true. That part is yours to do.'],
   [/\bsimplify\b/, 'simplify', 'To simplify means to rewrite something in a shorter form that has the same value.'],
   // What this app itself says.
   [/\b(?:could ?n[o']t|can ?n[o']t|not) confirm(?:ed)?\b/, 'could not confirm', 'It means I could not verify that your line follows from the one before. It does not mean your line is wrong.'],

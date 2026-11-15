@@ -13,6 +13,7 @@ import { announce, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
 import { spokenMath, structureSummary } from '../math/sre';
 import { useShortcuts } from '../shortcuts';
+import { readAloud, useLineKeys } from '../lineKeys';
 import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
 import type { Mode, Problem as ProblemData } from '../state';
 
@@ -20,6 +21,8 @@ export interface ProblemProps {
   problem: ProblemData;
   onLowVision: (index: number) => void;
   onNewCapture: () => void;
+  /** Removes a line the capture got wrong; capture output is never immutable. */
+  onDiscardLine: (id: string) => void;
   /** Called with the line the student was on, which their first step follows. */
   onStartWorking: (index: number) => void;
   mode: Mode;
@@ -34,6 +37,7 @@ export function Problem({
   problem,
   onLowVision,
   onNewCapture,
+  onDiscardLine,
   onStartWorking,
   mode,
   onExport,
@@ -97,6 +101,23 @@ export function Problem({
     announce(`${problem.instructions} ${body}`.trim());
   }
 
+  function discardLine(lineIndex: number) {
+    const line = lines[lineIndex];
+    if (!line) return;
+    const remaining = lines.length - 1;
+    // Work out the focus target before removing the line from the DOM.
+    const next = lines[lineIndex + 1] ?? lines[lineIndex - 1];
+    setIndex(Math.max(0, Math.min(lineIndex, remaining - 1)));
+    setSummary('');
+    onDiscardLine(line.id);
+    announce(
+      remaining
+        ? `Discarded line ${lineIndex + 1}. ${remaining} ${remaining === 1 ? 'line remains.' : 'lines remain.'}`
+        : 'Discarded the only line. Capture another problem when you are ready.',
+    );
+    window.setTimeout(() => focusFirst(next ? `#${next.id}` : '#no-problem-lines'), 80);
+  }
+
   /** "What changed?" on the source (DESIGN.md 14): how this line follows from
    *  the one before. Study mode names the operation; homework only says
    *  whether it checks out. Off in exam mode. Never solves or hints. */
@@ -124,6 +145,17 @@ export function Problem({
     );
   }
 
+  // Arrows and Space (#236): the easiest keys to find without looking.
+  useLineKeys({
+    previous: () => goTo(index - 1, 'previous'),
+    next: () => goTo(index + 1, 'next'),
+    read: () => {
+      if (!current) return;
+      const spoken = spokenMath(document.getElementById(current.id));
+      readAloud(spoken ? `Line ${index + 1}. ${spoken}` : `Line ${index + 1} is not ready to read yet.`);
+    },
+  });
+
   useShortcuts({
     g: glance,
     r: readLine,
@@ -141,7 +173,7 @@ export function Problem({
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
-      <h2 className="text-2xl font-semibold tracking-tight">Your problem</h2>
+      <h2 className="text-4xl font-medium tracking-tight">Your problem</h2>
 
       {problem.instructions && (
         <p className="mt-2 text-lg">
@@ -158,13 +190,14 @@ export function Problem({
           is not recited — "?" announces it properly. */}
       <p className="mt-2 text-sm text-[--muted]">
         {lines.length} {lines.length === 1 ? 'line' : 'lines'}
-        {unsure > 0 && `, ${unsure} unsure`}. Press{' '}
+        {unsure > 0 && `, ${unsure} unsure`}. Use the{' '}
+        <kbd className="kbd">arrow keys</kbd> to move between lines and{' '}
+        <kbd className="kbd">Space</kbd> to hear one. Press{' '}
         <kbd className="kbd">Enter</kbd> on a line to explore it,{' '}
         <kbd className="kbd">S</kbd> to start working.
         <span aria-hidden="true">
           {' '}
-          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">N</kbd>{' '}
-          and <kbd className="kbd">P</kbd> to move, <kbd className="kbd">L</kbd>{' '}
+          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">L</kbd>{' '}
           large print, <kbd className="kbd">?</kbd> for all shortcuts.
         </span>
       </p>
@@ -175,18 +208,34 @@ export function Problem({
         </p>
       )}
 
-      <ul className="mt-6 space-y-4" aria-label="Problem lines">
-        {lines.map((l, i) => (
-          <li key={l.id} onFocus={() => setIndex(i)}>
-            <MathLine
-              id={l.id}
-              latex={l.latex}
-              label={`Line ${i + 1}`}
-              unsure={!l.valid}
-            />
-          </li>
-        ))}
-      </ul>
+      {lines.length ? (
+        <ul className="mt-6 space-y-4" aria-label="Problem lines">
+          {lines.map((l, i) => (
+            <li key={l.id} className="relative" onFocus={() => setIndex(i)}>
+              <MathLine
+                id={l.id}
+                latex={l.latex}
+                label={`Line ${i + 1}`}
+                unsure={!l.valid}
+              />
+              <button
+                type="button"
+                className="btn absolute right-3 top-3 min-w-[48px] justify-center px-0 text-2xl leading-none"
+                onClick={() => discardLine(i)}
+                aria-label={`Discard problem line ${i + 1}`}
+                title="Discard this line"
+              >
+                <span aria-hidden="true">×</span>
+                <span className="sr-only">Discard</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <section id="no-problem-lines" tabIndex={-1} className="mt-6 rounded-lg border border-[--warn] px-4 py-3">
+          No problem lines remain. Capture another photo, scan or file.
+        </section>
+      )}
 
       {problem.diagrams.length > 0 && (
         <section aria-label="Diagrams" className="mt-8">
@@ -216,6 +265,7 @@ export function Problem({
           contents, and "Capture another" is left out of that group because it
           leaves the problem rather than reading it. */}
       <div className="mt-8">
+        {lines.length > 0 && <>
         <button
           type="button"
           className="btn-primary"
@@ -245,6 +295,7 @@ export function Problem({
             )}
           </div>
         </section>
+        </>}
 
         <div className="mt-6 border-t border-[--line] pt-4">
           <button type="button" className="btn-quiet" onClick={onNewCapture}>

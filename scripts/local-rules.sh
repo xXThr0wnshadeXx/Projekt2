@@ -109,7 +109,7 @@ not operable by keyboard and screen reader is not finished, it is broken.
 | Capture, read, explore | yes | yes | yes |
 | Scratchpad and readback | yes | yes | yes |
 | Step check on own work | yes, with explanation | "checks out" / "couldn't confirm" | no |
-| What changed, on the source | yes | no | no |
+| What changed, on the source | yes | yes | no |
 | Solve, hint, next step | never | never | never |
 
 Enforced in the interface **and** in the API. `/api/diff` returns 403 in exam

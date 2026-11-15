@@ -108,6 +108,16 @@ If a hypothesis fails, **say so in the pitch** and what we changed. Judges rewar
 2. "How do you receive work from students who can't hand-write it?"
 3. "Would a typed export of the student's own steps work for grading? What would worry you?" (integrity)
 
+### Kits
+
+Ready-to-use material for the people tasks:
+
+- [Outreach drafts and send tracker](outreach.md) (#6)
+- [Interview kit: scripts, Mom Test rules, H1-H4 scoring](interview-kit.md) (#40, #41)
+- [Concierge conversion run-sheet](concierge-test.md) (#42)
+- [iPhone check, 15 minutes](iphone-check.md) (#154)
+- [Evidence ledger](proof-log.md) and [evidence folder rules](evidence/README.md) (#40)
+
 ### Noise vs. signal
 | Noise (don't count) | Signal (count it) |
 |---|---|
