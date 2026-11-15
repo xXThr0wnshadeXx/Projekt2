@@ -10,6 +10,8 @@ from openai.types.chat import ChatCompletionMessageParam
 from pydantic import SecretStr, StringConstraints
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .observability import instrument_openai
+
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = Path(__file__).with_name("schemas")
 ModelId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -39,7 +41,9 @@ def load_schema(task: StructuredTask) -> dict:
 class ModelClient:
     def __init__(self, settings: ModelSettings):
         self.settings = settings
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
+        self.client = instrument_openai(
+            AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
+        )
 
     async def close(self) -> None:
         await self.client.close()
