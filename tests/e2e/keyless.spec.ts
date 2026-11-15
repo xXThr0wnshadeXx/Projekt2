@@ -71,7 +71,8 @@ test.describe('@smoke without a model', () => {
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
 
     await page.keyboard.press('Enter');
-    await expect(polite(page)).toHaveText('Saved as line 1.');
+    // With /api/diff unreachable, #131 says once that checking is down.
+    await expect(polite(page)).toHaveText('Saved as line 1. Step checking is unavailable right now.');
     await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
   });
 
@@ -114,7 +115,8 @@ test.describe('@smoke without a model', () => {
     await typeLine(page, '2x = 8');
     await expect(polite(page)).toContainText('I read:');
     await page.keyboard.press('Enter');
-    await expect(polite(page)).toHaveText('Saved as line 1.');
+    // With /api/diff unreachable, #131 says once that checking is down.
+    await expect(polite(page)).toHaveText('Saved as line 1. Step checking is unavailable right now.');
     await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
   });
 

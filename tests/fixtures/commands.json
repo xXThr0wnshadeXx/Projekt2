@@ -1,0 +1,335 @@
+{
+  "_note": "Shared by backend/app/commands.py and frontend/src/commands.ts (issue #128). Change both together.",
+  "cases": [
+    {
+      "text": "next line",
+      "current": 2,
+      "line_count": 4,
+      "expected": {
+        "intent": "navigate",
+        "target_line": "W3",
+        "instruction": null
+      }
+    },
+    {
+      "text": "Next.",
+      "current": null,
+      "line_count": 4,
+      "expected": {
+        "intent": "navigate",
+        "target_line": "W5",
+        "instruction": null
+      }
+    },
+    {
+      "text": "previous line",
+      "current": 3,
+      "line_count": 4,
+      "expected": {
+        "intent": "navigate",
+        "target_line": "W2",
+        "instruction": null
+      }
+    },
+    {
+      "text": "go back",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "navigate",
+        "target_line": "W1",
+        "instruction": null
+      }
+    },
+    {
+      "text": "go to line three",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "navigate",
+        "target_line": "W3",
+        "instruction": null
+      }
+    },
+    {
+      "text": "line 2",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "navigate",
+        "target_line": "W2",
+        "instruction": null
+      }
+    },
+    {
+      "text": "the second line",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "navigate",
+        "target_line": "W2",
+        "instruction": null
+      }
+    },
+    {
+      "text": "first line",
+      "current": 3,
+      "line_count": 4,
+      "expected": {
+        "intent": "navigate",
+        "target_line": "W1",
+        "instruction": null
+      }
+    },
+    {
+      "text": "last line",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "navigate",
+        "target_line": "W4",
+        "instruction": null
+      }
+    },
+    {
+      "text": "read it",
+      "current": 2,
+      "line_count": 4,
+      "expected": {
+        "intent": "read",
+        "target_line": "W2",
+        "instruction": null
+      }
+    },
+    {
+      "text": "read line four",
+      "current": 2,
+      "line_count": 4,
+      "expected": {
+        "intent": "read",
+        "target_line": "W4",
+        "instruction": null
+      }
+    },
+    {
+      "text": "read my work",
+      "current": 2,
+      "line_count": 4,
+      "expected": {
+        "intent": "read",
+        "target_line": null,
+        "instruction": "all"
+      }
+    },
+    {
+      "text": "please read everything",
+      "current": null,
+      "line_count": 4,
+      "expected": {
+        "intent": "read",
+        "target_line": null,
+        "instruction": "all"
+      }
+    },
+    {
+      "text": "delete line two",
+      "current": 4,
+      "line_count": 4,
+      "expected": {
+        "intent": "delete",
+        "target_line": "W2",
+        "instruction": null
+      }
+    },
+    {
+      "text": "delete line to",
+      "current": 4,
+      "line_count": 4,
+      "expected": {
+        "intent": "delete",
+        "target_line": "W2",
+        "instruction": null
+      }
+    },
+    {
+      "text": "delete that",
+      "current": 3,
+      "line_count": 4,
+      "expected": {
+        "intent": "delete",
+        "target_line": "W3",
+        "instruction": null
+      }
+    },
+    {
+      "text": "erase",
+      "current": null,
+      "line_count": 4,
+      "expected": {
+        "intent": "delete",
+        "target_line": "W4",
+        "instruction": null
+      }
+    },
+    {
+      "text": "undo",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "undo",
+        "target_line": null,
+        "instruction": null
+      }
+    },
+    {
+      "text": "Undo that.",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "undo",
+        "target_line": null,
+        "instruction": null
+      }
+    },
+    {
+      "text": "new line",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "new_line",
+        "target_line": null,
+        "instruction": null
+      }
+    },
+    {
+      "text": "check this step",
+      "current": 3,
+      "line_count": 4,
+      "expected": {
+        "intent": "check",
+        "target_line": "W3",
+        "instruction": null
+      }
+    },
+    {
+      "text": "check line two",
+      "current": 3,
+      "line_count": 4,
+      "expected": {
+        "intent": "check",
+        "target_line": "W2",
+        "instruction": null
+      }
+    },
+    {
+      "text": "what changed",
+      "current": 3,
+      "line_count": 4,
+      "expected": {
+        "intent": "what_changed",
+        "target_line": "W3",
+        "instruction": null
+      }
+    },
+    {
+      "text": "hand in my work",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "export",
+        "target_line": null,
+        "instruction": null
+      }
+    },
+    {
+      "text": "export",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "export",
+        "target_line": null,
+        "instruction": null
+      }
+    },
+    {
+      "text": "help",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "help",
+        "target_line": null,
+        "instruction": null
+      }
+    },
+    {
+      "text": "what can I say",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "help",
+        "target_line": null,
+        "instruction": null
+      }
+    },
+    {
+      "text": "change the three to a four",
+      "current": 2,
+      "line_count": 4,
+      "expected": {
+        "intent": "edit",
+        "target_line": "W2",
+        "instruction": "replace three with four"
+      }
+    },
+    {
+      "text": "replace x with y on line 1",
+      "current": 2,
+      "line_count": 4,
+      "expected": {
+        "intent": "edit",
+        "target_line": "W1",
+        "instruction": "replace x with y"
+      }
+    },
+    {
+      "text": "edit line three",
+      "current": 1,
+      "line_count": 4,
+      "expected": {
+        "intent": "edit",
+        "target_line": "W3",
+        "instruction": null
+      }
+    },
+    {
+      "text": "two x equals eight",
+      "current": 1,
+      "line_count": 3,
+      "expected": null
+    },
+    {
+      "text": "x plus one over two",
+      "current": 1,
+      "line_count": 3,
+      "expected": null
+    },
+    {
+      "text": "y equals three x",
+      "current": 1,
+      "line_count": 3,
+      "expected": null
+    },
+    {
+      "text": "the answer is four",
+      "current": 1,
+      "line_count": 3,
+      "expected": null
+    },
+    {
+      "text": "blah blah",
+      "current": 1,
+      "line_count": 3,
+      "expected": null
+    }
+  ]
+}

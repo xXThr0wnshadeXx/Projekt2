@@ -131,7 +131,7 @@ test.describe('@smoke commands', () => {
     await page.getByRole('button', { name: 'Add line' }).click();
     await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(polite(page)).toHaveText('Updated line 1.');
+    await expect(polite(page)).toHaveText('Updated line 1. Step checking is unavailable right now.');
     await expect(workLines(page)).toHaveCount(3);
     // Replaced in place, not appended: line 1 is now 4x = 9.
     const saved = await page.evaluate(() =>

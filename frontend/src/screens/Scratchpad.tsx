@@ -29,7 +29,7 @@ import {
 } from '../api';
 import { readTyped } from '../math/typed';
 import { speechFor } from '../math/sre';
-import { applyEdit, lineNumber, looksLikeCommand } from '../commands';
+import { applyEdit, lineNumber, looksLikeCommand, parseCommand } from '../commands';
 import { SAYS, stripFiller, understandTalk, type Talk } from '../talk';
 import { helpText, useShortcuts } from '../shortcuts';
 import type { Recording } from '../audio/recorder';
@@ -95,6 +95,8 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   // The most recent thing the student did, so a slow step-check result can
   // tell whether it is still the news.
   const lastAction = useRef<string>('');
+  // Whether "step checking is unavailable" has been said on this visit (#131).
+  const checkingNoticeGiven = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -246,7 +248,16 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
 
     if (!line.valid || !from?.valid || !stepChecksAllowed(mode)) return;
     const checked = await checkStep(from.latex, entry.latex, mode);
-    if (!checked) return;
+    if (!checked) {
+      // A student used to hearing a result after every line would otherwise
+      // hear silence and not know the step went unchecked (#131). Once per
+      // visit, and never over whatever the student did next.
+      if (!checkingNoticeGiven.current && lastAction.current === entry.id) {
+        checkingNoticeGiven.current = true;
+        announce(`${saved} Step checking is unavailable right now.`);
+      }
+      return;
+    }
     const verdict = withBasis(checked, basisFor(index));
     setChecks((prev) => ({ ...prev, [entry.id]: verdict }));
     // Only speak up if the student hasn't moved on. A late verdict must never
@@ -383,8 +394,21 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       const currentId = current !== null ? `W${current + 1}` : null;
       result = await command(text, currentId, lines.length);
     } catch (e: unknown) {
-      fail(e instanceof ApiFailure ? e.message : "I didn't catch that.");
-      return;
+      // The fixed commands need no model, so they still work when the server
+      // can't be reached (#128). The server stays first: it also has a model
+      // fallback for unusual phrasing.
+      const offline = e instanceof ApiFailure && (e.code === 'NETWORK' || e.code === 'NOT_FOUND');
+      const local = offline ? parseCommand(text, current !== null ? current + 1 : null, lines.length) : null;
+      if (offline && !local) {
+        // Same as an unknown command from the server: a calm note, not an error.
+        announce("I didn't catch that.");
+        return;
+      }
+      if (!local) {
+        fail(e instanceof ApiFailure ? e.message : "I didn't catch that.");
+        return;
+      }
+      result = local;
     } finally {
       setBusy(false);
     }
