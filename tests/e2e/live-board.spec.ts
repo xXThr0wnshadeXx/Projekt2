@@ -63,7 +63,7 @@ test('live board adds only new lines and stops capturing on request', async ({ p
   await expect(board.getByRole('listitem')).toHaveCount(0);
   await expect(page.getByTestId('live-polite')).toContainText('Discarded board line 1. It will not be read again.');
 
-  await page.clock.fastForward(10_100);
+  await page.clock.fastForward(7_100);
   await expect(board.getByRole('listitem')).toHaveCount(1);
   await expect(page.getByTestId('live-polite')).toContainText('1 new line.');
   await expect(board.getByRole('group', { name: 'Board line 1' })).toBeVisible();

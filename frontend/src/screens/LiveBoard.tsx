@@ -5,7 +5,7 @@ import { MathLine } from '../components/MathLine';
 import { sharpestFrame } from '../image';
 import { loadMathJax } from '../math/mathjax';
 
-const INTERVAL_MS = 10_000;
+const INTERVAL_MS = 7_000;
 
 // A vision transcription can vary only in display formatting between frames.
 // Those differences must not make an unchanged board sound like a new line.
@@ -152,7 +152,7 @@ export function LiveBoard({ onBack }: { onBack: () => void }) {
       }, { once: true }));
       setLines([]);
       setState('reading');
-      announce('Reading the board about every ten seconds.');
+    announce('Reading the board about every seven seconds.');
       void readBoard(current);
     } catch {
       fail(current, 'Could not open the camera. Check the camera permission and try again.');
@@ -178,7 +178,7 @@ export function LiveBoard({ onBack }: { onBack: () => void }) {
         Live board
       </h2>
       <p className="mt-2 text-[--muted]">
-        Aim your camera at a board. Glance sends a photo about every ten seconds and reads new lines.
+        Aim your camera at a board. Glance sends a photo about every seven seconds and reads new lines.
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
         <button ref={startButton} type="button" className="btn" aria-disabled={state !== 'idle'} onClick={start}>
