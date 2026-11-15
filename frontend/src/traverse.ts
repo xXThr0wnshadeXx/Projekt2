@@ -11,7 +11,7 @@
 // equation explorer, radio groups, and any open dialog.
 
 import { useEffect } from 'react';
-import { announce } from './components/LiveRegion';
+import { announceMove } from './components/LiveRegion';
 import { readAloud } from './lineKeys';
 import { spokenMath } from './math/sre';
 
@@ -144,7 +144,7 @@ function go(el: Element): void {
   // The app scrolls, never the student.
   el.scrollIntoView({ block: 'center' });
   highlight(el);
-  announce(describe(el));
+  announceMove(describe(el));
 }
 
 /** Move `delta` lines through the page, saying the line arrived at. */
@@ -155,11 +155,11 @@ export function move(delta: number): void {
   const from = at ? list.indexOf(at) : delta > 0 ? -1 : list.length;
   const to = from + delta;
   if (to < 0) {
-    announce('Top of the page.');
+    announceMove('Top of the page.');
     return;
   }
   if (to >= list.length) {
-    announce('End of the page.');
+    announceMove('End of the page.');
     return;
   }
   go(list[to]);

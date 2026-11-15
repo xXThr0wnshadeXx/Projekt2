@@ -8,7 +8,7 @@
 // reads these regions, and two voices at once is unusable (DESIGN.md 13).
 
 import { useEffect, useRef, useState } from 'react';
-import { say } from '../audio/tts';
+import { cancel, say } from '../audio/tts';
 
 type Urgency = 'polite' | 'assertive';
 
@@ -17,6 +17,14 @@ let announceImpl: (message: string, urgency?: Urgency) => void = () => {};
 let last = '';
 
 /** Announce a message to screen readers. Safe to call before mount. */
+/** Announce where the student has just moved to. Whatever was still being
+ *  read about the line they left is cut off first: pressing the arrows
+ *  quickly must never stack up a queue of old lines. */
+export function announceMove(message: string): void {
+  cancel();
+  announce(message);
+}
+
 export function announce(message: string, urgency: Urgency = 'polite'): void {
   last = message;
   announceImpl(message, urgency);
