@@ -77,9 +77,17 @@ export interface Shortcut {
 
 const HELP: Shortcut = { keys: 'Question mark', does: 'hear these shortcuts' };
 
+/** Screens without lines give the arrows to their controls (#239). */
+const WALK: Shortcut[] = [
+  { keys: 'Down or Right arrow', does: 'next choice' },
+  { keys: 'Up or Left arrow', does: 'previous choice' },
+  { keys: 'Space', does: 'press the choice you are on' },
+];
+
 export const KEYMAP: Record<ScreenName, Shortcut[]> = {
-  home: [{ keys: 'U or C', does: 'capture a problem' }, HELP],
+  home: [...WALK, { keys: 'U or C', does: 'capture a problem' }, HELP],
   capture: [
+    ...WALK,
     { keys: 'U', does: 'upload a file' },
     { keys: 'C', does: 'take a photo' },
     { keys: 'Control or Command V', does: 'paste a screenshot' },
@@ -122,10 +130,10 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     HELP,
   ],
   settings: [
-    { keys: 'Arrow keys', does: 'choose a mode once you are on the mode list' },
+    ...WALK,
     HELP,
   ],
-  export: [{ keys: 'D', does: 'download the accessible HTML file' }, HELP],
+  export: [...WALK, { keys: 'D', does: 'download the accessible HTML file' }, HELP],
   lowvision: [
     { keys: 'Right or Down arrow', does: 'next line' },
     { keys: 'Left or Up arrow', does: 'previous line' },

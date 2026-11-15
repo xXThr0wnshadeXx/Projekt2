@@ -18,6 +18,7 @@ import { InstallApp } from './components/InstallApp';
 import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
+import { useControlKeys } from './controlKeys';
 import { loadMathJax } from './math/mathjax';
 import { spokenMath } from './math/sre';
 import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
@@ -46,6 +47,17 @@ type Screen =
   | 'settings'
   | 'export';
 type BackEnd = 'checking' | 'up' | 'down';
+
+/** What a tap of Space says on a screen where the arrows walk the controls. */
+const SPACE_GUIDE: Record<Screen, string> = {
+  home: 'Glance home. Press Down to move through the choices, and Space to press one.',
+  capture: 'Bring in a problem. Press Down to move through the choices, and Space to press one.',
+  settings: 'Settings. Press Down to move through them, and Space to choose one.',
+  export: 'Hand in your work. Press Down to move through the choices, and Space to press one.',
+  problem: 'Press Down to move through the choices, and Space to press one.',
+  scratchpad: 'Press Down to move through the choices, and Space to press one.',
+  lowvision: 'Press Down to move through the choices, and Space to press one.',
+};
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('home');
@@ -113,6 +125,13 @@ export function App() {
   }
 
   useShortcuts({ '?': () => showHelp(false) });
+
+  // Arrows and Space on every screen (#239). The problem, scratchpad and
+  // low-vision screens give the arrows to their lines; everywhere else they
+  // move between the controls and Glance says what each one is.
+  const linesOwnArrows =
+    (screen === 'problem' || screen === 'scratchpad' || screen === 'lowvision') && problem !== null;
+  useControlKeys({ walk: !linesOwnArrows, guide: SPACE_GUIDE[screen] });
 
   // The list belongs to the screen it was opened on.
   useEffect(() => setHelp(null), [screen]);
