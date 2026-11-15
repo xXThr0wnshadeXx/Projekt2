@@ -1,6 +1,19 @@
 # Glance
 
-**Math you can hear and speak.** Bring in any math problem — a file, a screenshot, a photo of a whiteboard — hear its structure, navigate it piece by piece, work it out loud, confirm every line, and hand in clean typed work.
+**Math for students who are blind or have low vision.** Glance reads a math problem aloud, lets a student explore it piece by piece, and writes down their own working as they say it or type it. **It never solves the problem**: no answers, no hints, no next steps, so it can be used in class and in exams.
+
+Try it: **https://glance-shreev2703.vercel.app**
+
+### Try it in one minute
+
+1. Open the link and press **Try a sample problem**.
+2. Press **S** to start working.
+3. Type `two x equals eight` and press Enter. Glance reads the line back.
+4. Press Enter again to save it. Glance says whether the step checks out.
+5. Type `what does coefficient mean` and press Enter.
+6. Type `what is x` and press Enter. Glance declines, because the work is the student's.
+
+No mouse is needed for any of it.
 
 **Try it:** https://glance-shreev2703.vercel.app (the sample problem works with no setup) · **Code:** https://github.com/xXThr0wnshadeXx/Projekt2
 
