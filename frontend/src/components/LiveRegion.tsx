@@ -8,14 +8,23 @@
 // reads these regions, and two voices at once is unusable (DESIGN.md 13).
 
 import { useEffect, useRef, useState } from 'react';
+import { say } from '../audio/tts';
 
 type Urgency = 'polite' | 'assertive';
 
 let announceImpl: (message: string, urgency?: Urgency) => void = () => {};
 
+let last = '';
+
 /** Announce a message to screen readers. Safe to call before mount. */
 export function announce(message: string, urgency: Urgency = 'polite'): void {
+  last = message;
   announceImpl(message, urgency);
+}
+
+/** The most recent thing said, for "say that again". */
+export function lastAnnouncement(): string {
+  return last;
 }
 
 /** Move focus to the first match, so the student lands on the new result. */
@@ -41,9 +50,18 @@ export function LiveRegion() {
   useEffect(() => {
     announceImpl = (message, urgency = 'polite') => {
       const set = urgency === 'assertive' ? setAssertive : setPolite;
+      // The app's own voice, for a student with no screen reader. Silent
+      // unless they have switched it on.
+      say(message, urgency === 'assertive');
       // Clearing first guarantees the same message announces twice if repeated;
       // without this, an identical string is silently ignored.
       set('');
+      // An error stays in the assertive region until something replaces it,
+      // and nothing ever did: it was still sitting at the top of the page two
+      // screens later, where a screen-reader user reading from the top met a
+      // complaint about a line they had long since fixed. Whatever is said
+      // next is the news, so the old error goes.
+      if (urgency === 'polite') setAssertive('');
       const t = window.setTimeout(() => set(message), 50);
       timers.current.push(t);
     };
