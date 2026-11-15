@@ -23,9 +23,10 @@ covers what we **use to build, test, deploy and present** it.
 gh auth refresh -s project
 ```
 
-- [ ] nicolashlam
+- [x] nicolashlam
 - [ ] xXThr0wnshadeXx
 - [x] shreev2703 — board reads and card updates verified November 15, 2026
+- [ ] tuffling
 
 ## Back end
 
