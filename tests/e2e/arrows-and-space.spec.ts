@@ -53,18 +53,17 @@ test.describe('@smoke the whole page by arrows and space', () => {
   test.setTimeout(120_000);
   test('Down and Up walk the page line by line, said and highlighted', async ({ page }) => {
     await openSample(page);
-    await page.keyboard.press('ArrowDown');
-    expect(await heard(page)).toBe('Discard problem line 1, button.');
-    await expect(current(page)).toHaveCount(1);
+    // The discard buttons are not stops: Down goes from line to line, so a
+    // student can never land on one and remove a line with Space.
     await page.keyboard.press('ArrowDown');
     expect(await heard(page)).toBe('Line 2 of 2.');
+    await expect(current(page)).toHaveCount(1);
     await expect(page.locator('#L2')).toBeFocused();
     await expect(page.locator('#L2')).toHaveClass(/glance-current/);
-    await page.keyboard.press('ArrowRight');
-    expect(await heard(page)).toBe('Discard problem line 2, button.');
     await page.keyboard.press('ArrowLeft');
+    expect(await heard(page)).toBe('Line 1 of 2.');
+    await page.keyboard.press('ArrowRight');
     expect(await heard(page)).toBe('Line 2 of 2.');
-    await page.keyboard.press('ArrowUp');
     await page.keyboard.press('ArrowUp');
     expect(await heard(page)).toBe('Line 1 of 2.');
   });

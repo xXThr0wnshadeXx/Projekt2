@@ -656,6 +656,7 @@ export function Scratchpad({
                   className="btn mt-1"
                   onClick={() => remove(l, i)}
                   aria-label={`Delete your line ${i + 1}`}
+                  data-walk="skip"
                 >
                   Delete
                 </button>

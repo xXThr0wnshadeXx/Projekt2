@@ -12,8 +12,15 @@ test('@smoke each arrow press cuts off the line before it', async ({ page }) => 
       speaking: false,
       pending: false,
       paused: false,
-      speak: (u: { text: string }) => log.push(`speak:${u.text}`),
-      cancel: () => log.push('cancel'),
+      // Behaves like a real engine: busy from speak() until cancelled.
+      speak(u: { text: string }) {
+        log.push(`speak:${u.text}`);
+        engine.speaking = true;
+      },
+      cancel() {
+        log.push('cancel');
+        engine.speaking = false;
+      },
       pause() {},
       resume() {},
       getVoices: () => [],
@@ -40,8 +47,7 @@ test('@smoke each arrow press cuts off the line before it', async ({ page }) => 
   const log = await page.evaluate(() => (window as unknown as { __log: string[] }).__log);
   const speaks = log.filter((l) => l.startsWith('speak:'));
   expect(speaks.length).toBe(3);
-  // Every line is preceded by a cancel of whatever came before it.
-  for (let i = 0; i < log.length; i += 1) {
-    if (log[i].startsWith('speak:')) expect(log[i - 1]).toBe('cancel');
-  }
+  // Every line after the first cuts off the one before it.
+  const at = log.map((l, i) => (l.startsWith('speak:') ? i : -1)).filter((i) => i >= 0);
+  for (const i of at.slice(1)) expect(log[i - 1]).toBe('cancel');
 });

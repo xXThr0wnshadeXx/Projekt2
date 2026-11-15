@@ -21,7 +21,11 @@ const HEADING = 'h1, h2, h3, h4, h5, h6';
 const CURRENT = 'glance-current';
 /** Never stops, and never read: hidden, visually hidden, live regions, the
  *  skip link (the keys make it unnecessary), and MathJax's own internals. */
-const SKIP = '[hidden], [aria-hidden="true"], .sr-only, .skip-link, [data-testid^="live-"], script, style, noscript';
+// Destructive per-line buttons (discard, delete) are skipped too: walking onto
+// one and pressing Space removed the line, and the next press landed on the
+// next one, so a student could empty the page while hearing the same words.
+// They stay reachable by Tab and by mouse, and by voice ("delete line two").
+const SKIP = '[hidden], [aria-hidden="true"], .sr-only, .skip-link, [data-testid^="live-"], [data-walk="skip"], script, style, noscript';
 
 let current: Element | null = null;
 

@@ -30,13 +30,62 @@ export function isSupported(): boolean {
 }
 
 export function cancel(): void {
-  if (isSupported()) window.speechSynthesis.cancel();
+  if (isSupported() && isBusy()) window.speechSynthesis.cancel();
+}
+
+function isBusy(): boolean {
+  const s = window.speechSynthesis;
+  // Stand-in engines in tests may not report state; treat unknown as busy.
+  return s.speaking !== false || s.pending !== false;
+}
+
+// The browser's default voice is often its oldest, most robotic one. Pick the
+// most natural English voice the device has: the neural "Natural" and
+// "Online" voices on Windows and Edge, Google's voices in Chrome, and the
+// Enhanced and Premium voices on Apple devices.
+const PREFERRED = [
+  /natural/i,
+  /online/i,
+  /premium/i,
+  /enhanced/i,
+  /^Google (UK|US) English/i,
+  /^(Samantha|Ava|Allison|Serena|Daniel|Karen|Moira)/i,
+];
+
+let chosen: SpeechSynthesisVoice | null | undefined;
+
+function bestVoice(): SpeechSynthesisVoice | null {
+  if (chosen !== undefined) return chosen;
+  const voices = window.speechSynthesis.getVoices?.() ?? [];
+  if (!voices.length) return null; // not loaded yet; try again next time
+  const english = voices.filter((v) => /^en(-|_|$)/i.test(v.lang));
+  const pool = english.length ? english : voices;
+  chosen =
+    PREFERRED.map((re) => pool.find((v) => re.test(v.name))).find(Boolean) ??
+    pool.find((v) => v.localService === false) ??
+    pool.find((v) => v.default) ??
+    pool[0] ??
+    null;
+  return chosen;
+}
+
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  // Chrome loads its voice list late; choose again once it arrives.
+  window.speechSynthesis.addEventListener?.('voiceschanged', () => {
+    chosen = undefined;
+  });
 }
 
 function utter(text: string, rate: number): void {
   const u = new SpeechSynthesisUtterance(text);
+  const voice = bestVoice();
+  if (voice) {
+    u.voice = voice;
+    u.lang = voice.lang;
+  } else {
+    u.lang = 'en';
+  }
   u.rate = rate;
-  u.lang = 'en';
   window.speechSynthesis.speak(u);
 }
 
@@ -63,7 +112,10 @@ export function speak(text: string, rate = 1): void {
 export function say(text: string, urgent = false): void {
   if (!enabled || !isSupported() || !text.trim()) return;
   const now = Date.now();
-  if (urgent || now - lastStarted > FOLLOW_UP_MS) cancel();
+  // Only cancel when something is actually being said: a cancel that is
+  // immediately followed by speak() can drop or restart the new line in
+  // Chrome, which sounds like the voice stuttering.
+  if ((urgent || now - lastStarted > FOLLOW_UP_MS) && isBusy()) cancel();
   lastStarted = now;
   utter(text, 1);
 }

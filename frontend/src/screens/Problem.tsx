@@ -171,7 +171,7 @@ export function Problem({
       <h2 id="problem-heading" tabIndex={-1} className="step-title">Your worksheet</h2>
 
       {problem.instructions && (
-        <p className="mt-2 text-lg">
+        <p className="mt-3 text-2xl font-medium">
           <span className="sr-only">Instructions: </span>
           {problem.instructions}
         </p>
@@ -183,18 +183,9 @@ export function Problem({
           behind "?" where they can be asked for. The full list stays on screen
           for a sighted keyboard user, but is hidden from screen readers so it
           is not recited — "?" announces it properly. */}
-      <p className="mt-2 text-sm text-[--muted]">
+      <p className="mt-3 text-xl text-[--muted]">
         {lines.length} {lines.length === 1 ? 'line' : 'lines'}
-        {unsure > 0 && `, ${unsure} unsure`}. Use the{' '}
-        <kbd className="kbd">arrow keys</kbd> to move between lines and{' '}
-        <kbd className="kbd">Space</kbd> to hear one. Press{' '}
-        <kbd className="kbd">Enter</kbd> on a line to explore it,{' '}
-        <kbd className="kbd">S</kbd> to start working.
-        <span aria-hidden="true">
-          {' '}
-          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">L</kbd>{' '}
-          large print, <kbd className="kbd">?</kbd> for all shortcuts.
-        </span>
+        {unsure > 0 && `, ${unsure} unsure`}. Use the up and down arrows to move, and Space to hear a line.
       </p>
 
       {problem.warnings.length > 0 && (
@@ -218,6 +209,7 @@ export function Problem({
                 className="btn absolute right-3 top-3 min-w-[48px] justify-center px-0 text-2xl leading-none"
                 onClick={() => discardLine(i)}
                 aria-label={`Discard problem line ${i + 1}`}
+                data-walk="skip"
                 title="Discard this line"
               >
                 <span aria-hidden="true">×</span>
@@ -270,7 +262,7 @@ export function Problem({
         </button>
 
         <section aria-label="Ways to read this problem" className="mt-6">
-          <h3 className="text-sm font-medium uppercase tracking-wide text-[--muted]">
+          <h3 className="text-xl font-semibold">
             Ways to read this
           </h3>
           <div className="mt-3 flex flex-wrap gap-3">
