@@ -9,12 +9,13 @@
 //
 // So plain talk gets a plain answer. All of it is decided here, by rules, with
 // no model: that makes it instant, makes it work with no server, and makes it
-// impossible for an answer to contain a step or a solution, because none of
-// these answers is computed from the problem. The line this never crosses is
+// safe to describe the written parts without doing any algebra. The line
+// this never crosses is
 // the same as everywhere else: it reads, describes, explains words and checks
 // a line the student wrote. It never says what to do next.
 
 import { asksToSolve } from './commands';
+import { askAbout } from './math/ask';
 
 export type Talk =
   | { kind: 'filler' }
@@ -26,6 +27,7 @@ export type Talk =
   | { kind: 'capabilities' }
   | { kind: 'readProblem' }
   | { kind: 'status' }
+  | { kind: 'askPart'; answer: string }
   | { kind: 'define'; term: string; meaning: string }
   | { kind: 'unknownTerm'; term: string };
 
@@ -166,7 +168,7 @@ const DESCRIBES_A_STEP =
   /\b(?:both sides|each side)\b|^(?:(?:next|now|then|first|i|we|you|let me|let's|i'll|i will|i'm going to|i am going to|going to|i want to|want to|i need to|need to|i have to|have to|should|can|just|gonna) )*(?:add|subtract|multiply|divide|factor|expand|distribute|simplify|cancel|combine|isolate|move|take|get rid of)\b/i;
 
 /** What the student meant, when it was neither math nor a command. */
-export function understandTalk(text: string): Talk | null {
+export function understandTalk(text: string, problemLatex?: string): Talk | null {
   const said = text.trim().replace(/[.!?]+$/, '');
   if (!said) return null;
   if (ONLY_FILLER.test(said)) return { kind: 'filler' };
@@ -176,6 +178,10 @@ export function understandTalk(text: string): Talk | null {
   if (GREETS.test(lower)) return { kind: 'greeting' };
   if (THANKS.test(lower)) return { kind: 'thanks' };
   if (ASKS_REPEAT.test(lower)) return { kind: 'repeat' };
+  if (problemLatex !== undefined) {
+    const answer = askAbout(said, problemLatex) ?? askAbout(lower, problemLatex);
+    if (answer) return { kind: 'askPart', answer };
+  }
   let unknownTerm: string | undefined;
   if (ASKS_MEANING.test(lower)) {
     // Match the requested word, not the whole question. Otherwise the entry

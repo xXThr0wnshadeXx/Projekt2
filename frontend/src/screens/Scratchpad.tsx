@@ -296,10 +296,9 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
 
   /** Math goes to spoken-to-LaTeX; a command goes to the command route. */
   async function handleText(heard: string) {
-    // Plain talk gets a plain answer, decided by rules before anything is
-    // sent anywhere (talk.ts). None of these answers is worked out from the
-    // problem, so none of them can contain a step.
-    const talk = understandTalk(heard);
+    // Answer talk locally. Part questions read the problem line this work follows.
+    const source = problem.lines[startLine] ?? problem.lines[0];
+    const talk = understandTalk(heard, source?.latex);
     if (talk) {
       lastAction.current = 'talk';
       setError('');
@@ -341,6 +340,9 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         return;
       case 'capabilities':
         tell(SAYS.capabilities);
+        return;
+      case 'askPart':
+        tell(talk.answer);
         return;
       case 'define':
         // A human reader in an exam may not explain a word either.

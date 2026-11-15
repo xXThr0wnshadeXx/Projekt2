@@ -14,10 +14,14 @@ import { GLOSSARY, understandTalk } from '../../frontend/src/talk';
 const polite = (page: Page) => page.getByTestId('live-polite');
 const reply = (page: Page) => page.getByTestId('glance-reply');
 
-async function openScratchpad(page: Page) {
+async function openScratchpad(page: Page, line = 1) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Try a sample problem' }).click();
-  await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator(`#L${line} mjx-container`)).toBeVisible({ timeout: 15000 });
+  if (line !== 1) {
+    await expect(page.locator('#L1')).toBeFocused();
+    await page.locator(`#L${line}`).focus();
+  }
   await page.keyboard.press('s');
 }
 
@@ -92,6 +96,17 @@ test.describe('@smoke talking to Glance', () => {
 
     await say(page, 'what does eigenvalue mean');
     await expect(polite(page)).toContainText('I do not have a meaning for eigenvalue');
+    expect(sent).toEqual([]);
+  });
+
+  test('answers about the current problem line', async ({ page }) => {
+    const sent = await keyless(page);
+    await openScratchpad(page, 2);
+
+    await say(page, "what's on top");
+    const answer = 'The numerator is the square root of x plus 1.';
+    await expect(polite(page)).toHaveText(answer);
+    await expect(reply(page)).toHaveText(answer);
     expect(sent).toEqual([]);
   });
 
@@ -207,6 +222,8 @@ test.describe('@smoke talking to Glance', () => {
 
     await say(page, 'what does numerator mean');
     await expect(polite(page)).toHaveText('Explaining words is off in exam mode.');
+    await say(page, 'how many terms on the left?');
+    await expect(polite(page)).toHaveText('There are 2 terms on the left.');
   });
 });
 
