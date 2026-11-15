@@ -161,7 +161,7 @@ export function Problem({
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
-      <h2 className="text-2xl font-semibold tracking-tight">Your problem</h2>
+      <h2 className="text-4xl font-medium tracking-tight">Your problem</h2>
 
       {problem.instructions && (
         <p className="mt-2 text-lg">
