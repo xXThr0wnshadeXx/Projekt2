@@ -1,0 +1,18 @@
+{
+  "name": "Glance",
+  "short_name": "Glance",
+  "description": "Math you can hear, explore and write without seeing the page.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b5fa5",
+  "icons": [
+    {
+      "src": "/icons/glance.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
