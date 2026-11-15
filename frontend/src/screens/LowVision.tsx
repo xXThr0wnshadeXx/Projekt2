@@ -12,16 +12,9 @@ import { announce } from '../components/LiveRegion';
 import { LOW_VISION_THEMES } from '../lowVisionThemes';
 import { isSupported, setSelfVoicing, speak, cancel } from '../audio/tts';
 
-export interface LowVisionLine {
-  id: string;
-  latex: string;
-  label: string;
-  /** Plain-language reading, used for self-voicing. */
-  spoken?: string;
-}
-
 export interface LowVisionProps {
-  lines: LowVisionLine[];
+  lines: { id: string; latex: string }[];
+  spokenLines: Record<string, string>;
   /** Where to start, so entering the mode keeps the student's place. */
   startIndex?: number;
   onExit: (index: number) => void;
@@ -30,7 +23,7 @@ export interface LowVisionProps {
 const SIZES = [4, 6, 8, 11, 15, 20];
 const DEFAULT_SIZE = 2;
 
-export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
+export function LowVision({ lines, spokenLines, startIndex = 0, onExit }: LowVisionProps) {
   const [index, setIndex] = useState(() =>
     Math.min(Math.max(startIndex, 0), Math.max(lines.length - 1, 0)),
   );
@@ -52,10 +45,10 @@ export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
       }
       setIndex(next);
       const l = lines[next];
-      announce(`${l.label} of ${lines.length}.`);
-      if (voicing) speak(l.spoken ?? l.label);
+      announce(`Line ${next + 1} of ${lines.length}.`);
+      if (voicing) speak(spokenLines[l.id] ?? `Line ${next + 1}`);
     },
-    [lines, voicing],
+    [lines, spokenLines, voicing],
   );
 
   // Keyboard is the primary interface here, not a convenience.
@@ -124,7 +117,7 @@ export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
     setVoicing(next);
     setSelfVoicing(next);
     announce(next ? 'Reading aloud on.' : 'Reading aloud off.');
-    if (next && line) speak(line.spoken ?? line.label);
+    if (next && line) speak(spokenLines[line.id] ?? `Line ${index + 1}`);
   }
 
   if (!line) {
@@ -167,13 +160,13 @@ export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
         className="flex flex-1 flex-col items-center justify-center overflow-auto px-6 py-10"
       >
         <p className="mb-6 text-center" style={{ color: theme.muted, fontSize: '1.5rem' }}>
-          {line.label} of {lines.length}
+          Line {index + 1} of {lines.length}
         </p>
         <div
           className="w-full max-w-full text-center leading-tight"
           style={{ fontSize: `${SIZES[sizeStep]}rem` }}
         >
-          <MathLine id={`lv-${line.id}`} latex={line.latex} label={line.label} />
+          <MathLine id={`lv-${line.id}`} latex={line.latex} label={`Line ${index + 1}`} />
         </div>
       </div>
 
