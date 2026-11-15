@@ -17,10 +17,14 @@ export STATS_TOKEN=<from the host's variables, never pasted anywhere shared>
 
 - [ ] Railway: latest deploy is green and on `main` (#67)
 - [ ] Front end deployed with `VITE_API_BASE=$API`, and `$FRONTEND` is in the back end's `ALLOWED_ORIGIN`
-- [ ] Pre-flight on the venue Wi-Fi, all PASS:
+- [ ] Pre-flight on the venue Wi-Fi, no FAILs. Review each warning before proceeding:
   ```bash
   bash scripts/preflight.sh
   ```
+- [ ] If the demo uses live capture or speech, complete a synthetic worksheet
+  capture and spoken line on the deployed app. The pre-flight script only
+  checks route registration. Use the sample or the backup recording while
+  live provider access is pending (#88).
   See the [recorded live preflight results on #34](https://github.com/xXThr0wnshadeXx/Projekt2/issues/34#issuecomment-6891479938).
 - [ ] Start keep-warm in its own terminal tab and leave it running:
   ```bash
