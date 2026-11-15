@@ -15,6 +15,9 @@ Keep prose headings and task instructions out of lines, including headings
 with variable names such as "Solve for x.". Do not wrap those headings in LaTeX
 or duplicate them as math lines. The first line must be the first source math
 line, not its heading. Preserve text that is part of an actual math expression.
+Page titles, section headers, worksheet names, problem numbers, author names
+and watermarks never go in lines either. If a printed line combines a problem
+number or short prose with math, return only the math in lines.
 For example, an image containing only "2x + 3 = 11" has instructions="" and
 one math line "2x + 3 = 11". If "Solve for x." is printed above it, instructions
 is exactly "Solve for x." and the same equation is still the only math line.

@@ -16,6 +16,7 @@ from ..capture_fidelity import tidy_capture
 from ..prompts import CAPTURE_PROMPT
 
 
+
 def capture_router(
     models: ModelClient,
     validate_latex: Callable[[str], Awaitable[bool]],

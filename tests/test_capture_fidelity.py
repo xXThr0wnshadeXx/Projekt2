@@ -151,3 +151,28 @@ def test_the_live_outputs_from_production_come_out_right(model_output, instructi
     body, _ = post({**model_output, "diagrams": [], "warnings": []})
     assert body["instructions"] == instructions
     assert [entry["latex"] for entry in body["lines"]] == lines
+
+
+def test_a_title_beside_real_instructions_is_dropped_and_the_instructions_stay():
+    body, _ = post({**HEADING_AND_EQUATION, "instructions": "Solve each equation.",
+                    "lines": [line(r"\text{Algebra practice 1}"), line("2x + 3 = 11")]})
+    assert body["instructions"] == "Solve each equation."
+    assert [entry["latex"] for entry in body["lines"]] == ["2x + 3 = 11"]
+
+
+def test_with_no_instructions_every_printed_sentence_is_kept_in_order():
+    body, _ = post({**HEADING_AND_EQUATION, "instructions": "",
+                    "lines": [line(r"\text{Algebra practice 1}"), line(r"\text{Solve for } x."),
+                              line("2x + 3 = 11")]})
+    assert body["instructions"] == "Algebra practice 1 Solve for x."
+    assert [entry["latex"] for entry in body["lines"]] == ["2x + 3 = 11"]
+
+
+@pytest.mark.parametrize("latex", [r"\text{Worksheet}", r"\textrm{Name:}", r"\operatorname{Unit 3 review}"])
+def test_a_line_that_is_only_text_is_never_a_math_line(latex):
+    assert prose_of(latex) is not None
+
+
+@pytest.mark.parametrize("latex", [r"5\,\mathrm{kg}", r"\operatorname{sin} x", r"\mathrm{cm}^2 = 4"])
+def test_units_and_function_names_inside_math_stay_math(latex):
+    assert prose_of(latex) is None

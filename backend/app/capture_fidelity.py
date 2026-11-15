@@ -18,7 +18,7 @@ words that were not in the model's transcription, and no equation is changed.
 import re
 from typing import Any
 
-_TEXT = re.compile(r"\\(?:text|textrm|mathrm|textit|mbox)\s*\{([^{}]*)\}")
+_TEXT = re.compile(r"\\(?:text|textrm|mathrm|textit|mbox|operatorname)\s*\{([^{}]*)\}")
 # Spacing commands and math-mode wrappers that carry no content of their own.
 _NOISE = re.compile(r"\\[,;:! ]|\\quad|\\qquad|\$")
 
@@ -39,18 +39,22 @@ def _key(text: str) -> str:
 def prose_of(latex: str) -> str | None:
     """The sentence a "math" line really is, or None when it is math.
 
-    A line is prose when it has words in \\text{...} and, outside them, at most
-    a single letter and punctuation: `\\text{Solve for } x.` is a sentence,
-    `\\text{area} = 2x` is math.
+    A line is prose when it is only words in \\text{...} (a title such as
+    `\\text{Algebra practice 1}`), or words plus at most a single letter and
+    punctuation (`\\text{Solve for } x.`). `\\text{area} = 2x` is math.
     """
     words = " ".join(part.strip() for part in _TEXT.findall(latex))
-    if len(re.findall(r"[A-Za-z]{2,}", words)) < 2:
+    if not re.search(r"[A-Za-z]", words):
         return None
-    outside = _NOISE.sub("", _TEXT.sub(" ", latex))
-    if len(re.sub(r"[\s.,:;!?()]", "", outside)) > 1:
+    outside = re.sub(r"[\s.,:;!?()]", "", _NOISE.sub("", _TEXT.sub(" ", latex)))
+    if outside and (len(outside) > 1 or len(re.findall(r"[A-Za-z]{2,}", words)) < 2):
         return None
     sentence = _NOISE.sub("", _TEXT.sub(lambda m: m.group(1), latex))
     return re.sub(r"\s+", " ", sentence).strip()
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
 
 
 def tidy_capture(result: dict[str, Any]) -> dict[str, Any]:
@@ -68,12 +72,21 @@ def tidy_capture(result: dict[str, Any]) -> dict[str, Any]:
             sentences.append(sentence)
 
     # A sentence the model put among the math is text it copied from the page.
-    # If the instructions already contain it, the heading was given twice and
-    # is said once. If they do not, the instructions are the model's rewording
-    # of that heading ("Solve the equation for x." for "Solve for x."), so the
-    # printed words replace them.
-    if sentences and not all(_key(s) in _key(instructions) for s in sentences):
+    if not instructions:
+        # No printed instructions were reported (or only invented ones), so the
+        # printed sentences, in reading order, are the instructions.
         instructions = " ".join(sentences)
+        sentences = []
+    for sentence in sentences:
+        if _key(sentence) in _key(instructions):
+            # The heading was given in both places; it is said once.
+            continue
+        elif _words(sentence) <= _words(instructions):
+            # The instructions reword this heading ("Solve the equation for x."
+            # for "Solve for x."); the printed words replace them.
+            instructions = sentence
+        # Otherwise it is a title beside real instructions ("Algebra practice 1"
+        # beside "Solve each equation."): the instructions stay, the title goes.
 
     result["instructions"] = instructions
     result["lines"] = kept
