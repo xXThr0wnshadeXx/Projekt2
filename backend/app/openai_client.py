@@ -7,7 +7,13 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from openai import APIStatusError, AsyncOpenAI, OpenAIError
+from openai import (
+    APIConnectionError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncOpenAI,
+    OpenAIError,
+)
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import SecretStr, StringConstraints
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -37,7 +43,17 @@ def _log_provider_failure(task: str, error: Exception) -> None:
             code = "unknown"
         log.warning("model request failed task=%s status=%d code=%s", task, error.status_code, code)
     else:
-        category = "timeout" if isinstance(error, TimeoutError) else "client_error"
+        # APITimeoutError does NOT subclass the built-in TimeoutError — it
+        # subclasses APIConnectionError — so testing TimeoutError alone files
+        # every real SDK timeout under "client_error". On venue Wi-Fi a dropped
+        # connection is the likeliest failure of all, and these three categories
+        # are what tell us whether to blame the network, the provider or us.
+        if isinstance(error, (TimeoutError, APITimeoutError)):
+            category = "timeout"
+        elif isinstance(error, APIConnectionError):
+            category = "connection"
+        else:
+            category = "client_error"
         log.warning("model request failed task=%s category=%s", task, category)
 
 

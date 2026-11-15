@@ -3,7 +3,13 @@ from unittest.mock import AsyncMock
 
 import httpx
 import pytest
-from openai import AsyncOpenAI, RateLimitError
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncOpenAI,
+    OpenAIError,
+    RateLimitError,
+)
 
 from backend.app.openai_client import ModelClient, ModelError, ModelSettings
 
@@ -167,3 +173,31 @@ async def test_provider_failure_logs_only_safe_metadata(model_client, monkeypatc
         await model_client.close()
     assert f"task=spoken status=429 code={logged}" in caplog.text
     assert "private-data" not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error,category", [
+    (APITimeoutError(request=httpx.Request("POST", "https://api.openai.com")), "timeout"),
+    (TimeoutError(), "timeout"),
+    (APIConnectionError(request=httpx.Request("POST", "https://api.openai.com")), "connection"),
+    (OpenAIError("something else"), "client_error"),
+])
+async def test_non_status_failures_are_categorised_for_diagnosis(
+    model_client, monkeypatch, caplog, error, category
+):
+    """The three categories answer "network, provider, or us?" on demo day.
+
+    `APITimeoutError` subclasses `APIConnectionError`, not the built-in
+    `TimeoutError`, so checking `TimeoutError` alone silently files every real
+    SDK timeout under `client_error` — pointing whoever is debugging at our own
+    code while the venue Wi-Fi is the actual problem.
+    """
+    monkeypatch.setattr(
+        model_client.client.chat.completions, "create", AsyncMock(side_effect=error)
+    )
+    try:
+        with pytest.raises(ModelError):
+            await model_client.interpret("spoken", [{"role": "user", "content": "x"}])
+    finally:
+        await model_client.close()
+    assert f"task=spoken category={category}" in caplog.text
