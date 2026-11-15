@@ -12,7 +12,7 @@ import hmac
 from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import observability, timeouts
+from . import guards, observability, timeouts
 from .config import Settings, get_settings
 from .errors import ApiError, install_error_handlers
 from .explain import Explainer, model_explainer
@@ -40,6 +40,19 @@ def create_app(
         title="Glance API", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
 
+    # Middleware added last runs first: log → CORS → rate limit → body limit → app.
+    # Guards sit inside CORS so the browser can read their friendly errors.
+    app.add_middleware(
+        guards.BodyLimitMiddleware,
+        max_image_bytes=settings.max_image_bytes,
+        max_audio_seconds=settings.max_audio_seconds,
+    )
+    app.add_middleware(
+        guards.RateLimitMiddleware,
+        model_budget=guards.Budget(settings.rate_limit_model_per_minute, 60),
+        general_budget=guards.Budget(settings.rate_limit_per_minute, 60),
+        trusted_proxy_hops=settings.trusted_proxy_hops,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,

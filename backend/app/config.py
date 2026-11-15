@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     max_audio_seconds: int = 30
     cas_timeout_seconds: float = 2.0
 
+    # Per-IP request budgets. Model-backed endpoints share the tighter one.
+    rate_limit_model_per_minute: int = 20
+    rate_limit_per_minute: int = 120
+    # Proxies in front of the app that append to X-Forwarded-For (1 on Render).
+    trusted_proxy_hops: int = 0
+
     # Enables GET /api/stats when set; sent as the X-Stats-Token header.
     stats_token: SecretStr | None = None
 
