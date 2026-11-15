@@ -3,11 +3,11 @@
 #
 #   bash scripts/setup.sh
 #
-# It installs the local git hooks and writes the project rules into the files
-# that editors and command-line tooling look for, so your setup follows this
-# project's conventions instead of generic defaults. Every file it writes is
-# excluded from version control in your clone only — nothing new is committed,
-# and the repository stays identical for everyone.
+# It installs the local git hooks, checks your prerequisites and lists your open
+# tickets. It writes no other files unless you ask it to with GLANCE_RULES_FILES
+# (see below), and anything it does write is excluded from version control in
+# your clone only — nothing new is committed, and the repository stays identical
+# for everyone.
 #
 # Safe to re-run. Do re-run it after CONTRIBUTING.md or DESIGN.md changes.
 
@@ -21,14 +21,22 @@ bash scripts/install-hooks.sh
 
 echo
 echo "==> Project rules for local tooling"
-# Common filenames across editors and CLI tooling. Harmless if your setup only
-# reads one of them; add your own to this list if it reads something else.
-bash scripts/local-rules.sh \
-  AGENTS.md \
-  CLAUDE.md \
-  .cursorrules \
-  .github/copilot-instructions.md \
-  .windsurfrules
+# Nothing is written unless you ask for it, and nothing is named here. If your
+# editor or command-line tooling reads a rules file, create one yourself with
+# the filename it expects:
+#
+#   bash scripts/local-rules.sh <FILENAME>
+#
+# It fills that file from CONTRIBUTING.md and excludes it from version control
+# in your clone only. Set GLANCE_RULES_FILES to have this script do it for you:
+#
+#   GLANCE_RULES_FILES="FILE_A FILE_B" bash scripts/setup.sh
+if [ -n "${GLANCE_RULES_FILES:-}" ]; then
+  # shellcheck disable=SC2086
+  bash scripts/local-rules.sh $GLANCE_RULES_FILES
+else
+  echo "    skipped — see scripts/local-rules.sh if your tooling reads a rules file"
+fi
 
 echo
 echo "==> Checking prerequisites"
