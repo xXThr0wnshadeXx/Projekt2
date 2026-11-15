@@ -31,6 +31,7 @@ export interface ScratchpadProps {
   mode: Mode;
   /** The problem line the student was on; their first step follows from it. */
   startLine: number;
+  onExport: () => void;
 }
 
 interface Pending {
@@ -50,7 +51,7 @@ function newId(): string {
   return `W${nextId}`;
 }
 
-export function Scratchpad({ problem, onBack, mode, startLine }: ScratchpadProps) {
+export function Scratchpad({ problem, onBack, mode, startLine, onExport }: ScratchpadProps) {
   const [lines, setLines] = useState<WorkLine[]>(() => loadWork());
   const [pending, setPending] = useState<Pending | null>(null);
   const [clarify, setClarify] = useState<Clarify | null>(null);
@@ -212,6 +213,7 @@ export function Scratchpad({ problem, onBack, mode, startLine }: ScratchpadProps
     {
       u: undo,
       'shift+r': readAll,
+      x: onExport,
       p: () => {
         setShowProblem((v) => !v);
         announce(showProblem ? 'Problem hidden.' : 'Problem shown.');
@@ -367,6 +369,9 @@ export function Scratchpad({ problem, onBack, mode, startLine }: ScratchpadProps
         </button>
         <button type="button" className="btn" onClick={undo}>
           Undo delete
+        </button>
+        <button type="button" className="btn" onClick={onExport}>
+          Hand in my work
         </button>
         <button type="button" className="btn" onClick={onBack}>
           Back to the problem
