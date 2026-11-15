@@ -131,3 +131,29 @@ mjx-container:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 4px;
 }
+
+/* Print / Save as PDF from the Export screen (issue #22): only the hand-in,
+   black on white, whatever theme the student reads in. */
+@media print {
+  header,
+  footer,
+  .skip-link,
+  .no-print,
+  #keyboard-help {
+    display: none !important;
+  }
+  html,
+  body,
+  main,
+  #export-preview {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  #export-preview {
+    border: none !important;
+    padding: 0 !important;
+  }
+  #export-preview * {
+    color: #000 !important;
+  }
+}
