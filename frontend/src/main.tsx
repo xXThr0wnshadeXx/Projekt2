@@ -15,7 +15,12 @@ if ('serviceWorker' in navigator) {
 const root = document.getElementById('root');
 if (!root) throw new Error('#root is missing from index.html');
 
-createRoot(root).render(
+createRoot(root, {
+  // Error messages and stacks can contain student content. Screen boundaries
+  // log the error name and screen, including when React retries a render.
+  onCaughtError: () => {},
+  onRecoverableError: () => {},
+}).render(
   <StrictMode>
     <App />
   </StrictMode>,
