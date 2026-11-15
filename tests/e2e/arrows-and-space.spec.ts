@@ -1,10 +1,12 @@
-// Issue #236: the arrow keys and the space bar drive Glance. Up or Left is the
-// previous line, Down or Right the next, and a tap of Space reads the current
-// line aloud. Holding Space still records on the scratchpad.
+// Issue #236: there is no scrolling. Up and Down (or Left and Right) walk the
+// whole page one line at a time: headings, text, maths lines, buttons and text
+// boxes. The line you are on is highlighted and said. Space presses a button,
+// or reads anything else aloud. Holding Space still records on the scratchpad.
 
 import { test, expect, type Page } from '@playwright/test';
 
 const polite = (page: Page) => page.getByTestId('live-polite');
+const current = (page: Page) => page.locator('.glance-current');
 
 /** Record what Glance's own voice says, before the app loads. */
 async function recordSpeech(page: Page) {
@@ -22,6 +24,21 @@ async function recordSpeech(page: Page) {
 const said = (page: Page) =>
   page.evaluate(() => (window as unknown as { __said: string[] }).__said.join(' | '));
 
+/** The live region's text once it has settled (it clears before each message). */
+async function heard(page: Page) {
+  await page.waitForTimeout(200);
+  return (await polite(page).textContent()) ?? '';
+}
+
+/** Press Down until the announcement matches, or fail after `max` presses. */
+async function downTo(page: Page, wanted: RegExp, max = 20) {
+  for (let i = 0; i < max; i += 1) {
+    await page.keyboard.press('ArrowDown');
+    if (wanted.test(await heard(page))) return;
+  }
+  throw new Error(`never reached ${wanted}`);
+}
+
 async function openSample(page: Page) {
   await page.addInitScript(() => window.localStorage.clear());
   await recordSpeech(page);
@@ -31,53 +48,76 @@ async function openSample(page: Page) {
   await expect(page.locator('#L1')).toBeFocused();
 }
 
-test.describe('@smoke arrows and space on the problem', () => {
-  test('the arrows move between lines and say where you are', async ({ page }) => {
+test.describe('@smoke the whole page by arrows and space', () => {
+  test('Down and Up walk the page line by line, said and highlighted', async ({ page }) => {
     await openSample(page);
     await page.keyboard.press('ArrowDown');
-    await expect(polite(page)).toHaveText('Line 2 of 2.');
-    await expect(page.locator('#L2')).toBeFocused();
+    expect(await heard(page)).toBe('Discard problem line 1, button.');
+    await expect(current(page)).toHaveCount(1);
     await page.keyboard.press('ArrowDown');
-    await expect(polite(page)).toHaveText('This is the last line.');
-    await page.keyboard.press('ArrowUp');
-    await expect(polite(page)).toHaveText('Line 1 of 2.');
+    expect(await heard(page)).toBe('Line 2 of 2.');
+    await expect(page.locator('#L2')).toBeFocused();
+    await expect(page.locator('#L2')).toHaveClass(/glance-current/);
     await page.keyboard.press('ArrowRight');
-    await expect(polite(page)).toHaveText('Line 2 of 2.');
+    expect(await heard(page)).toBe('Discard problem line 2, button.');
     await page.keyboard.press('ArrowLeft');
-    await expect(polite(page)).toHaveText('Line 1 of 2.');
-    await page.keyboard.press('ArrowLeft');
-    await expect(polite(page)).toHaveText('This is the first line.');
+    expect(await heard(page)).toBe('Line 2 of 2.');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    expect(await heard(page)).toBe('Line 1 of 2.');
   });
 
-  test('a tap of Space reads the current line aloud', async ({ page }) => {
+  test('the top and the end of the page are said', async ({ page }) => {
     await openSample(page);
-    await page.keyboard.press('ArrowDown');
-    await expect(polite(page)).toHaveText('Line 2 of 2.');
+    for (let i = 0; i < 25; i += 1) await page.keyboard.press('ArrowUp');
+    expect(await heard(page)).toBe('Top of the page.');
+    await downTo(page, /^End of the page\.$/, 60);
+  });
+
+  test('the current line is always in view, with no scrolling', async ({ page, isMobile }) => {
+    await openSample(page);
+    if (!isMobile) {
+      expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe('hidden');
+    }
+    await downTo(page, /^End of the page\.$/, 60);
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(200);
+    const inView = await current(page).evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top >= 0 && r.bottom <= window.innerHeight;
+    });
+    expect(inView).toBe(true);
+  });
+
+  test('Space reads a maths line aloud', async ({ page }) => {
+    await openSample(page);
+    await downTo(page, /^Line 2 of 2\.$/);
     await page.keyboard.press(' ');
     await expect.poll(() => said(page)).toContain('Line 2. the fraction');
   });
 
-  test('Space still presses a focused button', async ({ page }) => {
+  test('Space reads text aloud, and presses a button', async ({ page }) => {
     await openSample(page);
-    await page.getByRole('button', { name: 'Glance', exact: true }).focus();
+    await downTo(page, /^Heading\. Ways to read this$/);
+    await page.keyboard.press(' ');
+    await expect.poll(() => said(page)).toContain('Heading. Ways to read this');
+    await page.keyboard.press('ArrowDown');
+    expect(await heard(page)).toBe('Glance, button.');
     await page.keyboard.press(' ');
     await expect(page.getByRole('region', { name: 'Structure summary' })).toBeVisible({ timeout: 15000 });
-    expect(await said(page)).not.toContain('Line 1.');
   });
 });
 
 test.describe('@smoke arrows and space on the scratchpad', () => {
-  test('before any lines, Space reads the problem line you follow', async ({ page }) => {
+  test('Space on the heading reads it', async ({ page }) => {
     await openSample(page);
     await page.keyboard.press('s');
     await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
-    await page.keyboard.press('ArrowDown');
-    await expect(polite(page)).toHaveText('You have not written any lines yet.');
     await page.keyboard.press(' ');
-    await expect.poll(() => said(page)).toContain('You have not written any lines yet. Problem line 1.');
+    await expect.poll(() => said(page)).toContain('Heading. Your work');
   });
 
-  test('arrows move through your lines and Space reads one', async ({ page }) => {
+  test('your saved lines are lines on the page, and Space reads one', async ({ page }) => {
     await page.route('**/api/**', (r) => r.abort());
     await openSample(page);
     await page.keyboard.press('s');
@@ -88,28 +128,23 @@ test.describe('@smoke arrows and space on the scratchpad', () => {
       await page.keyboard.press('Enter');
       await expect(polite(page)).toContainText('Saved as line');
     }
-    // Saving a line puts you on it, so you start on line 2.
-    await page.keyboard.press('ArrowUp');
-    await expect(polite(page)).toHaveText('Your line 1 of 2.');
-    await page.keyboard.press('ArrowUp');
-    await expect(polite(page)).toHaveText('This is your first line.');
-    await page.keyboard.press('ArrowDown');
-    await expect(polite(page)).toHaveText('Your line 2 of 2.');
-    await page.keyboard.press('ArrowLeft');
-    await expect(polite(page)).toHaveText('Your line 1 of 2.');
+    await page.getByRole('heading', { name: 'Your work', exact: true }).focus();
+    await downTo(page, /^Your line 1 of 2\.$/);
     await page.keyboard.press(' ');
-    await expect.poll(() => said(page)).toContain('Your line 1. 2 x equals 8');
+    await expect.poll(() => said(page)).toContain('Your line 1.');
   });
 
-  test('typing in the text box keeps its arrows and spaces', async ({ page }) => {
+  test('Up and Down leave the text box, Left and Right stay in it', async ({ page }) => {
     await openSample(page);
     await page.keyboard.press('s');
     const box = page.getByLabel('Or type your line');
     await box.click();
     await page.keyboard.type('x = 4');
     await page.keyboard.press('ArrowLeft');
+    await expect(box).toBeFocused();
     await expect(box).toHaveValue('x = 4');
-    expect(await said(page)).toBe('');
+    await page.keyboard.press('ArrowDown');
+    await expect(box).not.toBeFocused();
   });
 
   test('holding Space still records', async ({ page, browserName, isMobile }) => {
@@ -128,6 +163,6 @@ test.describe('@smoke arrows and space on the scratchpad', () => {
     await page.waitForTimeout(700);
     await page.keyboard.up(' ');
     // Held past the threshold: it went to the microphone, not to reading.
-    expect(await said(page)).not.toContain('You have not written any lines yet.');
+    expect(await said(page)).not.toContain('Heading. Your work');
   });
 });
