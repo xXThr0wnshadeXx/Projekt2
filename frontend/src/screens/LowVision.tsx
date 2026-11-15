@@ -147,7 +147,7 @@ export function LowVision({ lines, spokenLines, startIndex = 0, onExit }: LowVis
   return (
     <section
       aria-label="Low-vision mode"
-      className="flex min-h-dvh flex-col"
+      className="relative flex min-h-dvh flex-col"
       style={
         {
           background: theme.bg,
@@ -162,6 +162,13 @@ export function LowVision({ lines, spokenLines, startIndex = 0, onExit }: LowVis
         } as CSSProperties
       }
     >
+      <button
+        type="button"
+        className="lv-btn absolute left-4 top-4 z-10"
+        onClick={() => onExit(index)}
+      >
+        Back
+      </button>
       {/* The line itself gets the room. Controls are small and at the bottom,
           where they do not compete with it. */}
       <div
