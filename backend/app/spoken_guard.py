@@ -8,7 +8,7 @@ as though the student had said it. Either one, read back and confirmed, is the
 app doing the student's work, which is the one thing it must never do.
 
 So the model's answer is checked against the transcript, with no model
-involved: every number and every variable in the LaTeX has to have been spoken.
+involved: every number, variable, operator and relation must have been spoken.
 A line that brings in a number or a letter from somewhere else is refused. The
 check can only refuse; it never repairs, and a refused line is simply asked for
 again.
@@ -47,6 +47,126 @@ _TOKEN = re.compile(r"[a-z]+|\d+(?:\.\d+)?")
 _LATEX_TEXT = re.compile(r"\\(?:text|mathrm|operatorname)\s*\{[^{}]*\}")
 _LATEX_COMMAND = re.compile(r"\\[a-zA-Z]+")
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
+
+# Longest phrases first: "less than or equal to" is one relation, not two.
+# Operators are compared in spoken order, not just as a bag of symbols: moving
+# a minus across an equals sign would otherwise pass the same count check.
+_OP_WORDS = [
+    (r"less than or equal(?: to)?|at most", "<="),
+    (r"greater than or equal(?: to)?|at least", ">="),
+    (r"does not equal|not equal(?: to)?|is not equal to", "!="),
+    (r"plus or minus", "±"),
+    (r"minus or plus", "∓"),
+    (r"square root(?: of)?", "root:2"),
+    (r"cube root(?: of)?", "root:3"),
+    (r"fourth root(?: of)?", "root:4"),
+    (r"fifth root(?: of)?", "root:5"),
+    (r"sixth root(?: of)?", "root:6"),
+    (r"to the power(?: of)?|to the (?=(?:second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b)|squared|cubed", "^"),
+    (r"divided by|all over|over|halves|half|thirds|quarters|quarter|fourths|fifths|sixths|sevenths|eighths|ninths|tenths", "/"),
+    (r"multiplied by|times", "*"),
+    (r"less than", "<"),
+    (r"greater than", ">"),
+    (r"is equal to|equal to|equals|equal|is", "="),
+    (r"plus|positive", "+"),
+    (r"minus|negative", "-"),
+    (r"percent", "%"),
+]
+_SPOKEN_OP = re.compile(
+    "|".join(f"(?P<op{i}>\\b(?:{words})\\b)" for i, (words, _) in enumerate(_OP_WORDS))
+    + r"|(?P<symbol><=|>=|!=|[+−\-×*÷/=<>^±∓≤≥≠%])",
+    re.IGNORECASE,
+)
+_SYMBOLS = {"−": "-", "×": "*", "÷": "/", "≤": "<=", "≥": ">=", "≠": "!="}
+_COMMAND_OPS = {
+    r"\times": "*", r"\cdot": "*", r"\div": "/", r"\over": "/",
+    r"\le": "<=", r"\leq": "<=", r"\ge": ">=", r"\geq": ">=",
+    r"\ne": "!=", r"\neq": "!=", r"\lt": "<", r"\gt": ">",
+    r"\pm": "±", r"\mp": "∓", r"\%": "%",
+}
+# Formatting and named atoms cannot hide an operator. Anything else is refused
+# rather than stripped, including text/macros that could conceal a changed sign.
+_ATOM_COMMANDS = set(r"sin cos tan sec csc cot arcsin arccos arctan log ln exp theta alpha beta gamma delta pi phi omega infinity infty".split())
+_FORMAT_COMMANDS = {r"\left", r"\right", r"\,", r"\;", r"\!", r"\:", r"\ ", r"\quad", r"\qquad"}
+
+
+def _spoken_operators(text: str) -> list[str]:
+    result = []
+    for match in _SPOKEN_OP.finditer(text):
+        if match.lastgroup == "symbol":
+            value = match.group()
+            result.append(_SYMBOLS.get(value, value))
+        else:
+            result.append(_OP_WORDS[int(match.lastgroup[2:])][1])
+    return result
+
+
+def _written_operators(latex: str) -> list[str] | None:
+    """Read operators without evaluating, simplifying or repairing the math.
+
+    Fractions are walked numerator / denominator so their prefix TeX command
+    has the same order as spoken math. Both ambiguous fraction groupings can
+    still be offered for confirmation. Unknown syntax fails closed.
+    """
+    tokens = re.findall(r"\\[a-zA-Z]+|\\.|<=|>=|!=|[^\s]", latex)
+    index = 0
+
+    def walk(end: str | None = None, depth: int = 0) -> list[str]:
+        nonlocal index
+        if depth > 32:
+            raise ValueError("Too deeply nested")
+        result = []
+
+        def group() -> list[str]:
+            nonlocal index
+            if index >= len(tokens) or tokens[index] != "{":
+                raise ValueError("Expected a TeX group")
+            index += 1
+            return walk("}", depth + 1)
+
+        while index < len(tokens):
+            token = tokens[index]
+            index += 1
+            if token == end:
+                return result
+            if token == "}":
+                raise ValueError("Unexpected group end")
+            if token == "{":
+                result.extend(walk("}", depth + 1))
+            elif token in (r"\frac", r"\dfrac", r"\tfrac"):
+                numerator = group()
+                denominator = group()
+                result.extend([*numerator, "/", *denominator])
+            elif token == r"\sqrt":
+                root = "2"
+                if index < len(tokens) and tokens[index] == "[":
+                    index += 1
+                    start = index
+                    while index < len(tokens) and tokens[index].isdigit():
+                        index += 1
+                    root = "".join(tokens[start:index])
+                    if not root or index >= len(tokens) or tokens[index] != "]":
+                        raise ValueError("Unsupported root index")
+                    index += 1
+                result.extend([f"root:{root}", *group()])
+            elif token in _COMMAND_OPS:
+                result.append(_COMMAND_OPS[token])
+            elif token in _FORMAT_COMMANDS or token.removeprefix("\\") in _ATOM_COMMANDS:
+                continue
+            elif token.startswith("\\"):
+                raise ValueError("Unsupported command")
+            elif token in ("<=", ">=", "!=") or token in "+-−*×/÷=<>^±∓≤≥≠%":
+                result.append(_SYMBOLS.get(token, token))
+            elif not (token.isalnum() or token in ".()[],"):
+                raise ValueError("Unsupported notation")
+        if end:
+            raise ValueError("Unclosed group")
+        return result
+
+    try:
+        return walk()
+    except ValueError:
+        return None
 
 
 def _spoken(text: str) -> tuple[set[str], set[str]]:
@@ -94,7 +214,7 @@ def _spoken(text: str) -> tuple[set[str], set[str]]:
         if token in _HEARD_AS:
             letters.add(_HEARD_AS[token])
         # A letter said alone, or two said together ("x y"), names variables.
-        if len(token) <= 2:
+        if len(token) == 1:
             letters.update(token)
     close()
     return numbers, letters
@@ -119,9 +239,16 @@ def _number_was_said(number: str, said: set[str]) -> bool:
 
 
 def adds_to_what_was_said(latex: str, transcript: str) -> bool:
-    """True when the LaTeX holds a number or variable the student never spoke."""
+    """Refuse unspoken atoms or changed operators; never judge correctness."""
+    # A full restatement after a correction replaces the earlier version.
+    # An incomplete restatement is refused rather than filled in from context.
+    transcript = re.split(r"\b(?:sorry|no wait|i mean|correction)\b", transcript,
+                          flags=re.IGNORECASE)[-1]
     said_numbers, said_letters = _spoken(transcript)
     numbers, letters = _written(latex)
     if any(not _number_was_said(n, said_numbers) for n in numbers):
         return True
-    return bool(letters - said_letters)
+    if letters - said_letters:
+        return True
+    operators = _written_operators(latex)
+    return operators is None or operators != _spoken_operators(transcript)
