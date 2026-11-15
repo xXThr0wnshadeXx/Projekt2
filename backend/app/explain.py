@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .config import Settings
+from .model_quota import ModelQuota
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
@@ -51,7 +52,8 @@ def acceptable(text: str) -> bool:
 
 
 def model_explainer(
-    settings: Settings, timeout_s: float = 2.0, client: "AsyncOpenAI | None" = None
+    settings: Settings, timeout_s: float = 2.0, client: "AsyncOpenAI | None" = None,
+    *, quota: ModelQuota | None = None,
 ) -> Explainer | None:
     """An explainer backed by MODEL_TEXT, or None when models aren't configured."""
     if not settings.models_configured:
@@ -70,6 +72,8 @@ def model_explainer(
     )
 
     async def explain(a_latex: str, b_latex: str) -> str | None:
+        if quota is not None:
+            quota.acquire()
         try:
             result = await client.chat.completions.create(
                 model=settings.model_text,
