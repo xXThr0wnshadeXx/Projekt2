@@ -14,25 +14,37 @@ async function recordSpeech(page: Page) {
   await page.addInitScript(() => {
     const spoken: string[] = [];
     (window as unknown as { __spoken: string[] }).__spoken = spoken;
-    // Playwright's WebKit has no speech synthesis at all, though Safari on a
-    // real iPhone does. Give it one to record into, so the app's own voice is
-    // tested there too rather than quietly switched off.
-    if (!('speechSynthesis' in window)) {
-      Object.defineProperty(window, 'speechSynthesis', { value: {}, configurable: true });
-      (window as unknown as { SpeechSynthesisUtterance: unknown }).SpeechSynthesisUtterance =
-        class {
-          text: string;
-          rate = 1;
-          lang = '';
-          constructor(text: string) {
-            this.text = text;
-          }
-        };
-    }
-    window.speechSynthesis.speak = (u: SpeechSynthesisUtterance) => {
-      spoken.push(u.text);
+    // The test browsers differ: Playwright's WebKit has no speech synthesis
+    // on some platforms and one that cannot be patched on others, though
+    // Safari on a real iPhone speaks. So the whole engine is replaced with a
+    // recorder, and the app's own voice is tested the same way everywhere.
+    const recorder = {
+      speaking: false,
+      pending: false,
+      paused: false,
+      speak: (u: { text: string }) => {
+        spoken.push(u.text);
+      },
+      cancel: () => {},
+      pause: () => {},
+      resume: () => {},
+      getVoices: () => [],
+      addEventListener: () => {},
+      removeEventListener: () => {},
     };
-    window.speechSynthesis.cancel = () => {};
+    Object.defineProperty(window, 'speechSynthesis', {
+      value: recorder,
+      configurable: true,
+      writable: true,
+    });
+    (window as unknown as { SpeechSynthesisUtterance: unknown }).SpeechSynthesisUtterance = class {
+      text: string;
+      rate = 1;
+      lang = '';
+      constructor(text: string) {
+        this.text = text;
+      }
+    };
   });
 }
 
