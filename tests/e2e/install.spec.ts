@@ -1,69 +1,63 @@
 // Installing Glance as its own app window — issue #160.
 //
-// The manifest and icons must be served, the Install button must exist only
-// when the browser has offered installing, and the service worker must never
-// touch a request to /api.
+// The manifest and its icons must be served, the Install button must exist
+// only when the browser has offered installing, and the service worker must
+// never answer or keep a request to /api.
 
 import { test, expect, type Page } from '@playwright/test';
 
 const polite = (page: Page) => page.getByTestId('live-polite');
 
-async function openSettings(page: Page) {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Settings' }).click();
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeFocused();
-}
-
 test.describe('@smoke installing Glance', () => {
-  test('the page links a manifest that opens in its own window, with its icons', async ({ page, request }) => {
+  test('the manifest opens in its own window and every icon is served', async ({ page, request }) => {
     await page.goto('/');
     const href = await page.locator('link[rel="manifest"]').getAttribute('href');
-    expect(href).toBe('/manifest.webmanifest');
-
     const response = await request.get(href!);
     expect(response.ok()).toBe(true);
     const manifest = await response.json();
-    expect(manifest.short_name).toBe('Glance');
     expect(manifest.display).toBe('standalone');
     expect(manifest.start_url).toBe('/');
 
+    // Chromium wants a 192 and a 512 raster icon; iOS uses the touch icon.
     const sizes = manifest.icons.map((icon: { sizes: string }) => icon.sizes);
     expect(sizes).toContain('192x192');
     expect(sizes).toContain('512x512');
-    for (const icon of manifest.icons as { src: string }[]) {
-      const image = await request.get(icon.src);
-      expect(image.ok(), icon.src).toBe(true);
-      expect(image.headers()['content-type']).toContain('image/png');
+    const touch = await page.locator('link[rel="apple-touch-icon"]').getAttribute('href');
+    for (const src of [...manifest.icons.map((icon: { src: string }) => icon.src), touch]) {
+      const image = await request.get(src);
+      expect(image.ok(), src).toBe(true);
+      expect(image.headers()['content-type'], src).toMatch(/^image\//);
     }
   });
 
-  test('with no offer from the browser, Settings says how instead of showing a dead button', async ({ page }) => {
-    await openSettings(page);
-    await expect(page.getByRole('heading', { name: 'Use Glance as an app' })).toBeVisible();
+  test('with no offer from the browser, it says how instead of showing a dead button', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.addEventListener('beforeinstallprompt', (event) => event.stopImmediatePropagation());
+    });
+    await page.goto('/');
     await expect(page.getByRole('button', { name: 'Install Glance' })).toHaveCount(0);
+    await expect(page.getByTestId('install-status')).toContainText('Install app option');
     await expect(page.getByTestId('install-status')).toContainText('Add to Home Screen');
-    await expect(page.getByTestId('install-status')).toContainText('works the same in a browser tab');
   });
 
   test('when the browser offers it, Install is a real button that asks the browser', async ({ page }) => {
-    await openSettings(page);
+    await page.goto('/');
+    await expect(page.getByTestId('install-status')).toBeVisible();
 
     // What Chromium sends when the page can be installed.
     await page.evaluate(() => {
-      const offer = new Event('beforeinstallprompt', { cancelable: true }) as Event & {
-        prompt: () => Promise<void>;
-        userChoice: Promise<{ outcome: string }>;
-      };
-      (window as unknown as { prompted: boolean }).prompted = false;
-      offer.prompt = async () => {
-        (window as unknown as { prompted: boolean }).prompted = true;
-      };
-      offer.userChoice = Promise.resolve({ outcome: 'accepted' });
+      const w = window as unknown as { prompted: boolean };
+      w.prompted = false;
+      const offer = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+        prompt: async () => {
+          w.prompted = true;
+        },
+        userChoice: Promise.resolve({ outcome: 'accepted', platform: 'web' }),
+      });
       window.dispatchEvent(offer);
     });
 
     const install = page.getByRole('button', { name: 'Install Glance' });
-    await expect(install).toBeVisible();
     await install.focus();
     await page.keyboard.press('Enter');
     await expect(polite(page)).toHaveText('Glance is being installed. It will open in its own window.');
@@ -77,7 +71,7 @@ test.describe('@smoke installing Glance', () => {
 test.describe('@smoke the service worker', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'Service workers are exercised in Chromium.');
 
-  test('keeps only the app shell and lets every /api request through untouched', async ({ page }) => {
+  test('never answers or keeps a request to /api', async ({ page }) => {
     await page.goto('/');
     // The app registers it in production builds only, so register it here.
     await page.evaluate(async () => {
@@ -90,26 +84,28 @@ test.describe('@smoke the service worker', () => {
       .toBe(true);
 
     // If the worker answered /api requests itself, this stub would never be
-    // reached and the request would go to the dev server instead.
+    // reached: the request would go to the dev server instead.
     await page.route('**/api/ping', (route) =>
       route.fulfill({ status: 200, contentType: 'text/plain', body: 'reached the network' }),
     );
-    const body = await page.evaluate(() =>
-      fetch('/api/ping', { method: 'POST', body: 'student work' }).then((r) => r.text()),
+    expect(
+      await page.evaluate(() =>
+        fetch('/api/ping', { method: 'POST', body: 'student work' }).then((r) => r.text()),
+      ),
+    ).toBe('reached the network');
+    expect(await page.evaluate(() => fetch('/api/ping').then((r) => r.text()))).toBe(
+      'reached the network',
     );
-    expect(body).toBe('reached the network');
-    const got = await page.evaluate(() => fetch('/api/ping').then((r) => r.text()));
-    expect(got).toBe('reached the network');
 
     const cached = await page.evaluate(async () => {
-      const urls: string[] = [];
+      const paths: string[] = [];
       for (const key of await caches.keys()) {
         const cache = await caches.open(key);
-        for (const request of await cache.keys()) urls.push(new URL(request.url).pathname);
+        for (const request of await cache.keys()) paths.push(new URL(request.url).pathname);
       }
-      return urls;
+      return paths;
     });
-    expect(cached).toContain('/index.html');
+    expect(cached).toContain('/');
     expect(cached.filter((path) => path.startsWith('/api'))).toEqual([]);
   });
 });

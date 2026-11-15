@@ -58,9 +58,13 @@ export function stripFiller(text: string): string {
 // Words a student meets in a problem or hears from this app. Each meaning is
 // general: it is the same whatever problem is on screen, so it cannot point at
 // a step. Longer names come first so "square root" is found before "root".
-const GLOSSARY: [RegExp, string, string][] = [
+export const GLOSSARY: [RegExp, string, string][] = [
   [/\bsquare roots?\b/, 'square root', 'The square root of a number is the value that, multiplied by itself, gives that number.'],
   [/\bcube roots?\b/, 'cube root', 'The cube root of a number is the value that, used three times in a multiplication, gives that number.'],
+  [/\bx[ -]?intercepts?\b/, 'x-intercept', 'The x-intercept is where a graph meets the horizontal axis. At that point, the vertical value is zero.'],
+  [/\by[ -]?intercepts?\b/, 'y-intercept', 'The y-intercept is where a graph meets the vertical axis. At that point, the horizontal value is zero.'],
+  [/\bplus or minus\b/, 'plus or minus', 'Plus or minus means there are two possible values: one found by adding and one found by subtracting.'],
+  [/\bless than or equal to\b/, 'less than or equal to', 'Less than or equal to means a value can be smaller than another value or exactly the same as it.'],
   [/\bnumerators?\b/, 'numerator', 'The numerator is the top of a fraction: the part being divided.'],
   [/\bdenominators?\b/, 'denominator', 'The denominator is the bottom of a fraction: the part you divide by.'],
   [/\bfractions?\b/, 'fraction', 'A fraction is one amount divided by another, written with a top, the numerator, and a bottom, the denominator.'],
@@ -70,6 +74,48 @@ const GLOSSARY: [RegExp, string, string][] = [
   [/\bcoefficients?\b/, 'coefficient', 'A coefficient is the number multiplying a letter. In three x, the coefficient is three.'],
   [/\bvariables?\b/, 'variable', 'A variable is a letter that stands for a number.'],
   [/\bconstants?\b/, 'constant', 'A constant is a plain number, with no letter attached.'],
+  [/\bslopes?\b/, 'slope', 'Slope describes how steep a line is and whether it rises or falls as it goes from left to right.'],
+  [/\bintercepts?\b/, 'intercept', 'An intercept is a point where a graph crosses one of its axes.'],
+  [/\blinear\b/, 'linear', 'Linear describes a relationship whose graph is a straight line.'],
+  [/\bquadratics?\b/, 'quadratic', 'A quadratic is an expression or equation whose highest power is two. Its graph is usually a curved U shape.'],
+  [/\bpolynomials?\b/, 'polynomial', 'A polynomial is an expression made by adding or subtracting terms with whole-number powers of variables.'],
+  [/\bmonomials?\b/, 'monomial', 'A monomial is a polynomial with one term.'],
+  [/\bbinomials?\b/, 'binomial', 'A binomial is a polynomial with two terms.'],
+  [/\btrinomials?\b/, 'trinomial', 'A trinomial is a polynomial with three terms.'],
+  [/\bdegrees?\b/, 'degree', 'The degree of a polynomial is the largest exponent on a variable in any one of its terms.'],
+  [/\broots?\b/, 'root', 'A root of an equation is a value that makes the equation true.'],
+  [/\bsolutions?\b/, 'solution', 'A solution is a value that makes an equation or inequality true.'],
+  [/\bidentit(?:y|ies)\b/, 'identity', 'An identity is an equation that is true for every allowed value of its variables.'],
+  [/\bfunctions?\b/, 'function', 'A function is a rule that gives exactly one output for each allowed input.'],
+  [/\bdomains?\b/, 'domain', 'The domain of a function is the set of inputs it is allowed to have.'],
+  [/\branges?\b/, 'range', 'The range of a function is the set of outputs it can produce.'],
+  [/\bratios?\b/, 'ratio', 'A ratio compares two quantities by division.'],
+  [/\bproportions?\b/, 'proportion', 'A proportion is an equation that says two ratios are equal.'],
+  [/\bpercents?\b/, 'percent', 'Percent means out of one hundred.'],
+  [/\bintegers?\b/, 'integer', 'An integer is a whole number, its negative, or zero.'],
+  [/\brational numbers?\b/, 'rational number', 'A rational number can be written as one integer divided by another nonzero integer.'],
+  [/\birrational numbers?\b/, 'irrational number', 'An irrational number cannot be written as a ratio of two integers.'],
+  [/\bprimes?\b/, 'prime', 'A prime number is a whole number greater than one with exactly two positive factors: one and itself.'],
+  [/\bmultiples?\b/, 'multiple', 'A multiple of a number is the result of multiplying that number by a whole number.'],
+  [/\bmeans?\b/, 'mean', 'The mean is an average found by adding all the values and dividing by how many values there are.'],
+  [/\bmedians?\b/, 'median', 'The median is the middle value when values are arranged in order.'],
+  [/\bperimeters?\b/, 'perimeter', 'The perimeter is the distance around the outside of a two-dimensional shape.'],
+  [/\bareas?\b/, 'area', 'Area is the amount of flat space inside a two-dimensional shape.'],
+  [/\bvolumes?\b/, 'volume', 'Volume is the amount of space inside a three-dimensional object.'],
+  [/\bradii\b|\bradiuses\b|\bradius\b/, 'radius', 'A radius is the distance from the center of a circle to its edge.'],
+  [/\bdiameters?\b/, 'diameter', 'A diameter is the distance across a circle through its center.'],
+  [/\bcircumferences?\b/, 'circumference', 'The circumference is the distance around a circle.'],
+  [/\bhypotenuses?\b/, 'hypotenuse', 'The hypotenuse is the longest side of a right triangle. It is opposite the right angle.'],
+  [/\bangles?\b/, 'angle', 'An angle is the amount of turn between two lines or rays that meet.'],
+  [/\bparallel\b/, 'parallel', 'Parallel lines stay the same distance apart and never meet.'],
+  [/\bperpendicular\b/, 'perpendicular', 'Perpendicular lines meet to make a right angle.'],
+  [/\blogarithms?\b/, 'logarithm', 'A logarithm tells which exponent a base needs to produce a given number.'],
+  [/\bbases?\b/, 'base', 'In an exponent, the base is the number or expression that is multiplied by itself.'],
+  [/\bsines?\b/, 'sine', 'Sine is a trigonometric ratio that relates an angle in a right triangle to the side opposite it and the hypotenuse.'],
+  [/\bcosines?\b/, 'cosine', 'Cosine is a trigonometric ratio that relates an angle in a right triangle to the side beside it and the hypotenuse.'],
+  [/\btangents?\b/, 'tangent', 'Tangent is a trigonometric ratio that relates an angle in a right triangle to the side opposite it and the side beside it.'],
+  [/\bpi\b/, 'pi', 'Pi is the constant ratio of a circle’s circumference to its diameter.'],
+  [/\binfinity\b/, 'infinity', 'Infinity describes something without an end or limit. It is not an ordinary number.'],
   [/\blike terms\b/, 'like terms', 'Like terms have the same letters raised to the same exponents, so they can be added together.'],
   [/\bterms?\b/, 'term', 'A term is one of the pieces of an expression that are added or subtracted.'],
   [/\bexpressions?\b/, 'expression', 'An expression is numbers and letters joined by operations, with no equals sign.'],
@@ -98,6 +144,8 @@ const GLOSSARY: [RegExp, string, string][] = [
 
 const ASKS_MEANING =
   /^(?:what(?:'s| is| are| does| do)|define|explain|meaning of|tell me what)\b|\bmeans?\??$|\bstand for\??$/i;
+const MEANING_SUBJECT =
+  /^(?:what (?:does|do) (?:an? |the )?(.+?) means?|what(?:'s| is| are) (?:an? |the )?(.+)|define (?:an? |the )?(.+)|explain (?:an? |the )?(.+)|meaning of (?:an? |the )?(.+)|tell me what (?:an? |the )?(.+?)(?: means?| is)?|(?:what does )?(?:an? |the )?(.+?) stand for)$/i;
 const ASKS_FOR_PROBLEM =
   /\b(?:read|repeat|say|hear|what(?:'s| is| was))\b.*\b(?:problem|question)\b|^(?:the )?(?:problem|question)(?: again)?$/i;
 const ASKS_STATUS =
@@ -128,9 +176,17 @@ export function understandTalk(text: string): Talk | null {
   if (GREETS.test(lower)) return { kind: 'greeting' };
   if (THANKS.test(lower)) return { kind: 'thanks' };
   if (ASKS_REPEAT.test(lower)) return { kind: 'repeat' };
+  let unknownTerm: string | undefined;
   if (ASKS_MEANING.test(lower)) {
-    for (const [pattern, term, meaning] of GLOSSARY) {
-      if (pattern.test(lower)) return { kind: 'define', term, meaning };
+    // Match the requested word, not the whole question. Otherwise the entry
+    // for "mean" would match every question ending in "mean".
+    const question = MEANING_SUBJECT.exec(lower);
+    const requestedTerm = question?.slice(1).find(Boolean)?.trim();
+    if (requestedTerm) {
+      for (const [pattern, term, meaning] of GLOSSARY) {
+        if (pattern.test(requestedTerm)) return { kind: 'define', term, meaning };
+      }
+      unknownTerm = requestedTerm;
     }
   }
   if (asksToSolve(said)) return { kind: 'refuse' };
@@ -138,10 +194,9 @@ export function understandTalk(text: string): Talk | null {
   if (ASKS_CAPABILITIES.test(lower)) return { kind: 'capabilities' };
   if (ASKS_FOR_PROBLEM.test(lower)) return { kind: 'readProblem' };
   if (ASKS_STATUS.test(lower)) return { kind: 'status' };
+  if (unknownTerm) return { kind: 'unknownTerm', term: unknownTerm };
   // "What does X mean" about a word that is not in the list. Only when the
   // question has that exact shape, so a line of math is never taken for one.
-  const asked = /^what (?:does|do) (?:an? |the )?(.+?) means?$|^(?:define|explain) (?:an? |the )?(.+)$/.exec(lower);
-  if (asked) return { kind: 'unknownTerm', term: (asked[1] ?? asked[2]).trim() };
   return null;
 }
 

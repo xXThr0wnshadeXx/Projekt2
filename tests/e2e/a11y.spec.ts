@@ -20,6 +20,33 @@ const PROBLEM = {
 };
 const WORK = [{ id: 'W1', latex: '2x = 8', readback: '2 x equals 8', valid: true }];
 
+test.describe('@smoke progressive web app shell', () => {
+  test('publishes its manifest and explains the install fallback', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.addEventListener('beforeinstallprompt', (event) => event.stopImmediatePropagation());
+    });
+    await page.goto('/');
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
+    await expect(page.getByTestId('install-status')).toContainText('Install app option');
+    // The service worker is registered in production builds only; it is
+    // tested in install.spec.ts.
+  });
+});
+
+test('@smoke skip link moves focus to main content', async ({ page }) => {
+  await page.goto('/');
+  // Home deliberately focuses its heading on arrival. Two Shift+Tabs pass the
+  // header shortcut button and reach the preceding skip link.
+  await expect(
+    page.getByRole('heading', { name: 'Math for students who are blind or have low vision' }),
+  ).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('main')).toBeFocused();
+});
+
 const SPOKEN_CLEAR = {
   latex: 'x = 4', ambiguous: false, clarifying_question: null, alternatives: [], readback: 'x equals 4', valid: true,
 };

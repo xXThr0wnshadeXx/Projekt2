@@ -1,66 +1,64 @@
-// "Use Glance as an app" in Settings — issue #160.
-//
-// The Install button appears only when the browser has actually offered to
-// install, so it never does nothing when pressed. Everywhere else the section
-// says, in words, what is possible in that browser.
-
 import { useEffect, useState } from 'react';
 import { announce } from './LiveRegion';
-import { installState, onInstallChange, promptInstall, type InstallState } from '../install';
 
+interface InstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+
+/** A visible, keyboard-operable route to the browser's native app installer. */
 export function InstallApp() {
-  const [state, setState] = useState<InstallState>(installState);
+  const [deferredPrompt, setDeferredPrompt] = useState<InstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(isStandalone);
 
   useEffect(() => {
-    const update = () => setState(installState());
-    update();
-    return onInstallChange(update);
+    const receivePrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredPrompt(event as InstallPromptEvent);
+    };
+    const appInstalled = () => {
+      setDeferredPrompt(null);
+      setInstalled(true);
+      announce('Glance was installed and will open in its own app window.');
+    };
+    window.addEventListener('beforeinstallprompt', receivePrompt);
+    window.addEventListener('appinstalled', appInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', receivePrompt);
+      window.removeEventListener('appinstalled', appInstalled);
+    };
   }, []);
 
   async function install() {
-    const outcome = await promptInstall();
-    if (outcome === 'accepted') {
-      announce('Glance is being installed. It will open in its own window.');
-    } else if (outcome === 'dismissed') {
-      announce('Glance was not installed. You can install it from here at any time.');
-    } else {
-      announce('This browser is not offering to install Glance right now.');
-    }
+    if (!deferredPrompt) return;
+    await deferredPrompt.prompt();
+    const choice = await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+    if (choice.outcome === 'accepted') announce('Glance is being installed. It will open in its own window.');
+    if (choice.outcome === 'dismissed') announce('Glance was not installed. You can choose Install Glance whenever it is available.');
+  }
+
+  if (installed) {
+    return <p className="text-sm text-[--muted]">Glance is open in its own app window.</p>;
+  }
+
+  if (deferredPrompt) {
+    return (
+      <button type="button" className="btn" onClick={() => void install()}>
+        Install Glance
+      </button>
+    );
   }
 
   return (
-    <section aria-labelledby="install-heading" className="mt-8">
-      <h3 id="install-heading" className="text-lg font-semibold">
-        Use Glance as an app
-      </h3>
-      {state === 'installed' && (
-        <p className="mt-2" data-testid="install-status">
-          Glance is installed and open in its own window.
-        </p>
-      )}
-      {state === 'available' && (
-        <>
-          <p className="mt-2 text-sm text-[--muted]" id="install-detail">
-            Installing gives Glance its own window and an icon to open it from. Nothing you
-            capture or write is stored by installing.
-          </p>
-          <button
-            type="button"
-            className="btn mt-3"
-            aria-describedby="install-detail"
-            onClick={() => void install()}
-          >
-            Install Glance
-          </button>
-        </>
-      )}
-      {state === 'unavailable' && (
-        <p className="mt-2" data-testid="install-status">
-          This browser has not offered to install Glance. In Safari on an iPhone or iPad, use
-          the Share button, then Add to Home Screen. In Chrome or Edge on a computer, use the
-          install icon at the end of the address bar. Glance works the same in a browser tab.
-        </p>
-      )}
-    </section>
+    <p className="text-sm text-[--muted]" data-testid="install-status">
+      To open Glance in its own window, use your browser&apos;s Install app option, or Add to
+      Home Screen from the Share button in Safari on an iPhone or iPad.
+    </p>
   );
 }

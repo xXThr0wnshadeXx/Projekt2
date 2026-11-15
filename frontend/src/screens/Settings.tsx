@@ -5,7 +5,6 @@
 
 import { useEffect, useRef } from 'react';
 import { announce } from '../components/LiveRegion';
-import { InstallApp } from '../components/InstallApp';
 import { ReadingControls } from '../components/ReadingControls';
 import type { Mode, Settings as SettingsData } from '../state';
 
@@ -49,7 +48,7 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
   }
 
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}
@@ -97,8 +96,6 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
           <ReadingControls settings={settings} onChange={onChange} />
         </div>
       </section>
-
-      <InstallApp />
 
       {/* "Back" alone says nothing when it is read out with no screen to look
           at. Every way out of a screen now names where it goes. */}
