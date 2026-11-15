@@ -25,7 +25,7 @@ gh auth refresh -s project
 
 - [ ] nicolashlam
 - [ ] xXThr0wnshadeXx
-- [ ] shreev2703
+- [x] shreev2703 — board reads and card updates verified November 15, 2026
 
 ## Back end
 
