@@ -3,10 +3,10 @@
   "properties": {
     "outcome": {
       "type": "string",
-      "enum": ["confirmed", "needs_review", "hint"]
+      "enum": ["nothing_flagged", "look_again"]
     },
-    "message": {"type": "string"}
+    "line": {"type": ["integer", "null"]}
   },
-  "required": ["outcome", "message"],
+  "required": ["outcome", "line"],
   "additionalProperties": false
 }

@@ -330,24 +330,27 @@ export function command(
   });
 }
 
-export interface FeedbackResponse {
-  outcome: 'confirmed' | 'needs_review' | 'hint';
+export interface ReviewResponse {
+  outcome: 'nothing_flagged' | 'look_again';
+  /** 1-based line of the student's work, when one is named. */
+  line: number | null;
+  /** A fixed sentence from the server. Never model prose. */
   message: string;
 }
 
-/** Final hand-in feedback. The server is instructed never to return an answer
- * or next step; it only reviews the work the student chose to submit. */
-export function feedback(
+/** One review of the finished work before hand-in (#215). Allowed where step
+ *  checks are: study and homework, never exam. Says at most which line may be
+ *  worth another look; never what is wrong or what to do. */
+export function reviewWork(
   problemLines: string[],
   workLines: string[],
   mode: 'study' | 'homework' | 'exam',
-  kind: 'review' | 'hint',
-): Promise<FeedbackResponse> {
-  return request<FeedbackResponse>('/api/feedback', {
+): Promise<ReviewResponse> {
+  return request<ReviewResponse>('/api/feedback', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ problem_lines: problemLines, work_lines: workLines, mode, kind }),
-  });
+    body: JSON.stringify({ problem_lines: problemLines, work_lines: workLines, mode }),
+  }, SLOW_MS);
 }
 
 // The remaining endpoint is implemented with its own issue:
