@@ -74,9 +74,13 @@ test.describe('@smoke the whole page by arrows and space', () => {
     await downTo(page, /^End of the page\.$/, 60);
   });
 
-  test('the current line is always in view, with no scrolling', async ({ page, isMobile }) => {
+  test('the current line is always in view, with no scrolling', async ({ page }) => {
     await openSample(page);
-    if (!isMobile) {
+    // Scrolling is turned off only where the browser reports a mouse. Headless
+    // Firefox on Linux reports none, so there the page keeps scrolling, which
+    // is the safe default for an unknown device.
+    const keyboardDevice = await page.evaluate(() => matchMedia('(hover: hover) and (pointer: fine)').matches);
+    if (keyboardDevice) {
       expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe('hidden');
     }
     await downTo(page, /^End of the page\.$/, 60);
