@@ -77,22 +77,27 @@ export interface Shortcut {
 
 const HELP: Shortcut = { keys: 'Question mark', does: 'hear these shortcuts' };
 
+/** The page-wide keys (#236), on every screen but low-vision mode. */
+const MOVE: Shortcut[] = [
+  { keys: 'Up and Down arrows', does: 'move through the page one line at a time' },
+  { keys: 'Space', does: 'read the line aloud, or press it if it is a button' },
+];
+
 export const KEYMAP: Record<ScreenName, Shortcut[]> = {
-  home: [{ keys: 'U or C', does: 'capture a problem' }, HELP],
+  home: [...MOVE, { keys: 'U or C', does: 'capture a problem' }, HELP],
   capture: [
+    ...MOVE,
     { keys: 'U', does: 'upload a file' },
     { keys: 'C', does: 'take a photo' },
     { keys: 'Control or Command V', does: 'paste a screenshot' },
     HELP,
   ],
   problem: [
-    { keys: 'Down or Right arrow', does: 'next line' },
-    { keys: 'Up or Left arrow', does: 'previous line' },
-    { keys: 'Space', does: 'read the line aloud' },
+    ...MOVE,
     { keys: 'G', does: 'hear the structure of the line' },
     { keys: 'R', does: 'read the line' },
     { keys: 'Shift R', does: 'read the whole problem' },
-    { keys: 'N or P', does: 'next or previous line, as the arrows do' },
+    { keys: 'N or P', does: 'next or previous maths line, skipping everything in between' },
     { keys: 'Enter', does: 'explore inside the line with the arrow keys; Escape to come out' },
     { keys: 'W', does: 'what changed from the line before (not in exam mode)' },
     { keys: 'L', does: 'low-vision mode' },
@@ -102,9 +107,7 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     HELP,
   ],
   scratchpad: [
-    { keys: 'Down or Right arrow', does: 'your next line' },
-    { keys: 'Up or Left arrow', does: 'your previous line' },
-    { keys: 'Space, tapped', does: 'read the current line aloud' },
+    ...MOVE,
     { keys: 'Space, held down', does: 'record a line while you speak' },
     { keys: 'H', does: 'hands-free: just talk, and say stop listening to stop' },
     { keys: 'Enter', does: 'save the line you just heard' },
@@ -122,10 +125,11 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     HELP,
   ],
   settings: [
+    ...MOVE,
     { keys: 'Arrow keys', does: 'choose a mode once you are on the mode list' },
     HELP,
   ],
-  export: [{ keys: 'D', does: 'download the accessible HTML file' }, HELP],
+  export: [...MOVE, { keys: 'D', does: 'download the accessible HTML file' }, HELP],
   lowvision: [
     { keys: 'Right or Down arrow', does: 'next line' },
     { keys: 'Left or Up arrow', does: 'previous line' },
