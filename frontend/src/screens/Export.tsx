@@ -10,10 +10,13 @@ import { announce } from '../components/LiveRegion';
 import { ExportPreview } from '../components/ExportPreview';
 import { buildExportHtml, downloadFile } from '../export';
 import { useShortcuts } from '../shortcuts';
-import { loadWork, WORK_CHANGED, type Problem } from '../state';
+import { reviewWork, ApiFailure } from '../api';
+import { loadWork, reviewSpent, spendReview, WORK_CHANGED, type Mode, type Problem } from '../state';
+import { stepChecksAllowed } from '../stepCheck';
 
 export interface ExportProps {
   problem: Problem;
+  mode: Mode;
 }
 
 /** "math-work-2026-11-15.html", or with the student's name if they gave one. */
@@ -31,7 +34,7 @@ export function exportFilename(name: string, date: Date): string {
   return slug ? `math-work-${slug}-${day}.html` : `math-work-${day}.html`;
 }
 
-export function Export({ problem }: ExportProps) {
+export function Export({ problem, mode }: ExportProps) {
   // The work grows on the same page, so this follows every save.
   const [work, setWork] = useState(() => loadWork());
   useEffect(() => {
@@ -42,6 +45,11 @@ export function Export({ problem }: ExportProps) {
   const section = useRef<HTMLElement>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  // One review per problem, allowed where step checks are (DESIGN.md 14).
+  const reviewAllowed = stepChecksAllowed(mode);
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewed, setReviewed] = useState(() => reviewSpent(problem));
+  const [reviewSaid, setReviewSaid] = useState('');
   const date = useMemo(() => new Date(), []);
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -80,6 +88,36 @@ export function Export({ problem }: ExportProps) {
     // Let the announcement start before the dialog takes over.
     window.setTimeout(() => window.print(), 150);
   }
+
+  async function review() {
+    if (!work.length || !reviewAllowed || reviewing) return;
+    if (reviewed) {
+      announce("I can't review this problem again.");
+      return;
+    }
+    spendReview(problem);
+    setReviewed(true);
+    setReviewing(true);
+    announce('Reviewing your work…');
+    try {
+      const result = await reviewWork(
+        problem.lines.map((line) => line.latex),
+        work.map((line) => line.latex),
+        mode,
+      );
+      setReviewSaid(result.message);
+      announce(result.message);
+    } catch (error) {
+      const message = error instanceof ApiFailure
+        ? error.message
+        : "I couldn't review your work right now. Nothing was checked.";
+      setReviewSaid(message);
+      announce(message, 'assertive');
+    } finally {
+      setReviewing(false);
+    }
+  }
+
 
   useShortcuts({ d: () => void downloadHtml() }, !busy, section);
 
@@ -122,6 +160,35 @@ export function Export({ problem }: ExportProps) {
           Print or save as PDF
         </button>
       </div>
+
+      {/* Nothing about reviews is shown or said in exam mode, or with no work. */}
+      {reviewAllowed && work.length > 0 && (
+        <section aria-labelledby="review-heading" className="no-print mt-8 border-t border-[--line] pt-6">
+          <p className="mono text-sm text-[--muted]" aria-hidden="true">Before you hand in</p>
+          <h3 id="review-heading" className="mt-1 text-2xl font-medium tracking-tight">
+            One look over your work
+          </h3>
+          <p className="mt-3 max-w-2xl border-l-2 border-[--fg] pl-4 text-[--muted]">
+            Glance can say whether a line may be worth another look. Once per
+            problem. It never says what to change or what to do next, and
+            nothing from it goes into your file.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn"
+              aria-disabled={reviewed ? 'true' : undefined}
+              disabled={reviewing}
+              onClick={() => void review()}
+            >
+              {reviewed ? 'Reviewed' : 'Review my work'}
+            </button>
+            <p role="status" data-testid="review-result" className="min-h-[1.5rem]">
+              {reviewSaid}
+            </p>
+          </div>
+        </section>
+      )}
 
       <p role="status" className="no-print mt-4 min-h-[1.5rem] text-[--muted]">
         {busy && 'Making the file…'}

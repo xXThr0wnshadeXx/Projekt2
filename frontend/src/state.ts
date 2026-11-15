@@ -69,6 +69,7 @@ export const defaultSettings: Settings = {
 const PROBLEM_KEY = 'glance.problem.v1';
 const WORK_KEY = 'glance.work.v1';
 const SETTINGS_KEY = 'glance.settings.v1';
+const REVIEW_KEY = 'glance.review.v1';
 
 // Every access is wrapped: localStorage throws in private windows and in some
 // embedded webviews, and a storage failure must never take the app down.
@@ -112,6 +113,24 @@ export function clearProblem(): void {
   remove(PROBLEM_KEY);
   // A new problem means the old work no longer belongs to anything.
   remove(WORK_KEY);
+  remove(REVIEW_KEY);
+}
+
+/** What a review allowance is tied to: the problem, not the work. Editing a
+ *  line and asking again would make the review an answer oracle (#215). */
+function reviewKeyFor(problem: Problem): string {
+  return problem.lines.map((l) => l.latex).join('\n');
+}
+
+/** True once this problem has had its one review. Survives a reload. */
+export function reviewSpent(problem: Problem): boolean {
+  return read<string>(REVIEW_KEY) === reviewKeyFor(problem);
+}
+
+/** Spent before the request is sent: a failed request still uses it up, since
+ *  refunding it would let a student retry until they like the answer. */
+export function spendReview(problem: Problem): void {
+  write(REVIEW_KEY, reviewKeyFor(problem));
 }
 
 export function loadWork(): WorkLine[] {

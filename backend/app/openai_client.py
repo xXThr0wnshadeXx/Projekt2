@@ -23,7 +23,7 @@ from .model_quota import ModelQuota
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = Path(__file__).with_name("schemas")
 ModelId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-StructuredTask = Literal["capture", "spoken", "command"]
+StructuredTask = Literal["capture", "spoken", "command", "feedback"]
 log = logging.getLogger("glance.models")
 _SAFE_ERROR_CODES = {
     "credit_balance_exhausted",

@@ -75,7 +75,34 @@ test.describe('@smoke the whole page by arrows and space', () => {
     await downTo(page, /^End of the page\.$/, 400);
   });
 
-  test('the current line is always in view, with no scrolling', async ({ page }) => {
+  test('past the top, Down is the first line; past the end, Up is the last', async ({ page }) => {
+    await openSample(page);
+    for (let i = 0; i < 25; i += 1) await page.keyboard.press('ArrowUp');
+    expect(await heard(page)).toBe('Top of the page.');
+    await page.keyboard.press('ArrowDown');
+    const first = await heard(page);
+    expect(first).not.toBe('Top of the page.');
+    // Up from the first line is the top again, and Down is the first line again.
+    await page.keyboard.press('ArrowUp');
+    expect(await heard(page)).toBe('Top of the page.');
+    await page.keyboard.press('ArrowDown');
+    expect(await heard(page)).toBe(first);
+
+    await downTo(page, /^End of the page\.$/, 200);
+    await page.keyboard.press('ArrowUp');
+    const last = await heard(page);
+    expect(last).not.toBe('End of the page.');
+    await page.keyboard.press('ArrowDown');
+    expect(await heard(page)).toBe('End of the page.');
+    await page.keyboard.press('ArrowUp');
+    expect(await heard(page)).toBe(last);
+  });
+
+  test('the current line is always in view, with no scrolling', async ({ page, isMobile, browserName }) => {
+    // CI's Linux WebKit keeps a stale scroll range after the page grows (#256),
+    // so the lowest lines cannot be scrolled to there at all. Real browsers
+    // are not affected; chromium and firefox cover the check.
+    test.skip(isMobile && browserName === 'webkit', 'Linux WebKit cannot scroll to the lowest lines');
     await openSample(page);
     // Scrolling is turned off only where the browser reports a mouse. Headless
     // Firefox on Linux reports none, so there the page keeps scrolling, which

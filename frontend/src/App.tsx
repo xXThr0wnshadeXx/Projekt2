@@ -576,7 +576,7 @@ export function App() {
 
             {problem && (
               <ScreenBoundary screen="handin" onBackToStart={() => focusFirst('#problem-heading')} restartFocus="#handin-heading">
-                <Export problem={problem} />
+                <Export problem={problem} mode={settings.mode} />
               </ScreenBoundary>
             )}
 
