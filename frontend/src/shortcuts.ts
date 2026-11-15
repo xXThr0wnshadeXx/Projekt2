@@ -60,7 +60,13 @@ export function useShortcuts(handlers: Handlers, enabled = true): void {
 // Only keys that actually do something on that screen are listed, so the
 // spoken help never promises a shortcut the student then finds is dead.
 
-export type ScreenName = 'home' | 'capture' | 'problem' | 'scratchpad' | 'lowvision';
+export type ScreenName =
+  | 'home'
+  | 'capture'
+  | 'problem'
+  | 'scratchpad'
+  | 'lowvision'
+  | 'settings';
 
 export interface Shortcut {
   /** How the key is said and shown, e.g. "Shift R". */
@@ -85,6 +91,7 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'N', does: 'next line' },
     { keys: 'P', does: 'previous line' },
     { keys: 'Enter', does: 'explore inside the line with the arrow keys; Escape to come out' },
+    { keys: 'W', does: 'what changed from the line before (not in exam mode)' },
     { keys: 'L', does: 'low-vision mode' },
     { keys: 'S', does: 'start working' },
     { keys: 'U', does: 'capture another problem' },
@@ -99,6 +106,10 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'Shift R', does: 'read all your work' },
     { keys: 'U', does: 'undo a delete' },
     { keys: 'P', does: 'show or hide the problem' },
+    HELP,
+  ],
+  settings: [
+    { keys: 'Arrow keys', does: 'choose a mode once you are on the mode list' },
     HELP,
   ],
   lowvision: [
