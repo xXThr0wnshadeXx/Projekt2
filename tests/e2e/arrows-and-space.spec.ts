@@ -108,6 +108,58 @@ test.describe('@smoke the whole page by arrows and space', () => {
   });
 });
 
+/** Every visible piece of text, except inside maths lines (those are read by
+ *  Space in their spoken form, not as their raw characters). */
+async function visibleTexts(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const SKIP = '[hidden], [aria-hidden="true"], .sr-only, .skip-link, [data-testid^="live-"], script, style, mjx-container, [data-testid^="math-line-"]';
+    const out: string[] = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = n.nodeValue?.replace(/\s+/g, ' ').trim();
+      const el = n.parentElement;
+      if (!text || !el || el.closest(SKIP)) continue;
+      const r = el.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0)) continue;
+      // A labelled control is announced by its name ("Smaller text"), not by
+      // its face ("A−"), as a screen reader does.
+      const control = el.closest('button, a[href], summary, [role="button"]');
+      out.push(control?.getAttribute('aria-label') || text);
+    }
+    return out;
+  });
+}
+
+/** Walk from the top of the page to the end, collecting what is said. */
+async function walkAll(page: Page): Promise<string> {
+  for (let i = 0; i < 80; i += 1) await page.keyboard.press('ArrowUp');
+  const heardAll: string[] = [];
+  for (let i = 0; i < 120; i += 1) {
+    await page.keyboard.press('ArrowDown');
+    const t = await heard(page);
+    if (t === 'End of the page.') break;
+    heardAll.push(t);
+  }
+  return heardAll.join(' | ').replace(/\s+/g, ' ');
+}
+
+test.describe('@smoke every line of text is a stop', () => {
+  for (const where of ['home', 'problem'] as const) {
+    test(`on the ${where} screen, the walk reaches every piece of visible text`, async ({ page }) => {
+      await page.addInitScript(() => window.localStorage.clear());
+      await page.goto('/');
+      if (where === 'problem') {
+        await page.getByRole('button', { name: 'Try a sample problem' }).click();
+        await expect(page.locator('#L2 mjx-container')).toBeVisible({ timeout: 15000 });
+      }
+      const texts = await visibleTexts(page);
+      const said = await walkAll(page);
+      const missed = texts.filter((t) => !said.includes(t));
+      expect(missed, `never reached: ${JSON.stringify(missed)}`).toEqual([]);
+    });
+  }
+});
+
 test.describe('@smoke arrows and space on the scratchpad', () => {
   test('Space on the heading reads it', async ({ page }) => {
     await openSample(page);

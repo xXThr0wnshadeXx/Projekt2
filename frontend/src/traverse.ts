@@ -17,41 +17,67 @@ import { spokenMath } from './math/sre';
 
 const CONTROL = 'button, a[href], input:not([type="hidden"]), select, textarea, summary, [role="button"]';
 const MATH_LINE = '[data-testid^="math-line-"]';
-const TEXT = 'h1, h2, h3, h4, h5, h6, p, li, dt, dd, figcaption, th, td';
+const HEADING = 'h1, h2, h3, h4, h5, h6';
 const CURRENT = 'glance-current';
+/** Never stops, and never read: hidden, visually hidden, live regions, the
+ *  skip link (the keys make it unnecessary), and MathJax's own internals. */
+const SKIP = '[hidden], [aria-hidden="true"], .sr-only, .skip-link, [data-testid^="live-"], script, style, noscript';
 
 let current: Element | null = null;
 
-function shown(el: Element): boolean {
-  if (el.closest('[hidden], [aria-hidden="true"], .sr-only, .skip-link, [data-testid^="live-"], mjx-container')) {
-    return false;
-  }
+function hasBox(el: Element): boolean {
   const r = el.getBoundingClientRect();
   return r.width > 0 && r.height > 0;
 }
 
-/** Every line on the page, in reading order. */
-export function lines(root: ParentNode = document): Element[] {
-  const out: Element[] = [];
-  for (const el of root.querySelectorAll(`${MATH_LINE}, ${CONTROL}, ${TEXT}`)) {
-    if (!shown(el)) continue;
-    if (el.matches(MATH_LINE)) {
-      out.push(el);
-      continue;
-    }
-    // A maths line is one stop: nothing inside it is a stop of its own.
-    if (el.parentElement?.closest(MATH_LINE)) continue;
-    if (el.matches(CONTROL)) {
-      out.push(el);
-      continue;
-    }
-    // Text: only the innermost, and never text that is part of a control.
-    if (el.closest(CONTROL)) continue;
-    if (el.querySelector(`${CONTROL}, ${MATH_LINE}, ${TEXT}`)) continue;
-    if (!el.textContent?.trim()) continue;
-    out.push(el);
+function shown(el: Element): boolean {
+  return !el.closest(SKIP) && hasBox(el);
+}
+
+/** The block a piece of inline text belongs to, so a sentence with a bold
+ *  word or a key label in it is one line, not several. */
+function blockOf(el: Element, root: Element): Element {
+  let node: Element | null = el;
+  while (node && node !== root) {
+    const display = getComputedStyle(node).display;
+    if (display !== 'inline' && display !== 'contents') return node;
+    node = node.parentElement;
   }
-  return out;
+  return el;
+}
+
+/** The stop a text node belongs to: its maths line, its control, or else the
+ *  nearest block containing it. */
+function stopFor(text: Text, root: Element): Element | null {
+  const parent = text.parentElement;
+  if (!parent || parent.closest(SKIP)) return null;
+  const math = parent.closest(MATH_LINE);
+  if (math) return math;
+  // MathJax output outside a maths line (a preview, say) is read as one piece.
+  const mjx = parent.closest('mjx-container');
+  if (mjx) return blockOf(mjx, root);
+  const control = parent.closest(CONTROL);
+  if (control) return control;
+  return blockOf(parent, root);
+}
+
+/** Every line on the page, in reading order: every piece of visible text,
+ *  plus controls that have no text of their own (icon buttons, text boxes). */
+export function lines(root: Element = document.body): Element[] {
+  const found = new Set<Element>();
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!n.nodeValue?.trim()) continue;
+    const stop = stopFor(n as Text, root);
+    if (stop && shown(stop)) found.add(stop);
+  }
+  for (const el of root.querySelectorAll(`${CONTROL}, ${MATH_LINE}`)) {
+    if (el.parentElement?.closest(MATH_LINE)) continue;
+    if (shown(el)) found.add(el);
+  }
+  return Array.from(found).sort((a, b) =>
+    a === b ? 0 : a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+  );
 }
 
 const clean = (text: string | null | undefined) => (text ?? '').replace(/\s+/g, ' ').trim();
@@ -60,14 +86,28 @@ function nameOf(el: Element): string {
   return clean(el.getAttribute('aria-label')) || clean(el.textContent);
 }
 
+/** The text that belongs to this line and to no line inside it, so a box
+ *  holding loose text and its own paragraphs never reads them twice. */
+function ownText(el: Element): string {
+  const root = document.body;
+  const parts: string[] = [];
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (!n.nodeValue?.trim()) continue;
+    if (stopFor(n as Text, root) === el) parts.push(n.nodeValue);
+  }
+  // Text nodes carry their own spacing; joining with spaces would put one
+  // before every full stop that follows a bold word or a key label.
+  return clean(parts.join(''));
+}
+
 /** What is said on arriving at a line. */
 export function describe(el: Element): string {
   if (el.matches(MATH_LINE)) {
     const label = clean(el.getAttribute('aria-label')).replace(/, unsure$/, '');
     const unsure = /, unsure$/.test(el.getAttribute('aria-label') ?? '');
     const group = el.closest('section, ol, ul, main') ?? document;
-    const all = Array.from(group.querySelectorAll(MATH_LINE)).filter(shown);
-    const total = all.length;
+    const total = Array.from(group.querySelectorAll(MATH_LINE)).filter(shown).length;
     return `${label} of ${total}${unsure ? ', unsure' : ''}.`;
   }
   if (el.matches('input, select, textarea')) {
@@ -82,8 +122,8 @@ export function describe(el: Element): string {
   }
   if (el.matches('a[href]')) return `${nameOf(el)}, link.`;
   if (el.matches('button, [role="button"]')) return `${nameOf(el)}, button.`;
-  if (el.matches('h1, h2, h3, h4, h5, h6')) return `Heading. ${nameOf(el)}`;
-  return clean(el.textContent);
+  if (el.matches(HEADING)) return `Heading. ${nameOf(el)}`;
+  return ownText(el) || clean(el.getAttribute('aria-label')) || clean(el.textContent);
 }
 
 function highlight(el: Element | null): void {
