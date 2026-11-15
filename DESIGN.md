@@ -1,6 +1,6 @@
 # Glance — System Design
 
-> **Math you can hear and speak.** Bring in any math problem (file, screenshot, photo). Hear its structure, navigate it piece by piece, work it out loud, confirm every line, and hand in clean typed work.
+> **Math for students who are blind or have low vision.** Bring in any math problem (file, screenshot, photo). Hear its structure, navigate it piece by piece, work it out loud, confirm every line, and hand in clean typed work.
 
 Repo: `xXThr0wnshadeXx/Projekt2` · Team of 4 · Build window: Fri Nov 13, 5 PM → Sun Nov 15, 12 PM
 
