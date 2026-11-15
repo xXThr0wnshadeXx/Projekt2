@@ -178,7 +178,8 @@ export function capture(image: Blob, context = '', signal?: AbortSignal): Promis
 export function pdfPageCount(pdf: Blob): Promise<{ pages: number }> {
   const form = new FormData();
   form.append('pdf', pdf, 'worksheet.pdf');
-  return request<{ pages: number }>('/api/pdf/pages', { method: 'POST', body: form });
+  // The whole PDF is uploaded here too, so it gets the capture deadline.
+  return request<{ pages: number }>('/api/pdf/pages', { method: 'POST', body: form }, CAPTURE_MS);
 }
 
 /** One page of a PDF, rendered to a PNG that `capture` can read.

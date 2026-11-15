@@ -53,7 +53,11 @@ test.describe('@smoke stalled browser requests', () => {
     await page.locator('input[type=file]').setInputFiles({
       name: 'worksheet.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7 stub'),
     });
-    await page.getByRole('button', { name: 'Open this page' }).click();
+    // Keyboard, not click: with the clock installed, Playwright's WebKit on
+    // Linux never confirms a scrolled-to button is in view, so a click on
+    // anything below the fold times out. Enter is how a student does it anyway.
+    await page.getByRole('button', { name: 'Open this page' }).focus();
+    await page.keyboard.press('Enter');
     await expect.poll(() => requested).toBe(true);
     await page.clock.fastForward(12_100);
     await expect(page.getByTestId('live-assertive')).toContainText('took too long');
