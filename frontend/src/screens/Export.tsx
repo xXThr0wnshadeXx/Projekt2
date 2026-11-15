@@ -10,11 +10,10 @@ import { announce } from '../components/LiveRegion';
 import { ExportPreview } from '../components/ExportPreview';
 import { buildExportHtml, downloadFile } from '../export';
 import { useShortcuts } from '../shortcuts';
-import { loadWork, type Problem } from '../state';
+import { loadWork, WORK_CHANGED, type Problem } from '../state';
 
 export interface ExportProps {
   problem: Problem;
-  onBack: () => void;
 }
 
 /** "math-work-2026-11-15.html", or with the student's name if they gave one. */
@@ -32,18 +31,20 @@ export function exportFilename(name: string, date: Date): string {
   return slug ? `math-work-${slug}-${day}.html` : `math-work-${day}.html`;
 }
 
-export function Export({ problem, onBack }: ExportProps) {
-  const work = useMemo(() => loadWork(), []);
+export function Export({ problem }: ExportProps) {
+  // The work grows on the same page, so this follows every save.
+  const [work, setWork] = useState(() => loadWork());
+  useEffect(() => {
+    const refresh = () => setWork(loadWork());
+    window.addEventListener(WORK_CHANGED, refresh);
+    return () => window.removeEventListener(WORK_CHANGED, refresh);
+  }, []);
+  const section = useRef<HTMLElement>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const date = useMemo(() => new Date(), []);
   const heading = useRef<HTMLHeadingElement>(null);
 
-  useEffect(() => {
-    heading.current?.focus();
-    const count = `${work.length} ${work.length === 1 ? 'line' : 'lines'} of your work`;
-    announce(`Hand in your work. ${count}. Download a file, or print it.`);
-  }, [work.length]);
 
   /** The spoken form of each problem line, taken from the rendered preview. */
   function spokenFor(id: string, fallback: string): string {
@@ -80,14 +81,16 @@ export function Export({ problem, onBack }: ExportProps) {
     window.setTimeout(() => window.print(), 150);
   }
 
-  useShortcuts({ d: () => void downloadHtml() }, !busy);
+  useShortcuts({ d: () => void downloadHtml() }, !busy, section);
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
+    <section ref={section} id="step-handin" aria-labelledby="handin-heading" className="step">
+      <p className="step-number no-print" aria-hidden="true">03</p>
       <h2
         ref={heading}
+        id="handin-heading"
         tabIndex={-1}
-        className="no-print text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="no-print step-title focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Hand in your work
       </h2>
@@ -118,9 +121,6 @@ export function Export({ problem, onBack }: ExportProps) {
         <button type="button" className="btn" onClick={print}>
           Print or save as PDF
         </button>
-        <button type="button" className="btn" onClick={onBack}>
-          Back
-        </button>
       </div>
 
       <p role="status" className="no-print mt-4 min-h-[1.5rem] text-[--muted]">
@@ -128,6 +128,6 @@ export function Export({ problem, onBack }: ExportProps) {
       </p>
 
       <ExportPreview name={name} problem={problem} work={work} date={date} />
-    </main>
+    </section>
   );
 }

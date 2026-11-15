@@ -115,8 +115,13 @@ export function loadWork(): WorkLine[] {
   return Array.isArray(w) ? w : [];
 }
 
+/** Fired on `window` whenever the student's work changes, so every part of
+ *  the one page (the hand-in preview most of all) shows the same lines. */
+export const WORK_CHANGED = 'glance:work-changed';
+
 export function saveWork(lines: WorkLine[]): void {
   write(WORK_KEY, lines);
+  window.dispatchEvent(new Event(WORK_CHANGED));
 }
 
 export function loadSettings(): Settings {

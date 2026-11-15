@@ -2,7 +2,7 @@
 // help; this is the shared plumbing every screen uses so the rules about when a
 // shortcut must *not* fire live in exactly one place.
 
-import { useEffect } from 'react';
+import { useEffect, type RefObject } from 'react';
 
 /** True when a keystroke belongs to something else and must be left alone.
  *
@@ -30,12 +30,19 @@ export type Handlers = Record<string, (e: KeyboardEvent) => void>;
  *  Keys are matched case-insensitively, so `g` covers `G` with caps lock on.
  *  `Shift+R` is written as `shift+r`.
  */
-export function useShortcuts(handlers: Handlers, enabled = true): void {
+export function useShortcuts(
+  handlers: Handlers,
+  enabled = true,
+  /** On the one page (#240) several sections share the keyboard. Given a
+   *  scope, these keys only fire while focus is inside it. */
+  scope?: RefObject<HTMLElement | null>,
+): void {
   useEffect(() => {
     if (!enabled) return;
 
     function onKey(e: KeyboardEvent) {
       if (shouldIgnore(e)) return;
+      if (scope?.current && !scope.current.contains(document.activeElement)) return;
       const key = e.key.toLowerCase();
       // "?" needs Shift on most layouts but is one key to the person pressing
       // it, so it is matched as itself rather than as "shift+?". Some on-screen
@@ -116,7 +123,6 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: '1, 2 or 3', does: 'answer a which-did-you-mean question' },
     { keys: 'Shift R', does: 'read all your work' },
     { keys: 'U', does: 'undo a delete' },
-    { keys: 'P', does: 'show or hide the problem' },
     { keys: 'X', does: 'hand in your work' },
     {
       keys: 'Say or type a command',

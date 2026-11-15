@@ -3,15 +3,13 @@
 // The mode decides what the app may say about a student's work (DESIGN.md 14).
 // None of the three ever solves, hints, or gives a next step.
 
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { announce } from '../components/LiveRegion';
-import { ReadingControls } from '../components/ReadingControls';
 import type { Mode, Settings as SettingsData } from '../state';
 
 export interface SettingsProps {
   settings: SettingsData;
   onChange: (next: SettingsData) => void;
-  onBack: () => void;
 }
 
 export const MODE_INFO: Record<Mode, { name: string; detail: string }> = {
@@ -33,14 +31,9 @@ export const MODE_INFO: Record<Mode, { name: string; detail: string }> = {
 
 const MODES: Mode[] = ['study', 'homework', 'exam'];
 
-export function Settings({ settings, onChange, onBack }: SettingsProps) {
+export function Settings({ settings, onChange }: SettingsProps) {
   const heading = useRef<HTMLHeadingElement>(null);
 
-  useEffect(() => {
-    heading.current?.focus();
-    announce(`Settings. ${MODE_INFO[settings.mode].name} mode is on.`);
-    // Announce once, on arrival.
-  }, []);
 
   function setMode(mode: Mode) {
     onChange({ ...settings, mode });
@@ -48,13 +41,14 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
   }
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
+    <section id="step-settings" aria-labelledby="settings-heading" className="step">
       <h2
         ref={heading}
+        id="settings-heading"
         tabIndex={-1}
-        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="step-title focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
-        Settings
+        Mode
       </h2>
 
       <fieldset className="mt-6">
@@ -87,21 +81,6 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
           ))}
         </div>
       </fieldset>
-
-      <section aria-labelledby="reading-heading" className="mt-8">
-        <h3 id="reading-heading" className="text-lg font-semibold">
-          Reading
-        </h3>
-        <div className="mt-3">
-          <ReadingControls settings={settings} onChange={onChange} />
-        </div>
-      </section>
-
-      {/* "Back" alone says nothing when it is read out with no screen to look
-          at. Every way out of a screen now names where it goes. */}
-      <button type="button" className="btn mt-8" onClick={onBack}>
-        Back to the start
-      </button>
-    </main>
+    </section>
   );
 }

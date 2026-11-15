@@ -47,6 +47,7 @@ export function Problem({
   );
   const [summary, setSummary] = useState('');
   const announced = useRef(false);
+  const section = useRef<HTMLElement>(null);
 
   const lines = problem.lines;
   const current = lines[index];
@@ -155,13 +156,14 @@ export function Problem({
     w: () => void whatChanged(),
     x: onExport,
     u: onNewCapture,
-  });
+  }, true, section);
 
   const unsure = lines.filter((l) => !l.valid).length;
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
-      <h2 className="text-4xl font-medium tracking-tight">Your problem</h2>
+    <section ref={section} id="step-worksheet" aria-labelledby="problem-heading" className="step">
+      <p className="step-number" aria-hidden="true">01</p>
+      <h2 id="problem-heading" tabIndex={-1} className="step-title">Your worksheet</h2>
 
       {problem.instructions && (
         <p className="mt-2 text-lg">
@@ -287,10 +289,10 @@ export function Problem({
 
         <div className="mt-6 border-t border-[--line] pt-4">
           <button type="button" className="btn-quiet" onClick={onNewCapture}>
-            Capture another problem
+            Bring in a different worksheet
           </button>
         </div>
       </div>
-    </main>
+    </section>
   );
 }

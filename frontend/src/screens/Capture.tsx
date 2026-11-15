@@ -29,7 +29,10 @@ interface PendingPdf {
 
 export interface CaptureProps {
   onCaptured: (problem: Problem) => void;
-  onBack: () => void;
+  /** Opens the built-in sample problem. */
+  onSample: () => void;
+  /** Only while a problem is already loaded: keep it instead. */
+  onCancel?: () => void;
 }
 
 /** Turn capture warnings into one spoken, actionable instruction (issue #14).
@@ -45,7 +48,7 @@ export function retakeGuidance(warnings: string[]): string | null {
   return `${first}${ends} Try again when you are ready.`;
 }
 
-export function Capture({ onCaptured, onBack }: CaptureProps) {
+export function Capture({ onCaptured, onSample, onCancel }: CaptureProps) {
   const [busy, setBusy] = useState<Busy>('idle');
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -60,12 +63,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-
-  // Land on the heading so a screen reader reads where it is, not mid-page.
-  useEffect(() => {
-    heading.current?.focus();
-    announce('Capture. Upload a file, paste a screenshot, or take a photo.');
-  }, []);
+  const section = useRef<HTMLElement>(null);
 
   function stopCamera() {
     if (guideTimer.current) window.clearInterval(guideTimer.current);
@@ -305,6 +303,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       c: () => void startCamera(),
     },
     !working && !liveBoard && !cameraStarting,
+    section,
   );
 
   if (liveBoard) {
@@ -316,13 +315,15 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   }
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
+    <section ref={section} id="step-worksheet" aria-labelledby="capture-heading" className="step">
+      <p className="step-number" aria-hidden="true">01</p>
       <h2
         ref={heading}
+        id="capture-heading"
         tabIndex={-1}
-        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="step-title focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
-        Capture a problem
+        Bring in your worksheet
       </h2>
       <p className="mt-2 text-[--muted]">
         Upload a file, press <kbd className="kbd">Ctrl</kbd> or{' '}
@@ -371,13 +372,18 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
         >
           Live board
         </button>
-      </div>
-
-      <div className="mt-6">
-        <button type="button" className="btn-quiet" disabled={working} onClick={onBack}>
-          Back to the start
+        <button type="button" className="btn" disabled={working} onClick={onSample}>
+          Try a sample problem
         </button>
       </div>
+
+      {onCancel && (
+        <div className="mt-6">
+          <button type="button" className="btn-quiet" disabled={working} onClick={onCancel}>
+            Keep my current problem
+          </button>
+        </div>
+      )}
 
       {/* Status is a live region in its own right so the visible text and the
           spoken text can never drift apart. */}
@@ -484,6 +490,6 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
           </ul>
         </section>
       )}
-    </main>
+    </section>
   );
 }

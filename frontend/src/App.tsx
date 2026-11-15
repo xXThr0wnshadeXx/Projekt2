@@ -1,12 +1,14 @@
-// App shell — the M1 core loop (issues #9, #10, #11, #12, #13).
+// App shell: Glance is one page (#240).
 //
-// Home → Capture → Problem, with low-vision mode reachable from the problem.
-// The scratchpad (#18), export (#22) and settings (#21) screens attach here
-// with their own issues.
+// There are no screens to move between. The page reads top to bottom in the
+// order the work happens: bring in the worksheet, hear it, do the work, hand
+// it in. Each part appears in place as soon as it is useful, and the arrow
+// keys walk straight down the page (traverse.ts, #236). Moving between screens
+// was where students got lost: every switch was a place to re-orient, and a
+// screen-reader user had to find their place again each time.
 //
-// There is no router library. Four screens and one piece of state is not a
-// routing problem, and every dependency is one more thing that can break a
-// screen reader in a way we would have to discover ourselves.
+// Low-vision mode is the one exception. It is a full-screen magnifier over the
+// same page, not a different place, and leaving it returns to the same line.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
@@ -16,13 +18,13 @@ import { useTraversal } from './traverse';
 import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
 import { InstallApp } from './components/InstallApp';
+import { ReadingControls } from './components/ReadingControls';
 import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
-import { helpText, useShortcuts } from './shortcuts';
+import { helpText, useShortcuts, type ScreenName } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { spokenMath } from './math/sre';
 import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
-import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
 import { LowVision } from './screens/LowVision';
@@ -38,47 +40,29 @@ import {
   type Settings as SettingsData,
 } from './state';
 
-type Screen =
-  | 'home'
-  | 'capture'
-  | 'problem'
-  | 'lowvision'
-  | 'scratchpad'
-  | 'settings'
-  | 'export';
 type BackEnd = 'checking' | 'up' | 'down';
 
+// Said once when the page opens, so it is one breath long.
+const WELCOME =
+  'Glance. It reads your maths worksheet aloud and writes down your own work as you say it. It never solves it for you. Use the Down arrow to move through the page and Space to press or hear what you are on.';
+
 export function App() {
-  const [screen, setScreen] = useState<Screen>('home');
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
-  const [initialRestore] = useState(() => {
-    const count = loadWork().length || problem?.lines.length;
-    return count === undefined
-      ? ''
-      : `I restored your work from earlier: ${count} ${count === 1 ? 'line' : 'lines'}.`;
-  });
+  // A new worksheet is being brought in while one is already loaded.
+  const [replacing, setReplacing] = useState(false);
+  const [lowVisionOn, setLowVisionOn] = useState(false);
   const [lowVisionFailed, setLowVisionFailed] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
   const [backEndNote, setBackEndNote] = useState('');
   const [settings, setSettings] = useState<SettingsData>(() => loadSettings());
-  // Where to go back to from Settings, and which problem line the student was
-  // on when they started working (their first step is checked against it).
-  const [settingsFrom, setSettingsFrom] = useState<Screen>('home');
+  // The problem line the student's first step follows from.
   const [workingFrom, setWorkingFrom] = useState(0);
 
   useEffect(() => {
     setSelfVoicing(settings.selfVoicing);
   }, [settings.selfVoicing]);
-
-  const restored = useRef(initialRestore);
-  const takeRestoredAnnouncement = useCallback(() => {
-    const announcement = restored.current;
-    restored.current = '';
-    return announcement;
-  }, []);
-  const resumeProblem = useCallback(() => setScreen('problem'), []);
 
   // Every size in the app is in rem, so this one number is large print for
   // all of it — buttons, notes and maths alike.
@@ -93,30 +77,30 @@ export function App() {
     saveSettings(next);
   }
 
-  const [exportFrom, setExportFrom] = useState<Screen>('scratchpad');
-  function openExport(from: Screen) {
-    setExportFrom(from);
-    setScreen('export');
-  }
+  // One greeting on arrival, or what was restored from last time.
+  const greeted = useRef(false);
+  useEffect(() => {
+    if (greeted.current) return;
+    greeted.current = true;
+    const count = loadWork().length || problem?.lines.length;
+    const text = count
+      ? `Glance. I restored your work from earlier: ${count} ${count === 1 ? 'line' : 'lines'}. Use the Down arrow to move through the page and Space to press or hear what you are on.`
+      : WELCOME;
+    const timer = window.setTimeout(() => announce(text), 0);
+    return () => window.clearTimeout(timer);
+  }, [problem]);
 
-  function openSettings() {
-    setSettingsFrom(screen === 'settings' ? 'home' : screen);
-    setScreen('settings');
-  }
   // Keyboard help (#25): `null` when closed, otherwise whether it took focus.
   const [help, setHelp] = useState<null | { takeFocus: boolean }>(null);
+  const helpScreen: ScreenName = problem && !replacing ? 'problem' : 'capture';
 
-  /** "?" anywhere: say this screen's shortcuts and show them. */
+  /** "?" anywhere: say the shortcuts and show them. */
   function showHelp(takeFocus: boolean) {
-    const text = helpText(screen);
-    announce(text);
+    announce(helpText(helpScreen));
     setHelp({ takeFocus });
   }
 
   useShortcuts({ '?': () => showHelp(false) });
-
-  // The list belongs to the screen it was opened on.
-  useEffect(() => setHelp(null), [screen]);
 
   // MathJax is loaded once, up front. Waiting until a problem arrives would
   // put a multi-second script download inside the capture wait.
@@ -148,21 +132,21 @@ export function App() {
       });
   }, []);
 
-  function openProblem(next: ProblemData) {
+  const openProblem = useCallback((next: ProblemData) => {
     setProblem(next);
     saveProblem(next);
     setLineIndex(0);
-    setScreen('problem');
+    setWorkingFrom(0);
+    setReplacing(false);
 
     // A capture announces its own result, in more detail than is possible here
     // — it knows what was unsure and what the photo warnings were. The sample
-    // has no such step, and arriving on a new screen in silence is exactly the
-    // disorientation this app exists to remove, so it is announced here.
+    // has no such step, so it is announced here.
     if (next.source === 'sample') {
       const count = `${next.lines.length} ${next.lines.length === 1 ? 'line' : 'lines'}`;
       announce(`Sample problem. ${next.instructions} ${count}.`.trim());
     }
-  }
+  }, []);
 
   /** A capture is a suggestion, not a fact. Keep the student's correction in
    * their local copy too, so an inaccurate line cannot return after reload. */
@@ -181,10 +165,8 @@ export function App() {
   }
 
   function enterLowVision(index: number) {
-    // Grab MathJax's speech strings while the Problem screen is still mounted.
-    // Low-vision mode's optional self-voicing would otherwise fall back to
-    // "Line 2", which is not worth hearing. These come from the same engine the
-    // explorer uses, so the two read the expression identically.
+    // Grab MathJax's speech strings while the problem is still rendered, so
+    // low-vision mode's optional voice reads the maths, not just "Line 2".
     const spoken: Record<string, string> = {};
     for (const line of problem?.lines ?? []) {
       const label = spokenMath(document.getElementById(line.id));
@@ -193,180 +175,200 @@ export function App() {
     setSpokenLines(spoken);
     setLowVisionFailed(false);
     setLineIndex(index);
-    setScreen('lowvision');
+    setLowVisionOn(true);
   }
 
-  // Low-vision mode takes over the whole screen, so it renders instead of the
-  // normal chrome. `LiveRegion` is deliberately OUTSIDE this choice: if it
-  // unmounted and remounted on the way in or out, the announcement made during
-  // that same switch would be delivered to a component that is going away, and
-  // the student would hear nothing at the exact moment the screen changed.
-  // The whole page by Up/Down and Space, with no scrolling (#236). Low-vision
-  // mode has its own one-line-at-a-time arrows.
-  useTraversal(screen !== 'lowvision');
+  function newWorksheet() {
+    setReplacing(true);
+    announce('Bring in a different worksheet. Your current one stays until the new one is read.');
+    window.setTimeout(() => focusFirst('#capture-heading'), 60);
+  }
 
-  const lowVision = screen === 'lowvision' && problem
-    ? (
-        <LowVision
-          lines={problem.lines}
-          spokenLines={spokenLines}
-          startIndex={lineIndex}
-          onExit={(i) => {
-            setLineIndex(i);
-            setScreen('problem');
-            announce('Left low-vision mode.');
-            window.setTimeout(() => focusFirst(`#${problem.lines[i]?.id ?? 'L1'}`), 60);
-          }}
-        />
-      )
-    : null;
+  function startWorking(index: number) {
+    setWorkingFrom(index);
+    setLineIndex(index);
+    announce(`Your work, following line ${index + 1} of the worksheet. Hold Space to say a line, or type it.`);
+    window.setTimeout(() => focusFirst('#work-heading'), 60);
+  }
 
+  function goToHandIn() {
+    const count = loadWork().length;
+    announce(
+      `Hand in your work. ${count} ${count === 1 ? 'line' : 'lines'} of your work. Download a file, or print it.`,
+    );
+    window.setTimeout(() => focusFirst('#handin-heading'), 60);
+  }
+
+  const lowVision = lowVisionOn && problem;
+
+  // The whole page by Up/Down and Space (#236). Low-vision mode has its own
+  // one-line-at-a-time arrows.
+  useTraversal(!lowVision);
+
+  const showCapture = !problem || replacing;
+
+  // `LiveRegion` stays outside every conditional: if it remounted during a
+  // change, the announcement made at that moment would be lost.
   return (
     <>
       <LiveRegion />
       <div className="min-h-dvh bg-[--bg] text-[--fg]">
-      <div hidden={Boolean(lowVision) && !lowVisionFailed}>
-        {/* A skip link is the first thing a keyboard user needs. */}
-        <a href="#main" className="skip-link">
-          Skip to main content
-        </a>
+        {lowVision && (
+          <ScreenBoundary screen="lowvision" onBackToStart={() => setLowVisionOn(false)} onFailure={setLowVisionFailed}>
+            <LowVision
+              lines={problem.lines}
+              spokenLines={spokenLines}
+              startIndex={lineIndex}
+              onExit={(i) => {
+                setLineIndex(i);
+                setLowVisionOn(false);
+                announce('Left low-vision mode.');
+                window.setTimeout(() => focusFirst(`#${problem.lines[i]?.id ?? 'L1'}`), 60);
+              }}
+            />
+          </ScreenBoundary>
+        )}
 
-        <header className="border-b border-[--line] px-6 py-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="mono inline-flex min-h-[40px] items-center bg-[--accent] px-3 text-xl font-medium text-[--accent-fg]">Glance</h1>
-              <p className="mt-1 text-[--muted]">Math you can hear, explore and write without seeing the page.</p>
-              <div className="mt-2">
-                <ModeBadge mode={settings.mode} />
+        <div hidden={Boolean(lowVision) && !lowVisionFailed}>
+          <a href="#main" className="skip-link">
+            Skip to main content
+          </a>
+
+          <header className="app-bar">
+            <div className="app-bar-inner">
+              <h1 className="mono inline-flex min-h-[40px] items-center bg-[--accent] px-3 text-xl font-medium text-[--accent-fg]">
+                Glance
+              </h1>
+              <ModeBadge mode={settings.mode} />
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn"
+                  aria-expanded={help !== null}
+                  aria-controls="keyboard-help"
+                  aria-keyshortcuts="?"
+                  onClick={() => (help ? setHelp(null) : showHelp(true))}
+                >
+                  Keys
+                </button>
               </div>
             </div>
-            <button
-              type="button"
-              className="btn"
-              aria-expanded={help !== null}
-              aria-controls="keyboard-help"
-              aria-keyshortcuts="?"
-              onClick={() => (help ? setHelp(null) : showHelp(true))}
-            >
-              Keyboard shortcuts
-            </button>
-            <InstallApp />
-          </div>
-        </header>
+          </header>
 
-        {help && (
-          <KeyboardHelp
-            screen={screen}
-            takeFocus={help.takeFocus}
-            onClose={() => {
-              setHelp(null);
-              announce('Shortcuts closed.');
-            }}
-          />
-        )}
+          {help && (
+            <KeyboardHelp
+              screen={helpScreen}
+              takeFocus={help.takeFocus}
+              onClose={() => {
+                setHelp(null);
+                announce('Shortcuts closed.');
+              }}
+            />
+          )}
 
-      </div>
-
-      <ScreenBoundary
-        key={screen}
-        screen={screen}
-        onBackToStart={() => setScreen('home')}
-        onFailure={lowVision ? setLowVisionFailed : undefined}
-      >
-        {lowVision}
-        {screen === 'home' && (
-          <Home
-            onCapture={() => setScreen('capture')}
-            onSample={() => openProblem(sampleProblem())}
-            onResume={problem ? resumeProblem : undefined}
-            takeRestoredAnnouncement={takeRestoredAnnouncement}
-            settings={settings}
-            onSettingsChange={updateSettings}
-            onSettings={openSettings}
-          />
-        )}
-
-        {screen === 'capture' && (
-          <Capture onCaptured={openProblem} onBack={() => setScreen('home')} />
-        )}
-
-        {screen === 'problem' && problem && (
-          <Problem
-            problem={problem}
-            startIndex={lineIndex}
-            onLowVision={enterLowVision}
-            mode={settings.mode}
-            onNewCapture={() => setScreen('capture')}
-            onDiscardLine={discardProblemLine}
-            onStartWorking={(index) => {
-              setWorkingFrom(index);
-              setLineIndex(index);
-              setScreen('scratchpad');
-            }}
-            onExport={() => openExport('problem')}
-          />
-        )}
-
-        {screen === 'scratchpad' && problem && (
-          <Scratchpad
-            problem={problem}
-            mode={settings.mode}
-            startLine={workingFrom}
-            onBack={() => setScreen('problem')}
-            onExport={() => openExport('scratchpad')}
-          />
-        )}
-
-        {screen === 'export' && problem && (
-          <Export problem={problem} onBack={() => setScreen(exportFrom)} />
-        )}
-
-        {screen === 'settings' && (
-          <Settings
-            settings={settings}
-            onChange={updateSettings}
-            onBack={() => setScreen(settingsFrom)}
-          />
-        )}
-
-        {/* Only reachable if storage returned something unusable. */}
-        {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
-          <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
-            <h2 className="text-2xl font-semibold">No problem loaded</h2>
-            <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
-              Back to start
-            </button>
-          </main>
-        )}
-
-      </ScreenBoundary>
-
-      {/* Nothing is said while everything works. A reachable server and the
-          address it lives at are facts for whoever deployed it, not for the
-          student — and read aloud on every screen they are just noise before
-          the content. When it breaks, this says what still works first, and
-          keeps the technical detail for whoever goes looking. */}
-      {!lowVision && backEnd === 'down' && (
-        <footer className="mx-auto max-w-3xl px-6 pb-10 pt-4">
-          <div
-            role="status"
-            data-testid="backend-status"
-            className="rounded-lg border border-[--warn] bg-[--surface] px-4 py-3 text-sm"
-          >
-            <p>
-              Reading new problems is unavailable right now. The sample problem still
-              works — you can explore it, glance at it, write your own work and hand it in.
+          <main id="main" tabIndex={-1} className="page">
+            <p className="lead">
+              Glance reads your maths worksheet aloud and writes down your own work as you say it.{' '}
+              <strong>It never solves it for you.</strong>
             </p>
-            <details className="mt-2 text-[--muted]">
-              <summary className="cursor-pointer">Why</summary>
-              <p className="mt-2">{backEndNote}</p>
-              <p className="mt-1">
-                Server address: <code>{apiBase}</code>
-              </p>
+
+            <ol className="progress" aria-label="Steps">
+              <li data-done={problem ? 'true' : undefined}>Worksheet</li>
+              <li data-done={problem && loadWork().length > 0 ? 'true' : undefined}>Your work</li>
+              <li>Hand in</li>
+            </ol>
+
+            <ScreenBoundary screen="worksheet" onBackToStart={() => setReplacing(false)}>
+              {showCapture && (
+                <Capture
+                  onCaptured={openProblem}
+                  onSample={() => openProblem(sampleProblem())}
+                  onCancel={problem ? () => {
+                    setReplacing(false);
+                    announce('Kept your current worksheet.');
+                    window.setTimeout(() => focusFirst('#problem-heading'), 60);
+                  } : undefined}
+                />
+              )}
+              {problem && !replacing && (
+                <Problem
+                  key={problem.lines.map((l) => l.id).join()}
+                  problem={problem}
+                  startIndex={lineIndex}
+                  onLowVision={enterLowVision}
+                  mode={settings.mode}
+                  onNewCapture={newWorksheet}
+                  onDiscardLine={discardProblemLine}
+                  onStartWorking={startWorking}
+                  onExport={goToHandIn}
+                />
+              )}
+            </ScreenBoundary>
+
+            {problem && (
+              <ScreenBoundary screen="work" onBackToStart={() => focusFirst('#problem-heading')}>
+                <Scratchpad
+                  problem={problem}
+                  mode={settings.mode}
+                  startLine={workingFrom}
+                  onExport={goToHandIn}
+                />
+              </ScreenBoundary>
+            )}
+
+            {problem && (
+              <ScreenBoundary screen="handin" onBackToStart={() => focusFirst('#problem-heading')}>
+                <Export problem={problem} />
+              </ScreenBoundary>
+            )}
+
+            <section aria-labelledby="reading-heading" className="step">
+              <h2 id="reading-heading" className="step-title">How Glance reads to you</h2>
+              <div className="mt-4">
+                <ReadingControls settings={settings} onChange={updateSettings} />
+              </div>
+            </section>
+
+            <details className="step no-print">
+              <summary className="step-title cursor-pointer">More settings</summary>
+              <ScreenBoundary screen="settings" onBackToStart={() => undefined}>
+                <Settings settings={settings} onChange={updateSettings} />
+              </ScreenBoundary>
             </details>
-          </div>
-        </footer>
-      )}
+
+            <div className="mt-10 no-print">
+              <InstallApp />
+            </div>
+
+            <p className="mt-4 text-sm text-[--muted] no-print">
+              Images are sent to the OpenAI API to be read, and are not stored on our
+              server. There are no accounts, and your work stays in this browser.
+            </p>
+
+            {/* Nothing is said while everything works. When it breaks, this
+                says what still works first, and keeps the technical detail for
+                whoever goes looking. */}
+            {backEnd === 'down' && (
+              <div
+                role="status"
+                data-testid="backend-status"
+                className="mt-6 rounded-lg border border-[--warn] bg-[--surface] px-4 py-3 text-sm"
+              >
+                <p>
+                  Reading new problems is unavailable right now. The sample problem still
+                  works — you can explore it, glance at it, write your own work and hand it in.
+                </p>
+                <details className="mt-2 text-[--muted]">
+                  <summary className="cursor-pointer">Why</summary>
+                  <p className="mt-2">{backEndNote}</p>
+                  <p className="mt-1">
+                    Server address: <code>{apiBase}</code>
+                  </p>
+                </details>
+              </div>
+            )}
+          </main>
+        </div>
       </div>
     </>
   );

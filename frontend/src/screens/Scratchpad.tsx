@@ -41,7 +41,6 @@ import { loadWork, saveWork, type Mode, type Problem, type WorkLine } from '../s
 
 export interface ScratchpadProps {
   problem: Problem;
-  onBack: () => void;
   /** Decides whether and how a saved step is checked (DESIGN.md 14). */
   mode: Mode;
   /** The problem line the student was on; their first step follows from it. */
@@ -66,7 +65,7 @@ function newId(): string {
   return `W${nextId}`;
 }
 
-export function Scratchpad({ problem, onBack, mode, startLine, onExport }: ScratchpadProps) {
+export function Scratchpad({ problem, mode, startLine, onExport }: ScratchpadProps) {
   const [lines, setLines] = useState<WorkLine[]>(() => loadWork());
   const [pending, setPending] = useState<Pending | null>(null);
   const [clarify, setClarify] = useState<Clarify | null>(null);
@@ -78,7 +77,6 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   const listener = useRef<HandsFree | null>(null);
   const onUtterance = useRef<(r: Recording) => void>(() => {});
   const [error, setError] = useState('');
-  const [showProblem, setShowProblem] = useState(false);
   // The answer to something the student asked, kept on screen. The live
   // region is heard, not seen, and a low-vision student with no screen reader
   // would otherwise ask a question and watch nothing happen.
@@ -104,9 +102,9 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   // tell whether it is still the news.
   const lastAction = useRef<string>('');
   const heading = useRef<HTMLHeadingElement>(null);
+  const section = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    heading.current?.focus();
     // Say which problem line the work follows from. The first step saved here
     // is checked against the line the student pressed S on, so without this
     // they can get "I couldn't confirm this step" for a correct step and have
@@ -564,20 +562,19 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       h: () => void toggleHandsFree(),
       'shift+r': readAll,
       x: onExport,
-      p: () => {
-        setShowProblem((v) => !v);
-        announce(showProblem ? 'Problem hidden.' : 'Problem shown.');
-      },
     },
     !clarify && !pending,
+    section,
   );
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
+    <section ref={section} id="step-work" aria-labelledby="work-heading" className="step">
+      <p className="step-number" aria-hidden="true">02</p>
       <h2
         ref={heading}
+        id="work-heading"
         tabIndex={-1}
-        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="step-title focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Your work
       </h2>
@@ -591,32 +588,6 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         <p className="mt-4 text-sm text-[--muted]">
           Following line {startLine + 1} of the problem.
         </p>
-      )}
-
-      <div className="mt-2">
-        <button
-          type="button"
-          className="btn"
-          aria-expanded={showProblem}
-          onClick={() => setShowProblem((v) => !v)}
-        >
-          {showProblem ? 'Hide the problem' : 'Show the problem'}
-        </button>
-      </div>
-
-      {showProblem && (
-        <section aria-label="The problem" className="mt-4 space-y-3">
-          {problem.instructions && <p className="text-[--muted]">{problem.instructions}</p>}
-          {problem.lines.map((l, i) => (
-            <MathLine
-              key={l.id}
-              id={`p-${l.id}`}
-              latex={l.latex}
-              label={`Problem line ${i + 1}`}
-              unsure={!l.valid}
-            />
-          ))}
-        </section>
       )}
 
       <section aria-label="Your lines" className="mt-8">
@@ -785,8 +756,12 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
           {/* Named for where it goes, not "back" — "Show the problem" above
               opens it here beside the work, and two controls that both read as
               "the problem" is a guess the student should not have to make. */}
-          <button type="button" className="btn-quiet" onClick={onBack}>
-            Leave and read the problem again
+          <button
+            type="button"
+            className="btn-quiet"
+            onClick={() => focusFirst('#problem-heading')}
+          >
+            Go up to the worksheet
           </button>
         </div>
       </div>
@@ -817,6 +792,6 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
           }}
         />
       )}
-    </main>
+    </section>
   );
 }
