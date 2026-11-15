@@ -631,6 +631,18 @@ header h1 a {
   gap: 0.75rem;
 }
 
+/* First-visit question on the landing (#211): text, not controls. */
+.welcome-ask {
+  margin: 1rem auto 0;
+  max-width: 40rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--accent);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
 /* ---------------------------------------------------------------------------
    Accessibility pass. WCAG 2.1 AAA for text (7:1 or better), 60px targets,
    no thin borders or light weights, 20px body text, a 4px focus ring.
@@ -963,5 +975,16 @@ b {
   .reading-size {
     flex: 1 1 0;
     min-width: 0;
+  }
+}
+
+@layer components {
+  .reading-size {
+    flex-wrap: wrap;
+  }
+  .welcome-ask {
+    margin: 0;
+    border-width: 3px;
+    font-size: 1.4rem;
   }
 }
