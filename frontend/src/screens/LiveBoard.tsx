@@ -198,18 +198,18 @@ export function LiveBoard({ onBack }: { onBack: () => void }) {
         <h3 className="font-semibold">Board lines</h3>
         <ol className="mt-3 space-y-3">
           {lines.map((line, i) => (
-            <li key={line.id} className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <MathLine id={line.id} latex={line.latex} label={'Board line ' + (i + 1)}
-                  unsure={!line.valid} />
-              </div>
+            <li key={line.id} className="relative">
+              <MathLine id={line.id} latex={line.latex} label={'Board line ' + (i + 1)}
+                unsure={!line.valid} />
               <button
                 type="button"
-                className="btn mt-1"
+                className="btn absolute right-3 top-3 min-w-[48px] justify-center px-0 text-2xl leading-none"
                 onClick={() => discardLine(line, i)}
                 aria-label={'Discard board line ' + (i + 1)}
+                title="Discard this line"
               >
-                Discard
+                <span aria-hidden="true">×</span>
+                <span className="sr-only">Discard</span>
               </button>
             </li>
           ))}
