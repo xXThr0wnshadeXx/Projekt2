@@ -227,3 +227,25 @@ mjx-container:focus-visible {
   overflow-x: auto;
   overflow-y: hidden;
 }
+
+/* The line the student is on (#236): highlighted wherever it is, so a
+   low-vision student can see where the keys have taken them. */
+.glance-current {
+  outline: 4px solid var(--accent) !important;
+  outline-offset: 4px;
+}
+/* A tint behind every line of text and maths, but not controls: on a button
+   it would fight the button's own colours and make its label hard to read. */
+.glance-current:not(button, a, input, select, textarea, summary, [role='button']) {
+  background-color: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* No scrolling on keyboard devices (#236): the arrow keys move through the
+   page and the app keeps the current line in view. Touch devices keep
+   scrolling, since they have no arrow keys. */
+@media (hover: hover) and (pointer: fine) {
+  html,
+  body {
+    overflow: hidden;
+  }
+}

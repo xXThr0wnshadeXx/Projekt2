@@ -207,12 +207,14 @@ export function RecordButton({ onResult, onError, disabled = false, onTap }: Rec
       else recorder.current?.stop();
     }
 
-    window.addEventListener('keydown', onDown);
-    window.addEventListener('keyup', onUp);
+    // Capture phase, so this runs before the page-wide keys (#236) and a held
+    // Space records instead of reading.
+    window.addEventListener('keydown', onDown, true);
+    window.addEventListener('keyup', onUp, true);
     window.addEventListener('blur', onBlur);
     return () => {
-      window.removeEventListener('keydown', onDown);
-      window.removeEventListener('keyup', onUp);
+      window.removeEventListener('keydown', onDown, true);
+      window.removeEventListener('keyup', onUp, true);
       window.removeEventListener('blur', onBlur);
     };
   });
