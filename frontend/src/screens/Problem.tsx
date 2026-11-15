@@ -9,7 +9,7 @@
 // Nothing here solves, hints, or checks the student's answer, in any mode.
 
 import { useEffect, useRef, useState } from 'react';
-import { announce, focusFirst } from '../components/LiveRegion';
+import { announce, announceMove, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
 import { spokenMath, structureSummary } from '../math/sre';
 import { useShortcuts } from '../shortcuts';
@@ -64,13 +64,13 @@ export function Problem({
     if (lines.length === 0) return;
     const clamped = Math.max(0, Math.min(lines.length - 1, next));
     if (clamped === index && label !== 'same') {
-      announce(next < 0 ? 'This is the first line.' : 'This is the last line.');
+      announceMove(next < 0 ? 'This is the first line.' : 'This is the last line.');
       return;
     }
     setIndex(clamped);
     setSummary('');
     focusFirst(`#${lines[clamped].id}`);
-    announce(`Line ${clamped + 1} of ${lines.length}.`);
+    announceMove(`Line ${clamped + 1} of ${lines.length}.`);
   }
 
   /** The glance. Structure only — never the contents, never a solution. */

@@ -30,7 +30,16 @@ export function isSupported(): boolean {
 }
 
 export function cancel(): void {
-  if (isSupported()) window.speechSynthesis.cancel();
+  // Only while something is being said: in Chrome, a cancel() followed at
+  // once by speak() can drop or restart the new line, which sounds like the
+  // voice stuttering.
+  if (isSupported() && isBusy()) window.speechSynthesis.cancel();
+}
+
+function isBusy(): boolean {
+  const s = window.speechSynthesis;
+  // A stand-in engine in a test may not report state; treat unknown as busy.
+  return s.speaking !== false || s.pending !== false;
 }
 
 function utter(text: string, rate: number): void {
