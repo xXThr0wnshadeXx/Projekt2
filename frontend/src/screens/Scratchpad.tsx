@@ -29,10 +29,13 @@ import {
 } from '../api';
 import { readTyped } from '../math/typed';
 import { speechFor } from '../math/sre';
-import { applyEdit, lineNumber, looksLikeCommand } from '../commands';
+import { applyEdit, asksForCorrection, EDIT_REFUSAL, lineNumber, looksLikeCommand } from '../commands';
 import { SAYS, stripFiller, understandTalk, type Talk } from '../talk';
 import { helpText, useShortcuts } from '../shortcuts';
+import { readAloud, useLineKeys } from '../lineKeys';
 import type { Recording } from '../audio/recorder';
+import { HandsFree } from '../audio/handsFree';
+import { cancel as stopSpeaking } from '../audio/tts';
 import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
 import { loadWork, saveWork, type Mode, type Problem, type WorkLine } from '../state';
 
@@ -69,6 +72,11 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   const [clarify, setClarify] = useState<Clarify | null>(null);
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
+  // Hands-free dictation (#183). The HandsFree object lives for the screen;
+  // its events call whatever handler is current, so they never see stale state.
+  const [handsFree, setHandsFree] = useState(false);
+  const listener = useRef<HandsFree | null>(null);
+  const onUtterance = useRef<(r: Recording) => void>(() => {});
   const [error, setError] = useState('');
   const [showProblem, setShowProblem] = useState(false);
   // The answer to something the student asked, kept on screen. The live
@@ -223,6 +231,74 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     }
   }
 
+  // Said while a line is waiting to be confirmed, hands-free.
+  const SAYS_YES = /^(?:yes|yeah|yep|save|save it|that's right|that is right|correct|confirm|keep it)$/i;
+  const SAYS_NO = /^(?:no|nope|discard|discard it|scratch that|delete that|cancel)$/i;
+  const STOP_LISTENING = /^(?:stop listening|stop hands[- ]free|hands[- ]free off|that's all|that is all)$/i;
+
+  onUtterance.current = async (recording: Recording) => {
+    const hf = listener.current;
+    if (!hf) return;
+    hf.paused = true;
+    setBusy(true);
+    setError('');
+    try {
+      const { text } = await transcribe(recording.blob, recording.contentType);
+      const said = stripFiller(text).trim().replace(/[.!?]+$/, '');
+      if (!said) return;
+      if (STOP_LISTENING.test(said)) {
+        toggleHandsFree(false);
+        return;
+      }
+      // A line waiting for "Enter to save" can be confirmed by voice.
+      if (pending && SAYS_YES.test(said)) {
+        await savePending(pending);
+        return;
+      }
+      if (pending && SAYS_NO.test(said)) {
+        setPending(null);
+        setEditTarget(null);
+        announce('Discarded.');
+        return;
+      }
+      // Anything else while a line waits is the corrected line.
+      if (pending) setPending(null);
+      await handleText(text);
+    } catch (e: unknown) {
+      fail(e instanceof ApiFailure ? e.message : 'I could not hear that. Say it again, or type your line.');
+    } finally {
+      hf.paused = false;
+      setBusy(false);
+    }
+  };
+
+  async function toggleHandsFree(on = !handsFree) {
+    if (!on) {
+      listener.current?.stop();
+      listener.current = null;
+      setHandsFree(false);
+      announce('Hands-free is off.');
+      return;
+    }
+    const hf = new HandsFree({
+      // When the student starts talking, Glance stops talking.
+      onSpeechStart: () => stopSpeaking(),
+      onUtterance: (r) => void onUtterance.current(r),
+      onError: fail,
+    });
+    try {
+      await hf.start();
+    } catch (e: unknown) {
+      fail(e instanceof Error ? e.message : 'I could not start listening.');
+      return;
+    }
+    listener.current = hf;
+    setHandsFree(true);
+    announce('Hands-free is on. Just talk, and I will write down your line. When I read it back, say yes to save it or no to discard it. Say stop listening to stop.');
+  }
+
+  useEffect(() => () => listener.current?.stop(), []);
+
   async function savePending(line: Pending) {
     const entry: WorkLine = { id: newId(), ...line };
     // An edit (#24) replaces its line in place; anything else is appended.
@@ -309,6 +385,13 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     }
     // "Uh, okay, two x equals eight" is the line "two x equals eight".
     const text = stripFiller(heard);
+    if (asksForCorrection(text)) {
+      lastAction.current = 'talk';
+      setError('');
+      setReply(EDIT_REFUSAL);
+      announce(EDIT_REFUSAL);
+      return;
+    }
     if (looksLikeCommand(text)) await runCommand(text);
     else await interpret(text);
   }
@@ -389,6 +472,11 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       setBusy(false);
     }
 
+    if (result.message) {
+      setReply(result.message);
+      announce(result.message);
+      return;
+    }
     const n = lineNumber(result.target_line);
     const target = n !== null ? lines[n - 1] : undefined;
     const needsLine = ['navigate', 'delete', 'edit', 'check', 'what_changed'].includes(result.intent)
@@ -480,11 +568,53 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     announce(lines.map((l, i) => `Line ${i + 1}. ${l.readback}.`).join(' '));
   }
 
+  // Arrows move through your own lines and a tap of Space reads one (#236).
+  function moveWork(delta: number) {
+    if (lines.length === 0) {
+      announce('You have not written any lines yet.');
+      return;
+    }
+    const from = current ?? (delta > 0 ? -1 : lines.length);
+    const to = from + delta;
+    if (to < 0) {
+      announce('This is your first line.');
+      return;
+    }
+    if (to >= lines.length) {
+      announce('This is your last line.');
+      return;
+    }
+    setCurrent(to);
+    focusFirst(`#${lines[to].id}`);
+    announce(`Your line ${to + 1} of ${lines.length}.`);
+  }
+
+  async function readCurrent() {
+    if (lines.length === 0) {
+      const followed = problem.lines[startLine] ?? problem.lines[0];
+      const spoken = followed ? await speechFor(followed.latex) : null;
+      readAloud(
+        followed
+          ? `You have not written any lines yet. Problem line ${startLine + 1}. ${spoken || followed.latex}.`
+          : 'You have not written any lines yet.',
+      );
+      return;
+    }
+    const i = current ?? lines.length - 1;
+    readAloud(`Your line ${i + 1}. ${lines[i].readback}.`);
+  }
+
+  useLineKeys(
+    { previous: () => moveWork(-1), next: () => moveWork(1), read: () => void readCurrent() },
+    !clarify && !pending,
+  );
+
   // Shortcuts are suspended while a dialog or the readback bar owns the
   // keyboard, so Enter and the number keys mean what they say there.
   useShortcuts(
     {
       u: undo,
+      h: () => void toggleHandsFree(),
       'shift+r': readAll,
       x: onExport,
       p: () => {
@@ -500,7 +630,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Your work
       </h2>
@@ -600,9 +730,25 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         />
       )}
 
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn"
+          aria-pressed={handsFree}
+          onClick={() => void toggleHandsFree()}
+        >
+          Hands-free: {handsFree ? 'on' : 'off'}
+        </button>
+        {handsFree && (
+          <p className="font-semibold" data-testid="listening">
+            Listening. Just talk.
+          </p>
+        )}
+      </div>
+
       {!pending && (
         <section aria-label="Add a line" className="mt-8 border-t border-[--line] pt-6">
-          <RecordButton onResult={onRecording} onError={fail} disabled={busy} />
+          <RecordButton onResult={onRecording} onError={fail} disabled={busy} onTap={() => void readCurrent()} />
 
           <form
             className="mt-5"
