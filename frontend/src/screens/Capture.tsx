@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
 import { capture, ApiFailure, CAPTURE_TYPES } from '../api';
 import { downscale, sharpestFrame } from '../image';
+import { useShortcuts } from '../shortcuts';
 import type { Problem } from '../state';
 
 type Busy = 'idle' | 'preparing' | 'reading';
@@ -199,6 +200,15 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   }
 
   const working = busy !== 'idle';
+
+  // DESIGN.md 12: U uploads, C opens the camera. Paste is handled above.
+  useShortcuts(
+    {
+      u: () => fileInput.current?.click(),
+      c: () => void startCamera(),
+    },
+    !working,
+  );
 
   return (
     <main id="main" className="mx-auto max-w-3xl px-6 py-8">
