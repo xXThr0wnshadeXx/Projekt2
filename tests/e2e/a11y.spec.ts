@@ -90,6 +90,21 @@ for (const scheme of ['dark', 'light'] as const) {
       await expectNoSeriousViolations(page, 'capture after camera');
     });
 
+    test('capture, asking which page of a PDF', async ({ page }) => {
+      await page.route('**/api/pdf/pages', (r) =>
+        r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ pages: 3 }) }),
+      );
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Capture a problem' }).click();
+      await page.locator('input[type=file]').setInputFiles({
+        name: 'worksheet.pdf',
+        mimeType: 'application/pdf',
+        buffer: Buffer.from('%PDF-1.7\n%stub\n'),
+      });
+      await expect(page.getByTestId('live-polite')).toContainText('This PDF has 3 pages');
+      await expectNoSeriousViolations(page, 'capture PDF page choice');
+    });
+
     test('problem, with an unsure line, a diagram and a photo warning', async ({ page }) => {
       await openProblem(page);
       await page.keyboard.press('g');
