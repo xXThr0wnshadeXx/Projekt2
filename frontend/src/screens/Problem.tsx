@@ -58,7 +58,12 @@ export function Problem({
   useEffect(() => {
     if (announced.current || lines.length === 0) return;
     announced.current = true;
-    window.setTimeout(() => focusFirst(`#${(lines[index] ?? lines[0]).id}`), 80);
+    window.setTimeout(() => {
+      // A part of the page that failed has put focus on its recovery message;
+      // that matters more than landing on line 1.
+      if (document.activeElement?.closest('[aria-labelledby="recovery-title"]')) return;
+      focusFirst(`#${(lines[index] ?? lines[0]).id}`);
+    }, 80);
   }, [lines]);
 
   function goTo(next: number, label: string) {

@@ -128,6 +128,7 @@ test.describe('@smoke talking to Glance', () => {
 
     await say(page, '2x = 8');
     await expect(polite(page)).toContainText('I read:');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(polite(page)).toContainText('Saved as line 1.');
 

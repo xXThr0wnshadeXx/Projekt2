@@ -233,6 +233,8 @@ test.describe('@smoke scratchpad', () => {
     await page.getByLabel('Or type your line').fill('x plus one over two');
     await page.getByRole('button', { name: 'Add line' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
+    // Its key handler binds with its focus; an Escape sent sooner lands nowhere.
+    await expect(page.getByRole('dialog').getByRole('button').first()).toBeFocused();
 
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toBeHidden();

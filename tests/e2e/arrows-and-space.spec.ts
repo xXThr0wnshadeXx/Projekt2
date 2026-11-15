@@ -184,6 +184,8 @@ test.describe('@smoke arrows and space on the scratchpad', () => {
       await page.getByLabel('Or type your line').fill(line);
       await page.keyboard.press('Enter');
       await expect(polite(page)).toContainText('I read:');
+      // Focus moves to Save a moment after the readback appears; Enter only means "save" there.
+      await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(polite(page)).toContainText('Saved as line');
     }

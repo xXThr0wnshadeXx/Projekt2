@@ -104,6 +104,7 @@ test.describe('@smoke without a model', () => {
 
     await typeLine(page, 'x = 3 = y');
     await expect(polite(page)).toContainText('I read:');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(polite(page)).toHaveText('Saved as line 1. I could not check it.');
     await expect(page.getByRole('group', { name: 'Your line 1, unsure' })).toBeVisible();
@@ -116,6 +117,7 @@ test.describe('@smoke without a model', () => {
 
     await typeLine(page, '2x = 8');
     await expect(polite(page)).toContainText('I read:');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(polite(page)).toHaveText('Saved as line 1.');
     await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
@@ -146,6 +148,7 @@ test.describe('@smoke without a model', () => {
     for (const line of ['2x = 8', 'x = 4']) {
       await typeLine(page, line);
       await expect(polite(page)).toContainText('I read:');
+      await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(polite(page)).toContainText('Saved as line');
     }

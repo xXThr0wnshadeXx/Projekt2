@@ -43,8 +43,11 @@ test.describe('@smoke without the model', () => {
 
       test('the capture shortcut explains instead of opening', async ({ page }) => {
         await expect(page.getByRole('button', { name: CAPTURE_UNAVAILABLE })).toBeVisible();
-        await page.keyboard.press('u');
-        await expect(polite(page)).toContainText('Capture is unavailable right now.');
+        // The key handler rebinds a moment after the label changes; press until it answers.
+        await expect(async () => {
+          await page.keyboard.press('u');
+          await expect(polite(page)).toContainText('Capture is unavailable right now.', { timeout: 500 });
+        }).toPass();
         await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toHaveCount(0);
       });
 
@@ -125,6 +128,12 @@ test.describe('@smoke health is asked again', () => {
 
     models = true;
     await openScratchpad(page);
-    await expect(page.getByTestId('record-button')).toBeVisible();
+    // Recording is offered again. Where the browser cannot record at all
+    // (headless WebKit), it says so in place of the button; either way the
+    // "unavailable right now" notice is gone.
+    await expect(page.getByTestId('speech-unavailable')).toHaveCount(0);
+    await expect(
+      page.getByTestId('record-button').or(page.getByText('This browser cannot record audio.')),
+    ).toBeVisible();
   });
 });

@@ -278,7 +278,9 @@ export function App() {
     setWorkingFrom(index);
     setLineIndex(index);
     announce(`Your work, following line ${index + 1} of the worksheet. ${modelsUsable ? 'Hold Space to say a line, or type it.' : 'Type a line.'}`);
-    window.setTimeout(() => focusFirst('#work-heading'), 60);
+    // The section is already on the page, so focus moves now. A delayed move
+    // could take focus back from a student who had started typing.
+    focusFirst('#work-heading');
   }
 
   function goToHandIn() {
@@ -286,7 +288,7 @@ export function App() {
     announce(
       `Hand in your work. ${count} ${count === 1 ? 'line' : 'lines'} of your work. Download a file, or print it.`,
     );
-    window.setTimeout(() => focusFirst('#handin-heading'), 60);
+    focusFirst('#handin-heading');
   }
 
   const lowVision = lowVisionOn && problem;
