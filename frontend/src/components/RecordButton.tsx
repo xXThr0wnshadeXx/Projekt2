@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Recorder, isSupported, type Recording } from '../audio/recorder';
 import { announce } from './LiveRegion';
 import { shouldIgnore } from '../shortcuts';
+import { isPressable } from '../lineKeys';
 
 /** Said before the browser asks for the microphone, so the prompt is expected. */
 export const MIC_EXPLAINED =
@@ -28,7 +29,12 @@ export interface RecordButtonProps {
   onError: (message: string) => void;
   /** Blocked while a previous line is still being transcribed. */
   disabled?: boolean;
+  /** A short tap of Space, as opposed to holding it to record (#236). */
+  onTap?: () => void;
 }
+
+/** Held this long, Space records; released sooner, it was a tap (#236). */
+export const HOLD_MS = 350;
 
 /** True when this is a touch device, where hold-to-talk must not be used. */
 export function prefersTapToggle(): boolean {
@@ -39,7 +45,9 @@ export function prefersTapToggle(): boolean {
   );
 }
 
-export function RecordButton({ onResult, onError, disabled = false }: RecordButtonProps) {
+export function RecordButton({ onResult, onError, disabled = false, onTap }: RecordButtonProps) {
+  const onTapRef = useRef(onTap);
+  onTapRef.current = onTap;
   const [recording, setRecording] = useState(false);
   const recorder = useRef<Recorder | null>(null);
   const busy = useRef(false);
@@ -108,20 +116,48 @@ export function RecordButton({ onResult, onError, disabled = false }: RecordButt
   useEffect(() => {
     if (tapToggle.current) return;
 
+    // Tap or hold (#236): a short tap reads the current line, holding records.
+    // Recording starts once the key has been held for HOLD_MS.
+    let holdTimer: number | null = null;
+    let held = false;
+    const ours = (e: KeyboardEvent) =>
+      e.code === 'Space' &&
+      !shouldIgnore(e) &&
+      // Space presses a focused button. Only the record button's own press
+      // is taken over, since it would otherwise toggle recording back off.
+      (!isPressable(e.target) || (e.target as Element).closest('[data-testid="record-button"]') !== null);
+
     function onDown(e: KeyboardEvent) {
-      if (e.code !== 'Space' || e.repeat || shouldIgnore(e)) return;
-      // Space on a focused button would otherwise also click it, which would
-      // immediately toggle recording back off.
+      if (!ours(e)) return;
       e.preventDefault();
-      void start();
+      if (e.repeat || holdTimer !== null || held) return;
+      holdTimer = window.setTimeout(() => {
+        holdTimer = null;
+        held = true;
+        void start();
+      }, HOLD_MS);
     }
     function onUp(e: KeyboardEvent) {
-      if (e.code !== 'Space' || shouldIgnore(e)) return;
+      if (!ours(e)) return;
       e.preventDefault();
-      void stop();
+      if (holdTimer !== null) {
+        window.clearTimeout(holdTimer);
+        holdTimer = null;
+        onTapRef.current?.();
+        return;
+      }
+      if (held) {
+        held = false;
+        void stop();
+      }
     }
     // Releasing the key outside the window would otherwise leave it recording.
     function onBlur() {
+      if (holdTimer !== null) {
+        window.clearTimeout(holdTimer);
+        holdTimer = null;
+      }
+      held = false;
       if (recorder.current?.recording) void stop();
     }
 
