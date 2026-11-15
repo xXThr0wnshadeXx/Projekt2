@@ -91,6 +91,33 @@ body {
            bg-[--surface] px-5 text-base font-medium text-[--fg]
            hover:border-[--accent];
   }
+  /* Low-vision controls. Sized generously and drawn from the active theme, so
+     they stay AAA whichever pairing is chosen. */
+  .lv-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 56px;
+    padding: 0 1.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    border: 3px solid var(--lv-fg);
+    border-radius: 0.5rem;
+    background: var(--lv-bg);
+    color: var(--lv-fg);
+  }
+  .lv-btn:hover:not(:disabled) {
+    background: var(--lv-fg);
+    color: var(--lv-bg);
+  }
+  .lv-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .lv-btn:focus-visible {
+    outline: 4px solid var(--lv-accent);
+    outline-offset: 3px;
+  }
+
   .kbd {
     @apply rounded border border-[--line] bg-[--surface] px-1.5 py-0.5 font-mono text-sm;
   }
