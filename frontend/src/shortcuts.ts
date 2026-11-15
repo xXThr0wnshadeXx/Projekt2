@@ -66,7 +66,8 @@ export type ScreenName =
   | 'problem'
   | 'scratchpad'
   | 'lowvision'
-  | 'settings';
+  | 'settings'
+  | 'export';
 
 export interface Shortcut {
   /** How the key is said and shown, e.g. "Shift R". */
@@ -95,6 +96,7 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'L', does: 'low-vision mode' },
     { keys: 'S', does: 'start working' },
     { keys: 'U', does: 'capture another problem' },
+    { keys: 'X', does: 'hand in your work' },
     HELP,
   ],
   scratchpad: [
@@ -106,12 +108,14 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'Shift R', does: 'read all your work' },
     { keys: 'U', does: 'undo a delete' },
     { keys: 'P', does: 'show or hide the problem' },
+    { keys: 'X', does: 'hand in your work' },
     HELP,
   ],
   settings: [
     { keys: 'Arrow keys', does: 'choose a mode once you are on the mode list' },
     HELP,
   ],
+  export: [{ keys: 'D', does: 'download the accessible HTML file' }, HELP],
   lowvision: [
     { keys: 'Right or Down arrow', does: 'next line' },
     { keys: 'Left or Up arrow', does: 'previous line' },
