@@ -90,10 +90,17 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
 
   useEffect(() => {
     heading.current?.focus();
+    // Say which problem line the work follows from. The first step saved here
+    // is checked against the line the student pressed S on, so without this
+    // they can get "I couldn't confirm this step" for a correct step and have
+    // no way to tell why — they were working from a line they had forgotten
+    // they were on. Nobody can see which line is pinned; it has to be said.
+    const following =
+      problem.lines.length > 1 ? ` Following line ${startLine + 1} of the problem.` : '';
     announce(
       lines.length
-        ? `Your work. ${lines.length} ${lines.length === 1 ? 'line' : 'lines'} so far.`
-        : 'Your work. Record a line, or type one.',
+        ? `Your work.${following} ${lines.length} ${lines.length === 1 ? 'line' : 'lines'} so far.`
+        : `Your work.${following} Record a line, or type one.`,
     );
   }, []);
 
@@ -354,7 +361,16 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
 
       {/* The problem stays within reach but collapsed, so it does not sit
           between the student and the thing they came here to do. */}
-      <div className="mt-4">
+      {/* On screen as well as announced: a low-vision student reading the page
+          without a screen reader needs the same context, and it is the line
+          their first step is checked against. */}
+      {problem.lines.length > 1 && (
+        <p className="mt-4 text-sm text-[--muted]">
+          Following line {startLine + 1} of the problem.
+        </p>
+      )}
+
+      <div className="mt-2">
         <button
           type="button"
           className="btn"

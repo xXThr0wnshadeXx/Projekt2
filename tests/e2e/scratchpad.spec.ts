@@ -258,3 +258,30 @@ test.describe('@smoke scratchpad', () => {
     }
   });
 });
+
+test.describe('@smoke scratchpad context', () => {
+  test('the student is told which problem line their work follows', async ({ page }) => {
+    await stubSpoken(page, CLEAR);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Try a sample problem' }).click();
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+
+    // Move to line 2, then start working from there. Since #92 the first saved
+    // line is checked against the line S was pressed on, so a student who does
+    // not know which line that is gets "I couldn't confirm this step" for a
+    // correct step and no way to work out why.
+    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.keyboard.press('s');
+
+    await expect(page.getByRole('heading', { name: 'Your work' })).toBeFocused();
+    await expect(page.getByTestId('live-polite')).toContainText(
+      'Following line 2 of the problem',
+    );
+    // And on screen, for a low-vision student not running a screen reader.
+    // Scoped to main: the same sentence is also in the live region, which is
+    // visually hidden, so an unscoped match is ambiguous.
+    await expect(
+      page.getByRole('main').getByText('Following line 2 of the problem.'),
+    ).toBeVisible();
+  });
+});
