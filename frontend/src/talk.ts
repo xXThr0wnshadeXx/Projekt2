@@ -84,7 +84,7 @@ export const GLOSSARY: [RegExp, string, string][] = [
   [/\bmonomials?\b/, 'monomial', 'A monomial is a polynomial with one term.'],
   [/\bbinomials?\b/, 'binomial', 'A binomial is a polynomial with two terms.'],
   [/\btrinomials?\b/, 'trinomial', 'A trinomial is a polynomial with three terms.'],
-  [/\bdegrees?\b/, 'degree', 'The degree of a polynomial is the largest exponent on a variable in any one of its terms.'],
+  [/\bdegrees?\b/, 'degree', 'A degree is the unit angles are measured in. A full turn is three hundred and sixty degrees. The degree of a polynomial is its largest exponent on a variable in any one term.'],
   [/\broots?\b/, 'root', 'A root of an equation is a value that makes the equation true.'],
   [/\bsolutions?\b/, 'solution', 'A solution is a value that makes an equation or inequality true.'],
   [/\bidentit(?:y|ies)\b/, 'identity', 'An identity is an equation that is true for every allowed value of its variables.'],
