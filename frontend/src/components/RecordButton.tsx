@@ -39,37 +39,47 @@ export function RecordButton({ onResult, onError, disabled = false }: RecordButt
   const [recording, setRecording] = useState(false);
   const recorder = useRef<Recorder | null>(null);
   const busy = useRef(false);
+  const holdingSpace = useRef(false);
   const tapToggle = useRef(prefersTapToggle());
 
   useEffect(() => {
     const r = new Recorder();
     r.onCapped = () => announce('That is the longest line I can take. Stopping there.');
     recorder.current = r;
-    return () => r.cancel();
+    return () => {
+      recorder.current = null;
+      r.cancel();
+    };
   }, []);
 
+  useEffect(() => {
+    const r = recorder.current;
+    if (!r) return;
+    r.onResult = (result) => {
+      setRecording(false);
+      onResult(result);
+    };
+    r.onError = (message) => {
+      setRecording(false);
+      onError(message);
+    };
+  }, [onResult, onError]);
+
   async function start() {
-    if (busy.current || disabled || recording) return;
+    const r = recorder.current;
+    if (!r || busy.current || disabled || recording) return;
     busy.current = true;
     try {
-      await recorder.current?.start();
+      const started = await r.start();
+      if (!started || recorder.current !== r) return;
       setRecording(true);
       announce('Recording. Speak your line.', 'assertive');
     } catch (e: unknown) {
-      onError(e instanceof Error ? e.message : 'Could not start recording.');
+      if (recorder.current === r) {
+        onError(e instanceof Error ? e.message : 'Could not start recording.');
+      }
     } finally {
       busy.current = false;
-    }
-  }
-
-  async function stop() {
-    if (!recorder.current?.recording) return;
-    setRecording(false);
-    try {
-      const result = await recorder.current.stop();
-      onResult(result);
-    } catch (e: unknown) {
-      onError(e instanceof Error ? e.message : 'Nothing was recorded.');
     }
   }
 
@@ -79,20 +89,33 @@ export function RecordButton({ onResult, onError, disabled = false }: RecordButt
     if (tapToggle.current) return;
 
     function onDown(e: KeyboardEvent) {
-      if (e.code !== 'Space' || e.repeat || shouldIgnore(e)) return;
+      if (e.code !== 'Space' || shouldIgnore(e)) return;
       // Space on a focused button would otherwise also click it, which would
       // immediately toggle recording back off.
       e.preventDefault();
+      if (e.repeat || busy.current || disabled || recording) return;
+      holdingSpace.current = true;
       void start();
     }
+    function finishHold() {
+      holdingSpace.current = false;
+      const r = recorder.current;
+      if (r?.recording) {
+        r.stop();
+      } else if (r && busy.current) {
+        r.cancel();
+        announce('Recording did not start. Hold Space again when you are ready.');
+      }
+    }
     function onUp(e: KeyboardEvent) {
-      if (e.code !== 'Space' || shouldIgnore(e)) return;
+      if (e.code !== 'Space' || !holdingSpace.current) return;
       e.preventDefault();
-      void stop();
+      finishHold();
     }
     // Releasing the key outside the window would otherwise leave it recording.
     function onBlur() {
-      if (recorder.current?.recording) void stop();
+      if (holdingSpace.current) finishHold();
+      else recorder.current?.stop();
     }
 
     window.addEventListener('keydown', onDown);
@@ -126,7 +149,7 @@ export function RecordButton({ onResult, onError, disabled = false }: RecordButt
         onClick={() => {
           // Click is the tap-toggle path, and also what a screen reader sends
           // when it activates the button on either platform.
-          if (recording) void stop();
+          if (recording) recorder.current?.stop();
           else void start();
         }}
       >
