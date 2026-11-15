@@ -45,6 +45,14 @@ type Screen =
   | 'export';
 type BackEnd = 'checking' | 'up' | 'down';
 
+/** The last line the student discarded, kept so the discard can be undone. */
+interface Discarded {
+  line: ProblemData['lines'][number];
+  index: number;
+  workingFrom: number;
+  lineIndex: number;
+}
+
 export function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
@@ -57,6 +65,7 @@ export function App() {
   // on when they started working (their first step is checked against it).
   const [settingsFrom, setSettingsFrom] = useState<Screen>('home');
   const [workingFrom, setWorkingFrom] = useState(0);
+  const [discarded, setDiscarded] = useState<Discarded | null>(null);
 
   useEffect(() => {
     setSelfVoicing(settings.selfVoicing);
@@ -131,6 +140,7 @@ export function App() {
   }, []);
 
   function openProblem(next: ProblemData) {
+    setDiscarded(null);
     setProblem(next);
     saveProblem(next);
     setLineIndex(0);
@@ -147,19 +157,46 @@ export function App() {
   }
 
   /** A capture is a suggestion, not a fact. Keep the student's correction in
-   * their local copy too, so an inaccurate line cannot return after reload. */
+   * their local copy too, so an inaccurate line cannot return after reload.
+   *
+   * A discard can be undone: the button sits right after each line in the
+   * Tab order, so one stray Enter must not lose a line for good. The line, its
+   * place, and the student's place in the problem and the scratchpad are all
+   * kept, so "Put it back" restores exactly what was there. */
   function discardProblemLine(id: string) {
-    setProblem((current) => {
-      if (!current || !current.lines.some((line) => line.id === id)) return current;
-      const next = { ...current, lines: current.lines.filter((line) => line.id !== id) };
-      saveProblem(next);
-      return next;
-    });
+    if (!problem) return;
+    const index = problem.lines.findIndex((line) => line.id === id);
+    if (index < 0) return;
+    const next = { ...problem, lines: problem.lines.filter((line) => line.id !== id) };
+    setDiscarded({ line: problem.lines[index], index, workingFrom, lineIndex });
+    setProblem(next);
+    saveProblem(next);
+    // Indexes after the removed line move up one, so the scratchpad's
+    // starting line and the low-vision line still point at the same maths.
+    const last = Math.max(0, next.lines.length - 1);
+    const follow = (at: number) => Math.min(at > index ? at - 1 : at, last);
+    setWorkingFrom(follow);
+    setLineIndex(follow);
     setSpokenLines((current) => {
-      const next = { ...current };
-      delete next[id];
-      return next;
+      const copy = { ...current };
+      delete copy[id];
+      return copy;
     });
+  }
+
+  /** Undo the last discard, putting the line back where it was. */
+  function restoreProblemLine(): number | null {
+    if (!problem || !discarded) return null;
+    const lines = [...problem.lines];
+    const at = Math.min(discarded.index, lines.length);
+    lines.splice(at, 0, discarded.line);
+    const next = { ...problem, lines };
+    setProblem(next);
+    saveProblem(next);
+    setWorkingFrom(discarded.workingFrom);
+    setLineIndex(discarded.lineIndex);
+    setDiscarded(null);
+    return at;
   }
 
   function enterLowVision(index: number) {
@@ -269,6 +306,8 @@ export function App() {
           mode={settings.mode}
           onNewCapture={() => setScreen('capture')}
           onDiscardLine={discardProblemLine}
+          discardedIndex={discarded?.index ?? null}
+          onRestoreLine={restoreProblemLine}
           onStartWorking={(index) => {
             setWorkingFrom(index);
             setLineIndex(index);

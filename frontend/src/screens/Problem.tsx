@@ -22,6 +22,10 @@ export interface ProblemProps {
   onNewCapture: () => void;
   /** Removes a line the capture got wrong; capture output is never immutable. */
   onDiscardLine: (id: string) => void;
+  /** Where the last discarded line was, while it can still be put back. */
+  discardedIndex?: number | null;
+  /** Puts the last discarded line back; returns where it went. */
+  onRestoreLine?: () => number | null;
   /** Called with the line the student was on, which their first step follows. */
   onStartWorking: (index: number) => void;
   mode: Mode;
@@ -37,6 +41,8 @@ export function Problem({
   onLowVision,
   onNewCapture,
   onDiscardLine,
+  discardedIndex = null,
+  onRestoreLine,
   onStartWorking,
   mode,
   onExport,
@@ -111,10 +117,24 @@ export function Problem({
     onDiscardLine(line.id);
     announce(
       remaining
-        ? `Discarded line ${lineIndex + 1}. ${remaining} ${remaining === 1 ? 'line remains.' : 'lines remain.'}`
-        : 'Discarded the only line. Capture another problem when you are ready.',
+        ? `Discarded line ${lineIndex + 1}. ${remaining} ${remaining === 1 ? 'line remains.' : 'lines remain.'} To undo, use Put line ${lineIndex + 1} back, before the lines.`
+        : `Discarded the only line. To undo, use Put line 1 back. Or capture another problem.`,
     );
     window.setTimeout(() => focusFirst(next ? `#${next.id}` : '#no-problem-lines'), 80);
+  }
+
+  function restoreLine() {
+    const at = onRestoreLine?.();
+    if (at == null) return;
+    setIndex(at);
+    setSummary('');
+    announce(`Line ${at + 1} is back.`);
+    // Found on the page after the restored line has rendered; `lines` here is
+    // still the list from before it came back.
+    window.setTimeout(
+      () => focusFirst(`[aria-label="Problem lines"] > li:nth-child(${at + 1}) [role="group"]`),
+      80,
+    );
   }
 
   /** "What changed?" on the source (DESIGN.md 14): how this line follows from
@@ -195,19 +215,29 @@ export function Problem({
         </p>
       )}
 
+      {discardedIndex !== null && (
+        <button type="button" className="btn mt-6" onClick={restoreLine}>
+          Put line {discardedIndex + 1} back
+        </button>
+      )}
+
       {lines.length ? (
         <ul className="mt-6 space-y-4" aria-label="Problem lines">
           {lines.map((l, i) => (
-            <li key={l.id} className="relative" onFocus={() => setIndex(i)}>
-              <MathLine
-                id={l.id}
-                latex={l.latex}
-                label={`Line ${i + 1}`}
-                unsure={!l.valid}
-              />
+            // Beside the line, not on top of it: an overlaid button covered
+            // the end of long equations and large-print maths.
+            <li key={l.id} className="flex items-start gap-3" onFocus={() => setIndex(i)}>
+              <div className="min-w-0 flex-1">
+                <MathLine
+                  id={l.id}
+                  latex={l.latex}
+                  label={`Line ${i + 1}`}
+                  unsure={!l.valid}
+                />
+              </div>
               <button
                 type="button"
-                className="btn absolute right-3 top-3 min-w-[48px] justify-center px-0 text-2xl leading-none"
+                className="btn mt-1 min-h-[48px] min-w-[48px] shrink-0 justify-center px-0 text-2xl leading-none"
                 onClick={() => discardLine(i)}
                 aria-label={`Discard problem line ${i + 1}`}
                 title="Discard this line"
