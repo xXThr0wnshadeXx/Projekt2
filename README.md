@@ -69,31 +69,106 @@ Accessibility is the product, not a feature of it.
 
 ## Running it locally
 
-Once per machine, from inside the repository:
+Works on macOS and Windows. The app itself is a web app, so once it is running
+you can open it from either, and from a phone on the same network.
+
+### Before anything else: Python 3.11
+
+The back end pins **Python 3.11** (`backend/.python-version`). This is not a
+preference — `pydantic==2.10.4` has no wheels for 3.13 or newer, so on a newer
+interpreter `pip install` fails and the app will not even import. macOS with a
+Homebrew Python and a fresh Windows install are both commonly on 3.13+.
+
+Check first:
+
+```bash
+python --version
+```
+
+If it is not 3.11, the quickest way to get one without touching your system
+Python is [`uv`](https://docs.astral.sh/uv/):
+
+```bash
+uv python install 3.11
+uv venv --python 3.11 .venv
+```
+
+### macOS
 
 ```bash
 bash scripts/setup.sh
 ```
 
-Then:
-
 ```bash
-# Back end
 cd backend
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # then add your own API key and model IDs
+cp .env.example .env        # then add the API key and model IDs
 uvicorn app.main:app --reload
 ```
 
 ```bash
-# Front end
-cd frontend
-npm install
-npm run dev
+cd frontend && npm install && npm run dev
 ```
 
-Required back-end environment variables are listed in `backend/.env.example`. Never commit a real `.env`.
+### Windows
+
+The shell scripts in `scripts/` are bash and need **Git Bash** — they will not
+run in PowerShell or cmd. Git Bash ships with [Git for Windows](https://git-scm.com/download/win).
+
+In Git Bash:
+
+```bash
+bash scripts/setup.sh
+```
+
+Back end, in PowerShell or Git Bash:
+
+```bash
+cd backend
+py -3.11 -m venv .venv
+.venv/Scripts/activate      # PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+cp .env.example .env        # then add the API key and model IDs
+uvicorn app.main:app --reload
+```
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+### Without an API key
+
+The back end starts fine without model credentials — it just does not register
+the capture, transcribe and spoken-to-latex routes. `/api/health` and
+`/api/diff` still work, and in the app **Try a sample problem** gives you the
+glance, the explorer and low-vision mode. Useful for front-end work, and it is
+the demo fallback if the key is not set in time.
+
+### Demoing from an iPhone
+
+Flow B is iPhone plus VoiceOver, so it is worth opening on a real phone at
+least once before the demo.
+
+1. Start the front end so it listens beyond localhost:
+
+   ```bash
+   cd frontend && npm run dev -- --host
+   ```
+
+2. Vite prints a **Network:** address — open that on the phone, on the same
+   Wi-Fi.
+3. The phone must also be able to reach the back end, so set
+   `VITE_API_BASE` to the machine's network address, not `localhost`, and add
+   that front-end origin to the back end's `ALLOWED_ORIGIN`.
+
+Camera and microphone need a secure context: Safari allows them on
+`localhost`, but over the network it wants HTTPS. The simplest way around that
+for a demo is to point the phone at the **deployed** front end instead of a
+laptop dev server.
+
+Required back-end environment variables are listed in `backend/.env.example`.
+Never commit a real `.env`.
 
 ## Project board
 
