@@ -44,6 +44,12 @@ export function LiveRegion() {
       // Clearing first guarantees the same message announces twice if repeated;
       // without this, an identical string is silently ignored.
       set('');
+      // An error stays in the assertive region until something replaces it,
+      // and nothing ever did: it was still sitting at the top of the page two
+      // screens later, where a screen-reader user reading from the top met a
+      // complaint about a line they had long since fixed. Whatever is said
+      // next is the news, so the old error goes.
+      if (urgency === 'polite') setAssertive('');
       const t = window.setTimeout(() => set(message), 50);
       timers.current.push(t);
     };

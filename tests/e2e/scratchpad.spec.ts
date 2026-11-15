@@ -214,9 +214,9 @@ test.describe('@smoke scratchpad', () => {
     await expect(page.getByTestId('live-polite')).toContainText('Deleted line 1');
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
 
-    // U undoes the delete, which is the one history step worth having.
+    // U undoes the delete.
     await page.keyboard.press('u');
-    await expect(page.getByTestId('live-polite')).toHaveText('Put the line back.');
+    await expect(page.getByTestId('live-polite')).toHaveText('Put line 1 back.');
     await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
   });
 

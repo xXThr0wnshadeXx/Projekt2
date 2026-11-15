@@ -46,11 +46,23 @@ This is the expected state before keys are added, not a broken one:
 GET  /api/health    200   {"ok": true}
 POST /api/capture   404   route not registered — no keys
 POST /api/diff      200   {"verified": true, "method": "ratio_constant", …}
+POST /api/validate  200   {"valid": true}
 ```
 
 Step checking is pure SymPy, so **it works with no key and no credit**. The
 sample problem, exploring, low-vision mode, the scratchpad and handing in all
 work in this state. Only reading a *new* image and speech need a key.
+
+The scratchpad works here because a typed line is read in the browser when the
+model route is missing: symbols (`2x = 8`, `(x+1)/2 = 5`) and simple words
+("two x equals eight"). Words whose grouping is unclear are refused, not
+guessed, until a key is added. With no back end at all the line is still read,
+read back and saved; it just cannot be step checked.
+
+**If every step comes back "I couldn't confirm this step", the server is
+missing `antlr4-python3-runtime==4.11.1`.** SymPy cannot parse LaTeX without
+it and fails quietly. `POST /api/validate` with `{"latex": "2x = 8"}` is the
+one-line test: it must say `true`.
 
 ---
 

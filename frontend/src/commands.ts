@@ -25,6 +25,16 @@ export function looksLikeCommand(text: string): boolean {
   return COMMAND_START.test(text.trim().replace(/[.!?]+$/, ''));
 }
 
+// A request for the one thing this app never does. Matched on whole phrases a
+// person asking for help would use; none of them is something a line of math
+// or a command contains.
+const ASKS_TO_SOLVE =
+  /\b(solve|hint|clue|next step|what (?:do|should) i do|how do i|do it for me|work it out|figure it out|finish (?:it|this)|(?:what(?:'s| is)|give me|tell me|show me) the answer|help me (?:with|do|solve|finish))\b/i;
+
+export function asksToSolve(text: string): boolean {
+  return ASKS_TO_SOLVE.test(text);
+}
+
 /** "W3" → 3. */
 export function lineNumber(ref: string | null): number | null {
   const m = /^W(\d{1,3})$/.exec(ref ?? '');

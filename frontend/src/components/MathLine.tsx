@@ -58,7 +58,32 @@ export function MathLine({ id, latex, label, unsure = false }: MathLineProps) {
     };
   }, [latex]);
 
-  /** Enter hands control to the MathJax explorer; Esc comes back out. */
+  // Escape comes back out of the explorer, to the line the student started on.
+  //
+  // This cannot be a React handler. MathJax handles Escape on its own
+  // container and then focuses that container, after any handler of ours that
+  // ran on the way; React's run at the document root, so by the time focus was
+  // "put back" MathJax moved it again. Focus was left inside <mjx-container>,
+  // where every single-key shortcut is deliberately ignored — so after
+  // exploring a line, N, P, G, S and the rest all went silent until the
+  // student found their way out with Tab. Listening in the capture phase sees
+  // the key before MathJax can swallow it, and moving focus on the next tick
+  // lets MathJax finish closing the explorer first.
+  const line = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = line.current;
+    if (!el) return;
+    function onEscape(e: globalThis.KeyboardEvent) {
+      if (e.key !== 'Escape' || e.target === el) return;
+      window.setTimeout(() => {
+        if (el!.contains(document.activeElement)) el!.focus();
+      }, 0);
+    }
+    el.addEventListener('keydown', onEscape, true);
+    return () => el.removeEventListener('keydown', onEscape, true);
+  }, []);
+
+  /** Enter hands control to the MathJax explorer. */
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key === 'Enter' && e.target === e.currentTarget) {
       const container = host.current?.querySelector<HTMLElement>('mjx-container');
@@ -66,19 +91,13 @@ export function MathLine({ id, latex, label, unsure = false }: MathLineProps) {
       e.preventDefault();
       if (container.tabIndex < 0) container.tabIndex = 0;
       container.focus();
-      return;
-    }
-    // MathJax handles Escape internally but leaves focus on the container,
-    // which is not a tab stop — so the next Tab would jump from nowhere.
-    // Put focus back on the line the student started from.
-    if (e.key === 'Escape' && e.target !== e.currentTarget) {
-      e.currentTarget.focus();
     }
   }
 
   return (
     <div
       id={id}
+      ref={line}
       tabIndex={0}
       role="group"
       onKeyDown={onKeyDown}

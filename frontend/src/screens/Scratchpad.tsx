@@ -23,14 +23,17 @@ import {
   transcribe,
   spokenToLatex,
   command,
+  validateLatex,
   ApiFailure,
   type SpokenAlternative,
 } from '../api';
-import { applyEdit, lineNumber, looksLikeCommand } from '../commands';
+import { readTyped } from '../math/typed';
+import { speechFor } from '../math/sre';
+import { applyEdit, asksToSolve, lineNumber, looksLikeCommand } from '../commands';
 import { helpText, useShortcuts } from '../shortcuts';
 import { speak } from '../audio/tts';
 import type { Recording } from '../audio/recorder';
-import { checkStep, stepChecksAllowed } from '../stepCheck';
+import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
 import { loadWork, saveWork, type Mode, type Problem, type WorkLine } from '../state';
 
 export interface ScratchpadProps {
@@ -76,9 +79,11 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   const [current, setCurrent] = useState<number | null>(null);
   const [editTarget, setEditTarget] = useState<string | null>(null);
 
-  // One step of undo is enough in practice and is far easier to explain than a
-  // history: "undo" always means "put back the line I just removed".
-  const undone = useRef<{ line: WorkLine; at: number } | null>(null);
+  // "Undo" always means "put back the line I most recently removed", and can
+  // be repeated. One level was not enough: by voice a misheard "delete line
+  // two" is followed by a retry, and the second delete made the first line
+  // unrecoverable.
+  const undone = useRef<{ line: WorkLine; at: number }[]>([]);
   // A ref cannot drive the UI, and the Undo button must not be offered when
   // there is nothing to put back — a control that can only answer "there is
   // nothing to undo" is a dead end for someone moving by Tab.
@@ -125,7 +130,21 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         ...problem.lines.map((l) => l.latex),
         ...lines.map((l) => l.latex),
       ];
-      const result = await spokenToLatex(text, context);
+      let result;
+      try {
+        result = await spokenToLatex(text, context);
+      } catch (e: unknown) {
+        // The model is how plain words become math, but it is not the only
+        // way a line can be read. With no server, or a server with no model
+        // key, a line typed with ordinary symbols is read here instead, so the
+        // student can always write their work. BAD_INPUT and UNPARSEABLE are
+        // the server's considered answer about this line and are kept.
+        const considered =
+          e instanceof ApiFailure && (e.code === 'BAD_INPUT' || e.code === 'UNPARSEABLE');
+        if (considered) throw e;
+        await readHere(text);
+        return;
+      }
 
       if (result.ambiguous && result.clarifying_question) {
         setClarify({
@@ -152,6 +171,30 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Read a typed line in the browser, with no model (math/typed.ts). */
+  async function readHere(text: string) {
+    const latex = readTyped(text);
+    if (!latex) {
+      fail(
+        "I couldn't read that as math. Type it with symbols, for example 2x = 8, or (x+1)/2 = 5 with brackets.",
+      );
+      return;
+    }
+    const spoken = await speechFor(latex);
+    if (spoken === null) {
+      fail("I couldn't read that line as math. Check the brackets, then try again.");
+      return;
+    }
+    // When the server cannot be asked, the line is still the student's own,
+    // read by a strict grammar and typeset without error — flagging it
+    // "could not fully read this line" would be a false alarm on their work.
+    // Step checks need the server anyway, so nothing is claimed that is not so.
+    const valid = (await validateLatex(latex)) ?? true;
+    const readback = spoken || text;
+    setPending({ latex, readback, valid });
+    announce(`I read: ${readback}. Enter to save, E to edit.`);
   }
 
   async function onRecording(recording: Recording) {
@@ -195,17 +238,25 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     lastAction.current = entry.id;
 
     if (!line.valid || !from?.valid || !stepChecksAllowed(mode)) return;
-    const verdict = await checkStep(from.latex, entry.latex, mode);
-    if (!verdict) return;
+    const checked = await checkStep(from.latex, entry.latex, mode);
+    if (!checked) return;
+    const verdict = withBasis(checked, basisFor(index));
     setChecks((prev) => ({ ...prev, [entry.id]: verdict }));
     // Only speak up if the student hasn't moved on. A late verdict must never
     // talk over "Deleted line 1" or a new readback.
     if (lastAction.current === entry.id) announce(verdict);
   }
 
+  /** What the work line at `index` is checked against, in words. */
+  function basisFor(index: number): string {
+    return index > 0
+      ? `your line ${index}`
+      : `line ${Math.min(startLine, problem.lines.length - 1) + 1} of the problem`;
+  }
+
   function remove(line: WorkLine, index: number) {
     lastAction.current = `remove:${line.id}`;
-    undone.current = { line, at: index };
+    undone.current.push({ line, at: index });
     setCanUndo(true);
     setLines((prev) => prev.filter((l) => l.id !== line.id));
     announce(`Deleted line ${index + 1}. Press U to undo.`);
@@ -213,23 +264,41 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
 
   function undo() {
     lastAction.current = 'undo';
-    const last = undone.current;
+    const last = undone.current.pop();
     if (!last) {
       announce('There is nothing to undo.');
       return;
     }
+    const at = Math.min(last.at, lines.length);
     setLines((prev) => {
       const next = [...prev];
       next.splice(Math.min(last.at, next.length), 0, last.line);
       return next;
     });
-    undone.current = null;
-    setCanUndo(false);
-    announce('Put the line back.');
+    const left = undone.current.length;
+    setCanUndo(left > 0);
+    // The Undo button goes away with the last thing to undo. Left where it
+    // was, focus would fall off the page; it goes to the line that came back.
+    window.setTimeout(() => focusFirst(`#${last.line.id}`), 80);
+    announce(
+      left > 0
+        ? `Put line ${at + 1} back. Press U again to put back another.`
+        : `Put line ${at + 1} back.`,
+    );
   }
 
   /** Math goes to spoken-to-LaTeX; a command goes to the command route. */
   async function handleText(text: string) {
+    // Asked outright, the answer is a plain no — said before anything is sent
+    // anywhere, so it does not depend on a model choosing to decline.
+    if (asksToSolve(text)) {
+      lastAction.current = 'refused';
+      setTyped('');
+      announce(
+        'Glance does not solve, give answers or give hints. Write your next line and I will read it back.',
+      );
+      return;
+    }
     if (looksLikeCommand(text)) await runCommand(text);
     else await interpret(text);
   }
@@ -266,6 +335,11 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       return;
     }
 
+    // The command has been understood and is about to be carried out; left in
+    // the box it would be sent again by the next Enter. An edit fills the box
+    // itself, and an unknown command stays so it can be corrected.
+    if (result.intent !== 'edit' && result.intent !== 'unknown') setTyped('');
+
     switch (result.intent) {
       case 'navigate':
         setCurrent(n! - 1);
@@ -297,7 +371,11 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
           return;
         }
         const verdict = await checkStep(before.latex, target!.latex, mode);
-        announce(verdict ? `Line ${n}. ${verdict}` : "I couldn't check that right now. Try again in a moment.");
+        announce(
+          verdict
+            ? `Line ${n}. ${withBasis(verdict, basisFor(n! - 1))}`
+            : "I couldn't check that right now. Try again in a moment.",
+        );
         return;
       }
       case 'export':
@@ -471,7 +549,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
               Or type your line
             </label>
             <p id="typed-line-help" className="mt-1 text-sm text-[--muted]">
-              Plain words or LaTeX both work, for example "two x equals eight".
+              Symbols, plain words or LaTeX all work, for example 2x = 8 or "two x equals eight".
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               <input
@@ -506,26 +584,31 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
           as a real control. They appear as the work does. */}
       <div className="mt-8">
         {lines.length > 0 && (
-          <>
-            <button type="button" className="btn-primary" onClick={onExport}>
-              Hand in my work
-            </button>
-            <div className="mt-6 flex flex-wrap gap-3">
+          <button type="button" className="btn-primary" onClick={onExport}>
+            Hand in my work
+          </button>
+        )}
+        {/* Undo is offered whenever there is something to put back — also
+            when the line just deleted was the only one, which is exactly when
+            it is wanted most and when it used to disappear with the list. */}
+        {(lines.length > 0 || canUndo) && (
+          <div className="mt-6 flex flex-wrap gap-3">
+            {lines.length > 0 && (
               <button type="button" className="btn" onClick={readAll}>
                 Read my work
               </button>
-              {canUndo && (
-                <button type="button" className="btn" onClick={undo}>
-                  Undo delete
-                </button>
-              )}
-            </div>
-          </>
+            )}
+            {canUndo && (
+              <button type="button" className="btn" onClick={undo}>
+                Undo delete
+              </button>
+            )}
+          </div>
         )}
 
         <div
           className={
-            lines.length > 0 ? 'mt-6 border-t border-[--line] pt-4' : 'mt-2'
+            lines.length > 0 || canUndo ? 'mt-6 border-t border-[--line] pt-4' : 'mt-2'
           }
         >
           {/* Named for where it goes, not "back" — "Show the problem" above

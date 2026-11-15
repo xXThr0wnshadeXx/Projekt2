@@ -210,6 +210,24 @@ export function spokenToLatex(
   });
 }
 
+/** Whether SymPy can read a line that was typed and read in the browser.
+ *
+ *  One boolean, no model, so it works on a server with no model key. Null when
+ *  the server cannot be asked at all, which is a different thing from "no".
+ */
+export async function validateLatex(latex: string): Promise<boolean | null> {
+  try {
+    const result = await request<{ valid: boolean }>('/api/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latex }),
+    });
+    return Boolean(result.valid);
+  } catch {
+    return null;
+  }
+}
+
 /** Step check — DESIGN.md 9, 11, 14.
  *
  *  SymPy decides; the model only names the operation, and only in study mode

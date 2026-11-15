@@ -17,6 +17,7 @@ import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
+import { spokenMath } from './math/sre';
 import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
 import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
@@ -144,9 +145,7 @@ export function App() {
     // explorer uses, so the two read the expression identically.
     const spoken: Record<string, string> = {};
     for (const line of problem?.lines ?? []) {
-      const label = document
-        .querySelector(`#${line.id} mjx-container`)
-        ?.getAttribute('aria-label');
+      const label = spokenMath(document.getElementById(line.id));
       if (label) spoken[line.id] = label;
     }
     setSpokenLines(spoken);
@@ -239,11 +238,13 @@ export function App() {
       {screen === 'problem' && problem && (
         <Problem
           problem={problem}
+          startIndex={lineIndex}
           onLowVision={enterLowVision}
           mode={settings.mode}
           onNewCapture={() => setScreen('capture')}
           onStartWorking={(index) => {
             setWorkingFrom(index);
+            setLineIndex(index);
             setScreen('scratchpad');
           }}
           onExport={() => openExport('problem')}
