@@ -10,6 +10,9 @@
 
 import { useEffect, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
+import { KeyboardHelp } from './components/KeyboardHelp';
+import { speak } from './audio/tts';
+import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { health, apiBase, ApiFailure } from './api';
 import { Home } from './screens/Home';
@@ -34,6 +37,21 @@ export function App() {
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
   const [backEndNote, setBackEndNote] = useState('');
+  // Keyboard help (#25): `null` when closed, otherwise whether it took focus.
+  const [help, setHelp] = useState<null | { takeFocus: boolean }>(null);
+
+  /** "?" anywhere: say this screen's shortcuts and show them. */
+  function showHelp(takeFocus: boolean) {
+    const text = helpText(screen);
+    announce(text);
+    speak(text); // only when the student has turned self-voicing on
+    setHelp({ takeFocus });
+  }
+
+  useShortcuts({ '?': () => showHelp(false) });
+
+  // The list belongs to the screen it was opened on.
+  useEffect(() => setHelp(null), [screen]);
 
   // MathJax is loaded once, up front. Waiting until a problem arrives would
   // put a multi-second script download inside the capture wait.
@@ -124,9 +142,34 @@ export function App() {
       </a>
 
       <header className="border-b border-[--line] px-6 py-5">
-        <h1 className="text-2xl font-semibold tracking-tight">Glance</h1>
-        <p className="mt-1 text-[--muted]">Math you can hear and speak.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Glance</h1>
+            <p className="mt-1 text-[--muted]">Math you can hear and speak.</p>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            aria-expanded={help !== null}
+            aria-controls="keyboard-help"
+            aria-keyshortcuts="?"
+            onClick={() => (help ? setHelp(null) : showHelp(true))}
+          >
+            Keyboard shortcuts
+          </button>
+        </div>
       </header>
+
+      {help && (
+        <KeyboardHelp
+          screen={screen}
+          takeFocus={help.takeFocus}
+          onClose={() => {
+            setHelp(null);
+            announce('Shortcuts closed.');
+          }}
+        />
+      )}
 
       {screen === 'home' && (
         <Home
