@@ -8,12 +8,14 @@
 
 import { test, expect, type Page } from '@playwright/test';
 
+const WORKED_BEFORE = String.raw`\frac{\sqrt{x + 1}}{2} = 5`;
+const WORKED_AFTER = String.raw`\sqrt{x + 1} = 10`;
 const SPOKEN_CLEAR = {
-  latex: '2x = 8',
+  latex: WORKED_AFTER,
   ambiguous: false,
   clarifying_question: null,
   alternatives: [],
-  readback: '2 x equals 8',
+  readback: 'square root of x plus one equals ten',
   valid: true,
 };
 
@@ -44,9 +46,9 @@ async function stubDiff(page: Page, stub: DiffStub = {}) {
   return calls;
 }
 
-async function stubSpoken(page: Page) {
+async function stubSpoken(page: Page, line = SPOKEN_CLEAR) {
   await page.route('**/api/spoken-to-latex', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(SPOKEN_CLEAR) }),
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(line) }),
   );
 }
 
@@ -65,8 +67,8 @@ async function openSample(page: Page) {
 }
 
 /** Type a line in the scratchpad and confirm it. */
-async function saveTypedLine(page: Page) {
-  await page.getByLabel('Or type your line').fill('two x equals eight');
+async function saveTypedLine(page: Page, text = SPOKEN_CLEAR.readback) {
+  await page.getByLabel('Or type your line').fill(text);
   await page.getByRole('button', { name: 'Add line' }).click();
   await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
   await page.keyboard.press('Enter');
@@ -115,17 +117,17 @@ test.describe('@smoke modes', () => {
 
     await expect(polite(page)).toHaveText('This step checks out.');
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('This step checks out.');
-    expect(calls).toEqual([{ from_latex: '2x + 3 = 11', to_latex: '2x = 8', mode: 'homework' }]);
+    expect(calls).toEqual([{ from_latex: WORKED_BEFORE, to_latex: WORKED_AFTER, mode: 'homework' }]);
   });
 
   test('study: the explanation from the server is read out', async ({ page }) => {
     await setMode(page, 'Study');
-    await stubDiff(page, { message: '3 was subtracted from both sides.' });
+    await stubDiff(page, { message: 'Both sides were multiplied by two.' });
     await stubSpoken(page);
     await openSample(page);
     await page.keyboard.press('s');
     await saveTypedLine(page);
-    await expect(polite(page)).toHaveText('3 was subtracted from both sides.');
+    await expect(polite(page)).toHaveText('Both sides were multiplied by two.');
   });
 
   test('a step that is not verified is "couldn\'t confirm", never "wrong"', async ({ page }) => {
@@ -158,7 +160,7 @@ test.describe('@smoke modes', () => {
   });
 
   test('what changed: W compares the current problem line with the one before', async ({ page }) => {
-    const calls = await stubDiff(page, { verified: false });
+    const calls = await stubDiff(page);
     await page.goto('/');
     await openSample(page);
 
@@ -166,23 +168,24 @@ test.describe('@smoke modes', () => {
     await expect(polite(page)).toHaveText('This is the first line, so there is nothing before it to compare.');
 
     await page.keyboard.press('n');
-    await page.getByRole('button', { name: 'What changed?' }).click();
-    await expect(polite(page)).toHaveText("I couldn't confirm this step.");
+    await page.keyboard.press('w');
+    await expect(polite(page)).toHaveText('This step checks out.');
     expect(calls).toEqual([
-      { from_latex: '2x + 3 = 11', to_latex: '\\frac{\\sqrt{x + 1}}{2} = 5', mode: 'homework' },
+      { from_latex: WORKED_BEFORE, to_latex: WORKED_AFTER, mode: 'homework' },
     ]);
   });
 
   test('the first step follows the problem line the student started from', async ({ page }) => {
     const calls = await stubDiff(page);
-    await stubSpoken(page);
+    const next = { ...SPOKEN_CLEAR, latex: 'x + 1 = 100', readback: 'x plus one equals one hundred' };
+    await stubSpoken(page, next);
     await page.goto('/');
     await openSample(page);
     await page.keyboard.press('n');
     await page.keyboard.press('s');
-    await saveTypedLine(page);
+    await saveTypedLine(page, next.readback);
     await expect(polite(page)).toHaveText('This step checks out.');
-    expect(calls[0].from_latex).toBe('\\frac{\\sqrt{x + 1}}{2} = 5');
+    expect(calls[0].from_latex).toBe(WORKED_AFTER);
   });
 
   test('a slow check never talks over what the student did next', async ({ page }) => {

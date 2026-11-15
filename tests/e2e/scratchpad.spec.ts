@@ -241,11 +241,9 @@ test.describe('@smoke scratchpad', () => {
     await openScratchpad(page);
 
     // The hard rule in AGENTS.md. Asserted against the *controls*, not the page
-    // text: the problem's own instruction is legitimately "Solve for x.", so
-    // scanning all the text would both miss the point and break the moment a
-    // student expands the problem.
+    // text: captured instructions may legitimately ask a student to solve.
     await page.getByRole('button', { name: 'Show the problem' }).click();
-    await expect(page.getByRole('region', { name: 'The problem' })).toContainText('Solve for x.');
+    await expect(page.getByRole('region', { name: 'The problem' })).toContainText('Read this worked step.');
 
     const names = await page.getByRole('button').evaluateAll((els) =>
       els.map((el) => (el.textContent ?? '').toLowerCase()),

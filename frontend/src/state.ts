@@ -127,18 +127,18 @@ export function saveSettings(settings: Settings): void {
  */
 export function sampleProblem(): Problem {
   return {
-    instructions: 'Solve for x.',
+    instructions: 'Read this worked step.',
     lines: [
       // String.raw keeps every backslash; a plain string turns \f and \s into
       // escape sequences and silently mangles the LaTeX.
-      { id: 'L1', latex: String.raw`2x + 3 = 11`, confidence: 1, intent_notes: '', valid: true },
       {
-        id: 'L2',
+        id: 'L1',
         latex: String.raw`\frac{\sqrt{x + 1}}{2} = 5`,
         confidence: 1,
         intent_notes: '',
         valid: true,
       },
+      { id: 'L2', latex: String.raw`\sqrt{x + 1} = 10`, confidence: 1, intent_notes: '', valid: true },
     ],
     diagrams: [],
     warnings: [],

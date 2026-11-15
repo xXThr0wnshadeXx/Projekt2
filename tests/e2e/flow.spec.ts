@@ -61,7 +61,7 @@ test.describe('@smoke critical path', () => {
     // never arrives on a new one in silence.
     await openSample(page);
     await expect(page.locator('#L1')).toBeFocused();
-    await expect(page.getByTestId('live-polite')).toContainText('Solve for x.');
+    await expect(page.getByTestId('live-polite')).toContainText('Read this worked step.');
     await expect(page.getByTestId('live-polite')).toContainText('2 lines');
   });
 
@@ -84,9 +84,9 @@ test.describe('@smoke critical path', () => {
     await openSample(page);
 
     const polite = page.getByTestId('live-polite');
-    // Line 2 is the fraction with a root on top — the case the product is
+    // Line 1 is the fraction with a root on top — the case the product is
     // named after.
-    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.getByRole('group', { name: 'Line 1' }).focus();
     await page.keyboard.press('g');
 
     const summary = page.getByRole('region', { name: 'Structure summary' });
@@ -98,10 +98,10 @@ test.describe('@smoke critical path', () => {
     // The glance is spoken, not only shown.
     await expect(polite).toContainText('fraction');
 
-    // Hard rule in AGENTS.md: nothing in this app ever solves. x = 4 is the
-    // answer to line 1, and 99 to line 2; neither may appear.
-    await expect(summary).not.toContainText('x = 4');
-    await expect(summary).not.toContainText('99');
+    // The sample stops at a worked step. Neither the math nor the summary
+    // should reveal the value of x.
+    await expect(page.locator('main')).not.toContainText(/\b99\b/);
+    await expect(polite).not.toContainText(/\b99\b/);
   });
 
   test('N and P move between lines and announce the position', async ({ page }) => {
