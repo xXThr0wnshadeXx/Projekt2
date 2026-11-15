@@ -126,7 +126,7 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'X', does: 'hand in your work' },
     {
       keys: 'Say or type a command',
-      does: 'for example next line, read line two, delete line two, undo, check this step, change the three to a four, hand in, help',
+      does: 'for example describe it, what is on top, what is under the root, how many terms, spell it out, next line, read line two, delete line two, undo, check this step, change the three to a four, hand in, help',
     },
     HELP,
   ],

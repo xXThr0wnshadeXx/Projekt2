@@ -31,6 +31,7 @@ import { readTyped } from '../math/typed';
 import { speechFor } from '../math/sre';
 import { applyEdit, asksForCorrection, EDIT_REFUSAL, lineNumber, looksLikeCommand } from '../commands';
 import { SAYS, stripFiller, understandTalk, type Talk } from '../talk';
+import { describePart } from '../math/parts';
 import { helpText, useShortcuts } from '../shortcuts';
 import { activate } from '../traverse';
 import type { Recording } from '../audio/recorder';
@@ -435,6 +436,20 @@ export function Scratchpad({ problem, mode, startLine, onExport }: ScratchpadPro
             ? `You have written ${lines.length} ${lines.length === 1 ? 'line' : 'lines'}. Line ${lines.length} is: ${last.readback}.${following}`
             : `You have not written any lines yet.${following}`,
         );
+        return;
+      }
+      case 'part': {
+        // About the problem, the way a human reader would read it out: the
+        // line the student is following, unless they named another. Reading a
+        // part of the page is allowed in every mode, exam included (#199).
+        const at = talk.line ? talk.line - 1 : Math.min(startLine, problem.lines.length - 1);
+        const target = problem.lines[at];
+        if (!target) {
+          tell(`The problem has ${problem.lines.length} ${problem.lines.length === 1 ? 'line' : 'lines'}, so there is no line ${talk.line}.`);
+          return;
+        }
+        const answer = await describePart(target.latex, talk.part);
+        tell(problem.lines.length > 1 ? `Problem line ${at + 1}. ${answer}` : answer);
         return;
       }
       case 'readProblem': {

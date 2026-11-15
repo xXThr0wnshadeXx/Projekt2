@@ -24,7 +24,8 @@ import { Export } from './screens/Export';
 import { helpText, useShortcuts, type ScreenName } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { spokenMath } from './math/sre';
-import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
+import { health, apiBase, apiConnected, ApiFailure, diagnoseUnreachable } from './api';
+import { UNCONNECTED_MESSAGE } from './apiBase';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
 import { LowVision } from './screens/LowVision';
@@ -113,6 +114,12 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    // A deployed build with no server address has nothing to ask (#135).
+    if (!apiConnected) {
+      setBackEnd('down');
+      setBackEndNote(UNCONNECTED_MESSAGE);
+      return;
+    }
     health()
       .then(() => {
         setBackEnd('up');
