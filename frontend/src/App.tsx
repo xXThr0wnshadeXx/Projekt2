@@ -50,7 +50,23 @@ const WELCOME =
 export function App() {
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
   // A new worksheet is being brought in while one is already loaded.
-  const [replacing, setReplacing] = useState(false);
+  // The capture page: its own page, reached from Get started or from
+  // "Bring in a different worksheet". It is in the address (#capture) so the
+  // browser's Back button leaves it.
+  const [capturing, setCapturingState] = useState(() => window.location.hash === '#capture');
+  const setCapturing = useCallback((on: boolean) => {
+    setCapturingState(on);
+    const want = on ? '#capture' : '';
+    if (window.location.hash !== want) {
+      if (on) window.history.pushState(null, '', '#capture');
+      else window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, []);
+  useEffect(() => {
+    const onPop = () => setCapturingState(window.location.hash === '#capture');
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const [lowVisionOn, setLowVisionOn] = useState(false);
   const [lowVisionFailed, setLowVisionFailed] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
@@ -95,7 +111,7 @@ export function App() {
   // Keyboard help (#25): `null` when closed, otherwise whether it took focus.
   const [help, setHelp] = useState<null | { takeFocus: boolean }>(null);
   const helpScreen: ScreenName =
-    lowVisionOn && problem ? 'lowvision' : problem && !replacing ? 'problem' : 'capture';
+    lowVisionOn && problem ? 'lowvision' : problem && !capturing ? 'problem' : 'capture';
 
   /** "?" anywhere: say the shortcuts and show them. */
   function showHelp(takeFocus: boolean) {
@@ -146,7 +162,7 @@ export function App() {
     saveProblem(next);
     setLineIndex(0);
     setWorkingFrom(0);
-    setReplacing(false);
+    setCapturing(false);
 
     // A capture announces its own result, in more detail than is possible here
     // — it knows what was unsure and what the photo warnings were. The sample
@@ -188,9 +204,18 @@ export function App() {
   }
 
   function newWorksheet() {
-    setReplacing(true);
-    announce('Bring in a different worksheet. Your current one stays until the new one is read.');
-    window.setTimeout(() => focusFirst('#capture-heading'), 60);
+    setCapturing(true);
+  }
+
+  function leaveCapture() {
+    setCapturing(false);
+    if (problem) {
+      announce('Kept your current worksheet.');
+      window.setTimeout(() => focusFirst('#problem-heading'), 60);
+    } else {
+      announce('Back to the start.');
+      window.setTimeout(() => focusFirst('#start-heading'), 60);
+    }
   }
 
   function startWorking(index: number) {
@@ -214,7 +239,7 @@ export function App() {
   // one-line-at-a-time arrows.
   useTraversal(!lowVision);
 
-  const showCapture = !problem || replacing;
+  const showStart = !problem && !capturing;
 
   // `LiveRegion` stays outside every conditional: if it remounted during a
   // change, the announcement made at that moment would be lost.
@@ -276,29 +301,54 @@ export function App() {
           )}
 
           <main id="main" tabIndex={-1} className="page">
-            <ol className="progress" aria-label="Steps">
-              <li data-done={problem ? 'true' : undefined}>Worksheet</li>
-              <li data-done={problem && loadWork().length > 0 ? 'true' : undefined}>Your work</li>
-              <li>Hand in</li>
-            </ol>
-
-            <ScreenBoundary
-              screen="worksheet"
-              onBackToStart={() => setReplacing(false)}
-              restartFocus="#problem-heading, #capture-heading"
-            >
-              {showCapture && (
+            {capturing ? (
+              <ScreenBoundary screen="capture" onBackToStart={leaveCapture} restartFocus="#capture-heading">
                 <Capture
                   onCaptured={openProblem}
                   onSample={() => openProblem(sampleProblem())}
-                  onCancel={problem ? () => {
-                    setReplacing(false);
-                    announce('Kept your current worksheet.');
-                    window.setTimeout(() => focusFirst('#problem-heading'), 60);
-                  } : undefined}
+                  onCancel={leaveCapture}
+                  keepLabel={problem ? 'Keep my current problem' : 'Back to the start'}
                 />
-              )}
-              {problem && !replacing && (
+              </ScreenBoundary>
+            ) : showStart ? (
+              <section aria-labelledby="start-heading" className="step get-started">
+                <h2 id="start-heading" tabIndex={-1} className="display text-center">
+                  Maths you can hear, explore and write
+                </h2>
+                <p className="get-started-lead text-center">
+                  Glance reads your maths worksheet aloud, lets you explore each line
+                  piece by piece, and writes down your own working as you say it.{' '}
+                  <strong>It never solves anything for you</strong>, so the work stays
+                  yours, in class and in exams.
+                </p>
+                <ul className="get-started-points">
+                  <li><strong>Hear it.</strong> Every line is read aloud, with the maths said properly.</li>
+                  <li><strong>Explore it.</strong> Move through the page with the arrow keys and Space.</li>
+                  <li><strong>Write it.</strong> Say or type your own steps and hand them in as typed work.</li>
+                </ul>
+                <div className="hero-action">
+                  <button type="button" className="btn-hero" onClick={() => setCapturing(true)}>
+                    Get started
+                  </button>
+                </div>
+                <div className="text-center">
+                  <button type="button" className="btn-quiet" onClick={() => openProblem(sampleProblem())}>
+                    Try a sample problem
+                  </button>
+                </div>
+              </section>
+            ) : problem ? (
+              <>
+                <ol className="progress" aria-label="Steps">
+                  <li data-done="true">Worksheet</li>
+                  <li data-done={loadWork().length > 0 ? 'true' : undefined}>Your work</li>
+                  <li>Hand in</li>
+                </ol>
+                <ScreenBoundary
+                  screen="worksheet"
+                  onBackToStart={() => focusFirst('#problem-heading')}
+                  restartFocus="#problem-heading"
+                >
                 <Problem
                   key={problem.lines.map((l) => l.id).join()}
                   problem={problem}
@@ -310,8 +360,7 @@ export function App() {
                   onStartWorking={startWorking}
                   onExport={goToHandIn}
                 />
-              )}
-            </ScreenBoundary>
+                </ScreenBoundary>
 
             {problem && (
               <ScreenBoundary screen="work" onBackToStart={() => focusFirst('#problem-heading')} restartFocus="#work-heading">
@@ -329,6 +378,9 @@ export function App() {
                 <Export problem={problem} />
               </ScreenBoundary>
             )}
+
+              </>
+            ) : null}
 
             <section aria-labelledby="reading-heading" className="step">
               <h2 id="reading-heading" className="step-title">How Glance reads to you</h2>

@@ -398,3 +398,17 @@ mjx-container:focus-visible {
     opacity: 0.9;
   }
 }
+
+@layer components {
+  .get-started-points {
+    margin: 1.5rem auto 0;
+    display: grid;
+    max-width: 38rem;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+  }
+  .get-started-points li {
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+  }
+}

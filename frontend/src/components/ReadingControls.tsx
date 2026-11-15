@@ -33,7 +33,7 @@ export function ReadingControls({ settings, onChange }: ReadingControlsProps) {
 
   function toggleVoice() {
     const on = !settings.selfVoicing;
-    onChange({ ...settings, selfVoicing: on });
+    onChange({ ...settings, selfVoicing: on, voiceChosen: true });
     announce(
       on
         ? 'Reading aloud is on. Glance will speak everything it tells you.'

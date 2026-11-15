@@ -31,8 +31,10 @@ export interface CaptureProps {
   onCaptured: (problem: Problem) => void;
   /** Opens the built-in sample problem. */
   onSample: () => void;
-  /** Only while a problem is already loaded: keep it instead. */
-  onCancel?: () => void;
+  /** Leave without bringing anything in. */
+  onCancel: () => void;
+  /** What leaving is called: back to the start, or keep the current problem. */
+  keepLabel: string;
 }
 
 /** Turn capture warnings into one spoken, actionable instruction (issue #14).
@@ -48,7 +50,7 @@ export function retakeGuidance(warnings: string[]): string | null {
   return `${first}${ends} Try again when you are ready.`;
 }
 
-export function Capture({ onCaptured, onSample, onCancel }: CaptureProps) {
+export function Capture({ onCaptured, onSample, onCancel, keepLabel }: CaptureProps) {
   const [busy, setBusy] = useState<Busy>('idle');
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -64,18 +66,14 @@ export function Capture({ onCaptured, onSample, onCancel }: CaptureProps) {
   const stream = useRef<MediaStream | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const section = useRef<HTMLElement>(null);
-  // The three ways in stay behind one clear button until it is pressed, so
-  // the first thing on the page is a single obvious action. Replacing a
-  // worksheet opens them straight away.
-  const [choosing, setChoosing] = useState(Boolean(onCancel));
 
-  function openChoices() {
-    setChoosing(true);
+  // Its own page: land on the heading and say what is here.
+  useEffect(() => {
+    heading.current?.focus();
     announce(
-      'Three ways to bring in a problem. Upload a file you already have, take a photo, or follow a live board. Use the Down arrow to hear each one, and Space to choose.',
+      'Bring in your problem. Three choices: upload a file you already have, take a photo, or follow a live board. Use the Down arrow to hear each one, and Space to choose.',
     );
-    window.setTimeout(() => document.querySelector<HTMLElement>('#capture-choices .choice')?.focus(), 60);
-  }
+  }, []);
 
   function stopCamera() {
     if (guideTimer.current) window.clearInterval(guideTimer.current);
@@ -311,14 +309,8 @@ export function Capture({ onCaptured, onSample, onCancel }: CaptureProps) {
   // DESIGN.md 12: U uploads, C opens the camera. Paste is handled above.
   useShortcuts(
     {
-      u: () => {
-        setChoosing(true);
-        fileInput.current?.click();
-      },
-      c: () => {
-        setChoosing(true);
-        void startCamera();
-      },
+      u: () => fileInput.current?.click(),
+      c: () => void startCamera(),
     },
     !working && !liveBoard && !cameraStarting,
     section,
@@ -333,20 +325,17 @@ export function Capture({ onCaptured, onSample, onCancel }: CaptureProps) {
   }
 
   return (
-    <section ref={section} id="step-worksheet" aria-labelledby="capture-heading" className="step">
+    <section ref={section} id="step-worksheet" aria-labelledby="capture-heading" className="step capture-page">
       <h2
         ref={heading}
         id="capture-heading"
         tabIndex={-1}
         className="step-title text-center focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
-        Get started
+        Bring in your problem
       </h2>
-      <p className="get-started-lead">
-        Glance reads your maths worksheet aloud, lets you explore each line
-        piece by piece, and writes down your own working as you say it.{' '}
-        <strong>It never solves anything for you</strong>, so the work stays
-        yours, in class and in exams.
+      <p className="get-started-lead text-center">
+        Choose how to bring in your maths. Glance reads it and puts it on the page for you.
       </p>
 
       {/* The file input the "Upload a file" choice opens. It stays mounted so
@@ -366,20 +355,6 @@ export function Capture({ onCaptured, onSample, onCancel }: CaptureProps) {
         }}
       />
 
-      {!choosing ? (
-        <div className="hero-action">
-          <button
-            type="button"
-            className="btn-hero"
-            aria-expanded="false"
-            aria-controls="capture-choices"
-            disabled={working}
-            onClick={openChoices}
-          >
-            Capture a problem
-          </button>
-        </div>
-      ) : (
         <div
           id="capture-choices"
           role="group"
@@ -426,7 +401,6 @@ export function Capture({ onCaptured, onSample, onCancel }: CaptureProps) {
             </span>
           </button>
         </div>
-      )}
 
       <p className="mt-6 text-center text-sm text-[--muted]">
         You can also paste a screenshot with <kbd className="kbd">Ctrl</kbd> or{' '}
@@ -438,13 +412,11 @@ export function Capture({ onCaptured, onSample, onCancel }: CaptureProps) {
         </button>
       </div>
 
-      {onCancel && (
-        <div className="mt-6">
-          <button type="button" className="btn-quiet" disabled={working} onClick={onCancel}>
-            Keep my current problem
-          </button>
-        </div>
-      )}
+      <div className="mt-6 text-center">
+        <button type="button" className="btn-quiet" disabled={working} onClick={onCancel}>
+          {keepLabel}
+        </button>
+      </div>
 
       {/* Status is a live region in its own right so the visible text and the
           spoken text can never drift apart. */}

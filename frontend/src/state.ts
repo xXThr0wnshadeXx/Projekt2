@@ -46,9 +46,13 @@ export type Mode = 'study' | 'homework' | 'exam';
 
 export interface Settings {
   mode: Mode;
-  /** The app's own speech. Off by default: a screen reader already reads the
-   *  live regions, and two voices at once is unusable (DESIGN.md 13). */
+  /** The app's own speech. On by default (#241): most people trying Glance
+   *  have no screen reader, and silence made the keys look broken. A screen
+   *  reader user turns it off, so they don't hear everything twice. */
   selfVoicing: boolean;
+  /** True once the student has switched reading aloud on or off themselves.
+   *  Until then the default applies, even to settings saved before it changed. */
+  voiceChosen?: boolean;
   /** Size of all text, as a percentage of the browser's own size. */
   textScale: number;
 }
@@ -127,6 +131,8 @@ export function saveWork(lines: WorkLine[]): void {
 export function loadSettings(): Settings {
   const settings = { ...defaultSettings, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
   if (!TEXT_SCALES.includes(settings.textScale)) settings.textScale = defaultSettings.textScale;
+  // Settings saved while the voice was off by default never chose silence.
+  if (!settings.voiceChosen) settings.selfVoicing = defaultSettings.selfVoicing;
   return settings;
 }
 
