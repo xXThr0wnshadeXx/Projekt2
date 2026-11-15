@@ -42,6 +42,8 @@ export class ApiFailure extends Error {
 // leave a student waiting indefinitely. Do not retry model calls automatically.
 const REQUEST_MS = 6_000;
 const CAPTURE_MS = 12_000;
+// A framing check is stale after a couple of seconds; the server's budget is 4.
+const FRAME_MS = 5_000;
 // Transcription uploads up to 30 s of audio before its 4 s model budget even
 // starts, and a study-mode step check is up to 2 s of CAS plus a 4 s model
 // explanation. 6 s would cut both off just as the server was about to answer.
@@ -162,6 +164,24 @@ export interface CaptureResponse {
   lines: CaptureLine[];
   diagrams: CaptureDiagram[];
   warnings: string[];
+}
+
+export interface FrameResponse {
+  guidance: string;
+  reason: string | null;
+}
+
+/**
+ * Ask the vision model where the worksheet sits in one small camera frame
+ * (issue #242). Only framing is asked about, never what is written on the page.
+ * The caller decides what a failure means; guiding must never block the photo.
+ */
+export function checkFrame(jpeg: Blob, signal?: AbortSignal): Promise<FrameResponse> {
+  return request<FrameResponse>(
+    '/api/frame',
+    { method: 'POST', body: jpeg, headers: { 'Content-Type': 'image/jpeg' }, signal },
+    FRAME_MS,
+  );
 }
 
 /** Send an image for transcription. `context` is optional free text. */

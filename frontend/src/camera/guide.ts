@@ -1,20 +1,20 @@
 // Steering the phone onto the page by voice and sound — issue #198.
 //
-// Each camera frame gets a FrameReport (framing.ts). This turns a stream of
-// them into something a person can follow without seeing anything:
+// Each camera frame gets a FrameReport from the vision model (framing.ts, via
+// /api/frame). This turns a stream of them into something a person can follow without seeing anything:
 // - words, but only when the advice changes, and never more often than every
 //   couple of seconds, so it doesn't chatter;
 // - a soft tick, panned toward the way to move, that speeds up as the page
 //   gets centred, like a parking sensor;
 // - and once the page has been well framed for about a second, the photo.
 
-import { SAY, type FrameReport, type Guidance } from './framing';
+import { CENTRED, PAN, SAY, type FrameReport, type Guidance } from './framing';
 
 export interface GuideOptions {
   say: (text: string) => void;
   /** Called once, when the page has been steady and well framed long enough. */
   onReady: () => void;
-  /** Good frames in a row before taking the photo. */
+  /** Good answers in a row before taking the photo. Answers come about every 1.5 s. */
   steadyFrames?: number;
   /** Shortest gap between spoken instructions, in milliseconds. */
   speakEveryMs?: number;
@@ -33,9 +33,11 @@ export class FramingGuide {
   /** Feed one frame's report. */
   frame(report: FrameReport): void {
     if (this.done) return;
-    const { say, onReady, steadyFrames = 4, speakEveryMs = 2000, now = () => Date.now(), tone } = this.options;
+    const { say, onReady, steadyFrames = 2, speakEveryMs = 2000, now = () => Date.now(), tone } = this.options;
 
-    if (report.page) tone?.(report.pan, report.centred);
+    if (report.guidance !== 'no-page' && report.guidance !== 'too-dark') {
+      tone?.(PAN[report.guidance] ?? 0, CENTRED[report.guidance] ?? 0);
+    }
 
     if (report.guidance === 'good') {
       this.goodRun += 1;

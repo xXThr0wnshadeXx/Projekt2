@@ -23,7 +23,7 @@ from .model_quota import ModelQuota
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = Path(__file__).with_name("schemas")
 ModelId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-StructuredTask = Literal["capture", "spoken", "command"]
+StructuredTask = Literal["capture", "spoken", "command", "frame"]
 log = logging.getLogger("glance.models")
 _SAFE_ERROR_CODES = {
     "credit_balance_exhausted",
@@ -121,9 +121,11 @@ class ModelClient:
     async def interpret(
         self, task: StructuredTask, messages: list[ChatCompletionMessageParam]
     ) -> dict:
-        model = self.settings.model_vision if task == "capture" else self.settings.model_text
-        # Vision gets the long budget; everything else is on the spoken-line
-        # path and gets the short one.
+        model = (
+            self.settings.model_vision if task in ("capture", "frame") else self.settings.model_text
+        )
+        # A capture gets the long budget. Everything else, including a camera
+        # framing check, is on a live path and gets the short one.
         budget = (
             self.settings.model_timeout_seconds
             if task == "capture"

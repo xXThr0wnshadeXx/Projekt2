@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "properties": {
+    "guidance": {
+      "type": "string",
+      "enum": [
+        "too-dark",
+        "no-page",
+        "move-left",
+        "move-right",
+        "move-up",
+        "move-down",
+        "closer",
+        "further",
+        "good"
+      ]
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "guidance",
+    "reason"
+  ],
+  "additionalProperties": false
+}
