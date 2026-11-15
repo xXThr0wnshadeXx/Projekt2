@@ -5,6 +5,9 @@ from fastapi.testclient import TestClient
 from backend.app import main
 from backend.app.config import Settings
 
+# A real PNG signature: capture decides the type from the bytes (issue #79.4).
+PNG = bytes.fromhex("89504e470d0a1a0a") + b"0" * 32
+
 
 def test_app_registers_model_routes_and_validates_transcriptions(monkeypatch):
     models = AsyncMock()
@@ -30,7 +33,7 @@ def test_app_registers_model_routes_and_validates_transcriptions(monkeypatch):
     )
     with TestClient(main.create_app(settings)) as client:
         assert client.get("/api/health").json() == {"ok": True}
-        capture = client.post("/api/capture", files={"image": ("page.png", b"png", "image/png")})
+        capture = client.post("/api/capture", files={"image": ("page.png", PNG, "image/png")})
         spoken = client.post("/api/spoken-to-latex", json={"text": "x equals two"})
         transcribe = client.post("/api/transcribe", files={"audio": ("bad.webm", b"bad", "audio/webm")})
 

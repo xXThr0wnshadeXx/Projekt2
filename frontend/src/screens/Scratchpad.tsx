@@ -350,7 +350,14 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
             setClarify(null);
             // The student has told us which grouping they meant, so this is
             // theirs now — it goes straight to the readback to be confirmed.
-            setPending({ latex: choice.latex, readback: choice.readback, valid: true });
+            // The option carries its own `valid`: an alternative SymPy could
+            // not read is still offered, and saving it marks the line unsure
+            // rather than silently claiming it was checked.
+            setPending({
+              latex: choice.latex,
+              readback: choice.readback,
+              valid: choice.valid,
+            });
             announce(`You chose: ${choice.readback}. Enter to save, E to edit.`);
           }}
           onCancel={() => {

@@ -102,7 +102,15 @@ export function ClarifyDialog({
                 </span>
                 {/* The readback is the spoken form; it is what the student is
                     actually choosing between, so it is the accessible name. */}
-                {option.readback}
+                <span>
+                  {option.readback}
+                  {/* An option SymPy could not read is still offered — the
+                      student knows what they said — but saying so here is the
+                      difference between an honest choice and a silent one. */}
+                  {!option.valid && (
+                    <span className="ml-2 text-[--warn]">(I could not check this one)</span>
+                  )}
+                </span>
               </button>
             </li>
           ))}

@@ -65,11 +65,11 @@ export function health(): Promise<HealthResponse> {
 
 /** Capture response — DESIGN.md 9. `id` and `valid` are filled in server-side.
  *
- *  The back end accepts JPEG, PNG, WebP and GIF. PDF pages are issue #26; until
- *  then the Capture screen says so rather than letting the upload fail at the
- *  server with a less helpful message.
+ *  The back end checks the file signature, not the declared type, and allows
+ *  JPEG, PNG and WebP. PDF pages are issue #26; until then the Capture screen
+ *  says so rather than letting the upload fail at the server.
  */
-export const CAPTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+export const CAPTURE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export interface CaptureLine {
   id: string;
@@ -118,6 +118,10 @@ export function transcribe(audio: Blob, contentType: string): Promise<Transcribe
 export interface SpokenAlternative {
   latex: string;
   readback: string;
+  /** False when SymPy could not read this option. It is still offered — the
+   *  student knows what they said, and DESIGN.md 27 marks such a line unsure
+   *  rather than hiding it — but it is flagged as unchecked. */
+  valid: boolean;
 }
 
 /** Spoken math turned into LaTeX — DESIGN.md 9.
