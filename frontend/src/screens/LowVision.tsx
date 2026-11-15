@@ -149,6 +149,9 @@ export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
         {
           background: theme.bg,
           color: theme.fg,
+          '--surface': theme.bg,
+          '--line': theme.muted,
+          '--accent': theme.accent,
           '--lv-fg': theme.fg,
           '--lv-bg': theme.bg,
           '--lv-muted': theme.muted,
