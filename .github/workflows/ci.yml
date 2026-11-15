@@ -63,8 +63,11 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package.json') }}
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      # Chromium for desktop, WebKit for iPhone Safari (Flow B). Safari's
+      # keyboard behaviour differs (Tab skips buttons by default), and a bug
+      # that only showed there was what added it.
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Start dev server
         working-directory: frontend
@@ -80,7 +83,7 @@ jobs:
         env:
           CI: "true"
           BASE_URL: http://localhost:5173
-        run: npx playwright test --grep @smoke --project=chromium --pass-with-no-tests --reporter=line
+        run: npx playwright test --grep @smoke --project=chromium --project=mobile-safari --pass-with-no-tests --reporter=line
 
       - name: Upload report on failure
         if: failure()
