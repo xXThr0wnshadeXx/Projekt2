@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "file": "equations-only.png",
+      "source_text": ["2x + 3 = 11", "(x + 1) / 2 = 5"],
+      "instructions": "",
+      "lines": ["2x + 3 = 11", "\\frac{x + 1}{2} = 5"]
+    },
+    {
+      "file": "heading-and-equation.png",
+      "source_text": ["Solve for x.", "2x + 3 = 11"],
+      "instructions": "Solve for x.",
+      "lines": ["2x + 3 = 11"]
+    }
+  ]
+}
