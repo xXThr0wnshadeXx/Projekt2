@@ -20,19 +20,35 @@ if [ -z "$API" ]; then
   echo "Usage: API=https://<back-end> bash scripts/keep_warm.sh" >&2
   exit 2
 fi
+command -v python3 >/dev/null || { echo "python3 is required to read the step-check response" >&2; exit 2; }
 
+step_body="$(mktemp)" || exit 2
+trap 'rm -f "$step_body"' EXIT
 end=$(( $(date +%s) + MINUTES * 60 ))
 echo "Keeping $API warm every ${EVERY}s for ${MINUTES} min. Ctrl+C to stop."
 
 while [ "$(date +%s)" -lt "$end" ]; do
-  health="$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' --max-time 15 "$API/api/health" 2>/dev/null || echo '000 0')"
-  step="$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' --max-time 15 -X POST "$API/api/diff" \
+  health="$(curl -sS -o /dev/null -w '%{http_code} %{time_total}' --max-time 15 "$API/api/health" 2>/dev/null)" || health='000 0'
+  : > "$step_body"
+  step="$(curl -sS -o "$step_body" -w '%{http_code} %{time_total}' --max-time 15 -X POST "$API/api/diff" \
     -H 'Content-Type: application/json' \
-    -d '{"from_latex":"2x + 3 = 11","to_latex":"2x = 8","mode":"homework"}' 2>/dev/null || echo '000 0')"
+    -d '{"from_latex":"2x + 3 = 11","to_latex":"2x = 8","mode":"homework"}' 2>/dev/null)" || step='000 0'
   printf '%s  health %s  step check %s\n' "$(date '+%H:%M:%S')" \
     "$(echo "$health" | awk '{printf "%s %dms", $1, $2*1000}')" \
     "$(echo "$step" | awk '{printf "%s %dms", $1, $2*1000}')"
   case "$health" in 200*) ;; *) printf '          ^ back end not answering — check the host\n' ;; esac
+  case "$step" in
+    200\ *)
+      if python3 -c 'import json, sys; sys.exit(json.load(sys.stdin).get("verified") is not True)' < "$step_body" 2>/dev/null; then
+        printf '          Step check verified the sample.\n'
+      else
+        printf '          ^ step check did not verify the sample — run preflight\n'
+      fi
+      ;;
+    *)
+      printf '          ^ step check request failed — run preflight\n'
+      ;;
+  esac
   sleep "$EVERY"
 done
 echo "Done."

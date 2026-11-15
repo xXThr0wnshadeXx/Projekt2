@@ -49,13 +49,23 @@ export interface Settings {
   /** The app's own speech. Off by default: a screen reader already reads the
    *  live regions, and two voices at once is unusable (DESIGN.md 13). */
   selfVoicing: boolean;
+  /** Size of all text, as a percentage of the browser's own size. */
+  textScale: number;
 }
 
-export const defaultSettings: Settings = { mode: 'homework', selfVoicing: false };
+/** Large print is the default, not a mode to go and find. */
+export const TEXT_SCALES = [100, 125, 150, 175, 200];
+
+export const defaultSettings: Settings = {
+  mode: 'homework',
+  selfVoicing: false,
+  textScale: 125,
+};
 
 const PROBLEM_KEY = 'glance.problem.v1';
 const WORK_KEY = 'glance.work.v1';
 const SETTINGS_KEY = 'glance.settings.v1';
+const REVIEW_KEY = 'glance.review.v1';
 
 // Every access is wrapped: localStorage throws in private windows and in some
 // embedded webviews, and a storage failure must never take the app down.
@@ -99,6 +109,24 @@ export function clearProblem(): void {
   remove(PROBLEM_KEY);
   // A new problem means the old work no longer belongs to anything.
   remove(WORK_KEY);
+  remove(REVIEW_KEY);
+}
+
+/** What a review allowance is tied to: the problem, not the work. Editing a
+ *  line and asking again would make the review an answer oracle (#215). */
+function reviewKeyFor(problem: Problem): string {
+  return problem.lines.map((l) => l.latex).join('\n');
+}
+
+/** True once this problem has had its one review. Survives a reload. */
+export function reviewSpent(problem: Problem): boolean {
+  return read<string>(REVIEW_KEY) === reviewKeyFor(problem);
+}
+
+/** Spent before the request is sent: a failed request still uses it up, since
+ *  refunding it would let a student retry until they like the answer. */
+export function spendReview(problem: Problem): void {
+  write(REVIEW_KEY, reviewKeyFor(problem));
 }
 
 export function loadWork(): WorkLine[] {
@@ -111,7 +139,9 @@ export function saveWork(lines: WorkLine[]): void {
 }
 
 export function loadSettings(): Settings {
-  return { ...defaultSettings, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
+  const settings = { ...defaultSettings, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
+  if (!TEXT_SCALES.includes(settings.textScale)) settings.textScale = defaultSettings.textScale;
+  return settings;
 }
 
 export function saveSettings(settings: Settings): void {

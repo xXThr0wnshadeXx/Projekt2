@@ -10,6 +10,10 @@
 // question is operable by keyboard.
 
 import { test, expect, type Page } from '@playwright/test';
+import { stubServerWithModels } from './server';
+
+// Capture is offered only when the server says it has its model (#127).
+test.beforeEach(async ({ page }) => stubServerWithModels(page));
 
 const CAPTURED = {
   instructions: 'Solve for x.',
@@ -87,7 +91,10 @@ test.describe('@smoke pdf worksheets', () => {
 
     const field = page.getByLabel('Which page is your problem on?');
     await field.fill('9');
-    await page.getByRole('button', { name: 'Open this page' }).click();
+    // Enter, not a click: on CI's Linux WebKit phone emulation the page cannot
+    // be scrolled to its last ~100px after a screen change, so a click on a
+    // control at the bottom never lands. A real phone is not affected.
+    await page.getByRole('button', { name: 'Open this page' }).press('Enter');
 
     await expect(page.getByTestId('live-assertive')).toContainText('between 1 and 3');
     await expect(page.getByRole('region', { name: 'Choose a page' })).toBeVisible();

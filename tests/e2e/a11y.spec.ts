@@ -7,6 +7,8 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { stubServerWithModels } from './server';
+
 
 const PROBLEM = {
   instructions: 'Solve for x.',
@@ -19,6 +21,45 @@ const PROBLEM = {
   source: 'upload',
 };
 const WORK = [{ id: 'W1', latex: '2x = 8', readback: '2 x equals 8', valid: true }];
+
+test.describe('@smoke progressive web app shell', () => {
+  // The rest of the suite blocks service workers (playwright.config.ts).
+  test.use({ serviceWorkers: 'allow' });
+
+  test('publishes its manifest and explains the install fallback', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.addEventListener('beforeinstallprompt', (event) => event.stopImmediatePropagation());
+    });
+    await page.goto('/');
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
+    await expect(page.getByTestId('install-status')).toContainText('Install app option');
+    await expect
+      .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.active?.scriptURL ?? ''))
+      .toContain('/sw.js');
+  });
+});
+
+test('@smoke skip link moves focus to main content', async ({ page, browserName }) => {
+  await page.goto('/');
+  // Home deliberately focuses its heading on arrival. Two Shift+Tabs pass the
+  // header shortcut button and reach the preceding skip link.
+  await expect(
+    page.getByRole('heading', { name: 'Math for students who are blind or have low vision' }),
+  ).toBeFocused();
+  const skip = page.getByRole('link', { name: 'Skip to main content' });
+  if (browserName === 'webkit') {
+    // Safari leaves links out of the Tab order unless "Press Tab to highlight
+    // each item" is on, so the walk is checked on Chromium. What matters on
+    // both is what Enter on the link does.
+    await skip.focus();
+  } else {
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Shift+Tab');
+  }
+  await expect(skip).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('main')).toBeFocused();
+});
 
 const SPOKEN_CLEAR = {
   latex: 'x = 4', ambiguous: false, clarifying_question: null, alternatives: [], readback: 'x equals 4', valid: true,
@@ -81,6 +122,7 @@ for (const scheme of ['dark', 'light'] as const) {
     });
 
     test('capture, including a refused camera', async ({ page }) => {
+      await stubServerWithModels(page); // capture needs the model (#127)
       await page.goto('/');
       await page.getByRole('button', { name: 'Capture a problem' }).click();
       await expectNoSeriousViolations(page, 'capture');
@@ -93,6 +135,7 @@ for (const scheme of ['dark', 'light'] as const) {
       await page.route('**/api/pdf/pages', (r) =>
         r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ pages: 3 }) }),
       );
+      await stubServerWithModels(page); // capture needs the model (#127)
       await page.goto('/');
       await page.getByRole('button', { name: 'Capture a problem' }).click();
       await page.locator('input[type=file]').setInputFiles({
