@@ -122,3 +122,42 @@ def test_out_of_range_line_is_kept_so_the_app_can_say_so():
 def test_bad_input_is_rejected():
     assert client().post("/api/command", json={"text": "", "line_count": 3}).status_code == 422
     assert client().post("/api/command", json={"text": "x" * 501}).status_code == 422
+
+
+REFUSAL = "I can only change what you tell me to change. Say, for example, change the 3 to a 4."
+
+
+@pytest.mark.parametrize("text", [
+    "fix my mistake", "correct line 2", "make it right", "what's wrong with line two",
+    "fix it", "where is my mistake", "get it right",
+])
+def test_correction_requests_are_refused_without_a_model(text):
+    models = AsyncMock()
+    body = client(models).post("/api/command", json={"text": text, "current_line": "W2", "line_count": 3}).json()
+    assert body == {"intent": "unknown", "target_line": None, "instruction": None, "message": REFUSAL}
+    models.interpret.assert_not_awaited()
+
+
+@pytest.mark.parametrize("text, instruction", [
+    ("could the second one say a different number", "replace 3 with 7"),   # new value not said
+    ("change it to something else", "replace it with 5"),
+    ("could three x become four", "replace 3x with 4"),                    # not a single token
+])
+def test_model_edit_that_the_student_did_not_say_is_refused(text, instruction):
+    models = AsyncMock()
+    models.interpret.return_value = {"intent": "edit", "target_line": "W2", "instruction": instruction}
+    body = client(models).post("/api/command", json={"text": "uh " + text, "current_line": "W2", "line_count": 3}).json()
+    assert body["intent"] == "unknown" and body["instruction"] is None
+    assert body["message"] == REFUSAL
+
+
+def test_model_edit_with_values_the_student_said_is_accepted():
+    models = AsyncMock()
+    models.interpret.return_value = {"intent": "edit", "target_line": "W2", "instruction": "replace 3 with 4"}
+    body = client(models).post("/api/command", json={"text": "could the second one say 4 instead of three", "current_line": "W2", "line_count": 3}).json()
+    assert body["instruction"] == "replace 3 with 4" and "message" not in body
+
+
+def test_rule_edit_must_name_a_token():
+    body = client().post("/api/command", json={"text": "change it to four", "current_line": "W2", "line_count": 3}).json()
+    assert body["message"] == REFUSAL

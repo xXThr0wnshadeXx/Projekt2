@@ -35,6 +35,19 @@ export function asksToSolve(text: string): boolean {
   return ASKS_TO_SOLVE.test(text);
 }
 
+/** Glance changes only what the student names ("change the 3 to a 4"). A
+ *  request for a correction is refused with this fixed sentence (#188). Kept in
+ *  step with backend/app/commands.py. */
+export const EDIT_REFUSAL =
+  'I can only change what you tell me to change. Say, for example, change the 3 to a 4.';
+
+const ASKS_FOR_CORRECTION =
+  /\b(?:fix|correct|repair|redo|rewrite)\b(?!\s+(?:the\s+)?(?:\w+\s+)?(?:to|with|into)\b)|\bmake (?:it|this|that|them) (?:right|correct|better|work)\b|\bwhat(?:'s| is) wrong\b|\bwhere(?:'s| is| did i go) (?:my |the )?(?:mistake|error|wrong)\b|\bmy (?:mistake|error)\b|\bget it right\b|\bdo (?:it|this) (?:right|correctly)\b/i;
+
+export function asksForCorrection(text: string): boolean {
+  return ASKS_FOR_CORRECTION.test(text);
+}
+
 /** "W3" → 3. */
 export function lineNumber(ref: string | null): number | null {
   const m = /^W(\d{1,3})$/.exec(ref ?? '');
