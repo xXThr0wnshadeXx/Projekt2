@@ -320,7 +320,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Capture a problem
       </h2>
