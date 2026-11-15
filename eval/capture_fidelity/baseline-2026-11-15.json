@@ -1,0 +1,64 @@
+{
+  "revision": "production-baseline-unverified",
+  "model": "production-model-unreported",
+  "run_at": "2026-11-15T09:29:49.799553+00:00",
+  "results": [
+    {
+      "file": "equations-only.png",
+      "passed": false,
+      "errors": [
+        "Instructions differ from the printed source."
+      ],
+      "actual": {
+        "instructions": "Transcribe the given equations exactly as they appear.",
+        "lines": [
+          {
+            "latex": "2x + 3 = 11",
+            "confidence": 1,
+            "intent_notes": "",
+            "id": "L1",
+            "valid": true
+          },
+          {
+            "latex": "\\frac{x + 1}{2} = 5",
+            "confidence": 1,
+            "intent_notes": "Rewritten from (x + 1) / 2 = 5 as a fraction",
+            "id": "L2",
+            "valid": true
+          }
+        ],
+        "diagrams": [],
+        "warnings": []
+      }
+    },
+    {
+      "file": "heading-and-equation.png",
+      "passed": false,
+      "errors": [
+        "Instructions differ from the printed source.",
+        "Math lines differ, are missing, or contain extra text."
+      ],
+      "actual": {
+        "instructions": "Transcribe the given math problem as written in the image.",
+        "lines": [
+          {
+            "latex": "\\text{Solve for } x.",
+            "confidence": 1,
+            "intent_notes": "",
+            "id": "L1",
+            "valid": true
+          },
+          {
+            "latex": "2x + 3 = 11",
+            "confidence": 1,
+            "intent_notes": "",
+            "id": "L2",
+            "valid": true
+          }
+        ],
+        "diagrams": [],
+        "warnings": []
+      }
+    }
+  ]
+}
