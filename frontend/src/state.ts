@@ -32,6 +32,16 @@ export interface Problem {
   source: 'upload' | 'paste' | 'camera' | 'sample';
 }
 
+/** One line of the student's own work (issue #18). */
+export interface WorkLine {
+  id: string;
+  latex: string;
+  /** How it is spoken back, kept so a line can be re-read without the model. */
+  readback: string;
+  /** False when SymPy could not parse it. Saved anyway, flagged as unsure. */
+  valid: boolean;
+}
+
 export type Mode = 'study' | 'homework' | 'exam';
 
 export interface Settings {
@@ -44,6 +54,7 @@ export interface Settings {
 export const defaultSettings: Settings = { mode: 'homework', selfVoicing: false };
 
 const PROBLEM_KEY = 'glance.problem.v1';
+const WORK_KEY = 'glance.work.v1';
 const SETTINGS_KEY = 'glance.settings.v1';
 
 // Every access is wrapped: localStorage throws in private windows and in some
@@ -86,6 +97,17 @@ export function saveProblem(problem: Problem): void {
 
 export function clearProblem(): void {
   remove(PROBLEM_KEY);
+  // A new problem means the old work no longer belongs to anything.
+  remove(WORK_KEY);
+}
+
+export function loadWork(): WorkLine[] {
+  const w = read<WorkLine[]>(WORK_KEY);
+  return Array.isArray(w) ? w : [];
+}
+
+export function saveWork(lines: WorkLine[]): void {
+  write(WORK_KEY, lines);
 }
 
 export function loadSettings(): Settings {

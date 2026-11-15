@@ -19,9 +19,15 @@ export interface ProblemProps {
   problem: ProblemData;
   onLowVision: (index: number) => void;
   onNewCapture: () => void;
+  onStartWorking: () => void;
 }
 
-export function Problem({ problem, onLowVision, onNewCapture }: ProblemProps) {
+export function Problem({
+  problem,
+  onLowVision,
+  onNewCapture,
+  onStartWorking,
+}: ProblemProps) {
   const [index, setIndex] = useState(0);
   const [summary, setSummary] = useState('');
   const announced = useRef(false);
@@ -89,6 +95,7 @@ export function Problem({ problem, onLowVision, onNewCapture }: ProblemProps) {
     n: () => goTo(index + 1, 'next'),
     p: () => goTo(index - 1, 'previous'),
     l: () => onLowVision(index),
+    s: onStartWorking,
     u: onNewCapture,
   });
 
@@ -111,7 +118,8 @@ export function Problem({ problem, onLowVision, onNewCapture }: ProblemProps) {
         <kbd className="kbd">G</kbd> for the structure of a line,{' '}
         <kbd className="kbd">Enter</kbd> to explore inside it,{' '}
         <kbd className="kbd">N</kbd> and <kbd className="kbd">P</kbd> to move
-        between lines, <kbd className="kbd">L</kbd> for low-vision mode.
+        between lines, <kbd className="kbd">L</kbd> for low-vision mode,{' '}
+        <kbd className="kbd">S</kbd> to start working.
       </p>
 
       {problem.warnings.length > 0 && (
@@ -159,6 +167,9 @@ export function Problem({ problem, onLowVision, onNewCapture }: ProblemProps) {
         </button>
         <button type="button" className="btn" onClick={readAll}>
           Read all
+        </button>
+        <button type="button" className="btn" onClick={onStartWorking}>
+          Start working
         </button>
         <button type="button" className="btn" onClick={() => onLowVision(index)}>
           Low-vision mode

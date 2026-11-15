@@ -1,2 +1,125 @@
-// ClarifyDialog — issue #19. See DESIGN.md 12.
-export {};
+// ClarifyDialog — issue #19.
+//
+// "x plus one over two" is two different expressions and speech cannot tell
+// them apart. A tool that guesses is worse than useless for homework, because
+// the student cannot see what it chose. So we ask.
+//
+// This is the demo's wow moment (DESIGN.md 25), which means it has to be
+// flawless with a screen reader: a real modal dialog, focus trapped inside it
+// while it is open, focus restored to wherever the student was when it closes,
+// and number keys 1 to 3 as a shortcut for people who do not want to tab.
+
+import { useEffect, useRef } from 'react';
+import type { SpokenAlternative } from '../api';
+
+export interface ClarifyDialogProps {
+  question: string;
+  alternatives: SpokenAlternative[];
+  onChoose: (choice: SpokenAlternative) => void;
+  onCancel: () => void;
+}
+
+export function ClarifyDialog({
+  question,
+  alternatives,
+  onChoose,
+  onCancel,
+}: ClarifyDialogProps) {
+  const dialog = useRef<HTMLDivElement>(null);
+  const first = useRef<HTMLButtonElement>(null);
+  const restoreTo = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    // Remember where focus was so it can go back; losing a student's place in
+    // the page is disorienting in a way sighted users rarely notice.
+    restoreTo.current = document.activeElement as HTMLElement | null;
+    first.current?.focus();
+    return () => restoreTo.current?.focus?.();
+  }, []);
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onCancel();
+      return;
+    }
+
+    // 1 to 3 pick an option directly (DESIGN.md 12).
+    const n = Number(e.key);
+    if (Number.isInteger(n) && n >= 1 && n <= alternatives.length) {
+      e.preventDefault();
+      onChoose(alternatives[n - 1]);
+      return;
+    }
+
+    if (e.key !== 'Tab') return;
+
+    // Focus trap. Without it, Tab walks out of the dialog into the page behind
+    // and a screen-reader user has no idea the dialog is still open.
+    const focusables = dialog.current?.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (!focusables || focusables.length === 0) return;
+    const firstEl = focusables[0];
+    const lastEl = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === firstEl) {
+      e.preventDefault();
+      lastEl.focus();
+    } else if (!e.shiftKey && document.activeElement === lastEl) {
+      e.preventDefault();
+      firstEl.focus();
+    }
+  }
+
+  return (
+    // The backdrop is not clickable-to-close on purpose: a stray tap must not
+    // silently throw away what the student just said.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      <div
+        ref={dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="clarify-question"
+        onKeyDown={onKeyDown}
+        data-testid="clarify-dialog"
+        className="w-full max-w-lg rounded-lg border border-[--line] bg-[--surface] p-6"
+      >
+        <h2 id="clarify-question" className="text-lg font-semibold">
+          {question}
+        </h2>
+
+        <ul className="mt-4 space-y-3">
+          {alternatives.map((option, i) => (
+            <li key={option.latex}>
+              <button
+                ref={i === 0 ? first : undefined}
+                type="button"
+                className="btn w-full justify-start text-left"
+                onClick={() => onChoose(option)}
+              >
+                <span aria-hidden="true" className="mr-3 font-mono">
+                  {i + 1}.
+                </span>
+                {/* The readback is the spoken form; it is what the student is
+                    actually choosing between, so it is the accessible name. */}
+                {option.readback}
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button type="button" className="btn" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+
+        <p className="mt-3 text-sm text-[--muted]">
+          Press <kbd className="kbd">1</kbd> to{' '}
+          <kbd className="kbd">{alternatives.length}</kbd> to choose, or{' '}
+          <kbd className="kbd">Esc</kbd> to cancel.
+        </p>
+      </div>
+    </div>
+  );
+}

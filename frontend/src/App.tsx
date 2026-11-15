@@ -16,6 +16,7 @@ import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
 import { LowVision } from './screens/LowVision';
+import { Scratchpad } from './screens/Scratchpad';
 import {
   loadProblem,
   saveProblem,
@@ -23,7 +24,7 @@ import {
   type Problem as ProblemData,
 } from './state';
 
-type Screen = 'home' | 'capture' | 'problem' | 'lowvision';
+type Screen = 'home' | 'capture' | 'problem' | 'lowvision' | 'scratchpad';
 type BackEnd = 'checking' | 'up' | 'down';
 
 export function App() {
@@ -145,11 +146,16 @@ export function App() {
           problem={problem}
           onLowVision={enterLowVision}
           onNewCapture={() => setScreen('capture')}
+          onStartWorking={() => setScreen('scratchpad')}
         />
       )}
 
+      {screen === 'scratchpad' && problem && (
+        <Scratchpad problem={problem} onBack={() => setScreen('problem')} />
+      )}
+
       {/* Only reachable if storage returned something unusable. */}
-      {screen === 'problem' && !problem && (
+      {(screen === 'problem' || screen === 'scratchpad') && !problem && (
         <main id="main" className="mx-auto max-w-3xl px-6 py-8">
           <h2 className="text-2xl font-semibold">No problem loaded</h2>
           <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
