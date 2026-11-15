@@ -15,7 +15,9 @@ import re
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from ..commands import INTENTS, Command, parse_command
+from ..commands import (
+    EDIT_REFUSAL, INTENTS, Command, asks_for_correction, grounded_edit, parse_command,
+)
 from ..openai_client import ModelClient, ModelError
 from ..prompts import COMMAND_PROMPT
 
@@ -24,6 +26,7 @@ class CommandResponse(BaseModel):
     intent: str
     target_line: str | None
     instruction: str | None
+    message: str | None = None
 
 
 class CommandRequest(BaseModel):
@@ -40,7 +43,10 @@ def _line_number(ref: str | None) -> int | None:
     return int(m.group(1)) if m else None
 
 
-def _checked(cmd: dict, line_count: int) -> Command:
+REFUSED = {"intent": "unknown", "target_line": None, "instruction": None, "message": EDIT_REFUSAL}
+
+
+def _checked(cmd: dict, line_count: int, transcript: str = "") -> dict:
     """Trust nothing about a result: intent from the list, line in range."""
     intent = cmd.get("intent")
     if intent not in INTENTS:
@@ -54,18 +60,26 @@ def _checked(cmd: dict, line_count: int) -> Command:
     instruction = cmd.get("instruction")
     if not isinstance(instruction, str) or not instruction.strip():
         instruction = None
+    if intent == "edit" and instruction is not None and not grounded_edit(instruction, transcript):
+        # Glance changes only a token the student named to a value the student
+        # said. Anything else (a model's correction) is refused, not repaired.
+        return REFUSED
+    if intent != "edit":
+        instruction = instruction if intent == "read" and instruction == "all" else None
     return {"intent": intent, "target_line": target, "instruction": instruction}
 
 
 def command_router(models: ModelClient | None) -> APIRouter:
     router = APIRouter(prefix="/api")
 
-    @router.post("/command", response_model=CommandResponse)
-    async def command(req: CommandRequest) -> Command:
+    @router.post("/command", response_model=CommandResponse, response_model_exclude_defaults=True)
+    async def command(req: CommandRequest) -> dict:
+        if asks_for_correction(req.text):
+            return REFUSED
         current = _line_number(req.current_line)
         ruled = parse_command(req.text, current, req.line_count)
         if ruled is not None:
-            return _checked(ruled, req.line_count)
+            return _checked(ruled, req.line_count, req.text)
         if models is None:
             return UNKNOWN
         try:
@@ -79,6 +93,6 @@ def command_router(models: ModelClient | None) -> APIRouter:
             ])
         except ModelError:
             return UNKNOWN
-        return _checked(result, req.line_count)
+        return _checked(result, req.line_count, req.text)
 
     return router
