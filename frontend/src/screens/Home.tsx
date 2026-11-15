@@ -18,6 +18,7 @@ export interface HomeProps {
   onSample: () => void;
   /** Present only when a problem from earlier in the session is still loaded. */
   onResume?: () => void;
+  takeRestoredAnnouncement: () => string;
   onSettings: () => void;
   settings: Settings;
   onSettingsChange: (next: Settings) => void;
@@ -31,6 +32,7 @@ export function Home({
   onCapture,
   onSample,
   onResume,
+  takeRestoredAnnouncement,
   onSettings,
   settings,
   onSettingsChange,
@@ -39,12 +41,14 @@ export function Home({
 
   useEffect(() => {
     heading.current?.focus();
-    announce(
-      onResume
-        ? `${WHAT} Capture a problem, try the sample, or go back to your problem.`
-        : `${WHAT} Capture a problem, or try the sample.`,
-    );
-  }, [onResume]);
+    const welcome = onResume
+      ? `${WHAT} Capture a problem, try the sample, or go back to your problem.`
+      : `${WHAT} Capture a problem, or try the sample.`;
+    // Announce after the live regions have mounted. StrictMode cancels the
+    // first timer before it can use the one-time restoration message.
+    const timer = window.setTimeout(() => announce(takeRestoredAnnouncement() || welcome), 0);
+    return () => window.clearTimeout(timer);
+  }, [onResume, takeRestoredAnnouncement]);
 
   useShortcuts({ u: onCapture, c: onCapture });
 
