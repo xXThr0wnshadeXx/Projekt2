@@ -157,3 +157,14 @@ mjx-container:focus-visible {
     color: #000 !important;
   }
 }
+
+/* 400% zoom (WCAG 1.4.10, DESIGN.md 13). A long equation scrolls inside its
+   line instead of pushing the whole page sideways; math is the one kind of
+   content WCAG lets scroll in two dimensions. The scrolling box is the line's
+   own focusable group — the one tab stop per line — so keyboard users can
+   reach and scroll it (axe: scrollable-region-focusable). */
+[data-testid^='math-line-'] {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
