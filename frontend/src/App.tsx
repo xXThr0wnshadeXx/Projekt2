@@ -13,6 +13,7 @@ import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { KeyboardHelp } from './components/KeyboardHelp';
 import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
+import { InstallApp } from './components/InstallApp';
 import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
@@ -214,6 +215,7 @@ export function App() {
           >
             Keyboard shortcuts
           </button>
+          <InstallApp />
         </div>
       </header>
 

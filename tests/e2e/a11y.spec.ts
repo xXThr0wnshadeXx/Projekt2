@@ -20,6 +20,20 @@ const PROBLEM = {
 };
 const WORK = [{ id: 'W1', latex: '2x = 8', readback: '2 x equals 8', valid: true }];
 
+test.describe('@smoke progressive web app shell', () => {
+  test('publishes its manifest and explains the install fallback', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.addEventListener('beforeinstallprompt', (event) => event.stopImmediatePropagation());
+    });
+    await page.goto('/');
+    await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
+    await expect(page.getByTestId('install-status')).toContainText('Install app option');
+    await expect
+      .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.active?.scriptURL ?? ''))
+      .toContain('/sw.js');
+  });
+});
+
 const SPOKEN_CLEAR = {
   latex: 'x = 4', ambiguous: false, clarifying_question: null, alternatives: [], readback: 'x equals 4', valid: true,
 };
