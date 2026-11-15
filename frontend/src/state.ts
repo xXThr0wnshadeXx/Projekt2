@@ -42,7 +42,12 @@ export interface WorkLine {
   valid: boolean;
 }
 
-export type Mode = 'study' | 'homework' | 'exam';
+/** reader is the default: Glance reads the problem and writes down the work and
+ *  never checks anything. study and homework exist only for students whose
+ *  instructor allows step checks. */
+export type Mode = 'reader' | 'study' | 'homework' | 'exam';
+
+export const MODE_VALUES: Mode[] = ['reader', 'study', 'homework', 'exam'];
 
 export interface Settings {
   mode: Mode;
@@ -57,14 +62,20 @@ export interface Settings {
 export const TEXT_SCALES = [100, 125, 150, 175, 200];
 
 export const defaultSettings: Settings = {
-  mode: 'homework',
+  mode: 'reader',
   selfVoicing: false,
   textScale: 125,
 };
 
 const PROBLEM_KEY = 'glance.problem.v1';
 const WORK_KEY = 'glance.work.v1';
-const SETTINGS_KEY = 'glance.settings.v1';
+const SETTINGS_KEY = 'glance.settings.v2';
+// v1 defaulted to homework, so a stored 'homework' there was never a choice.
+const OLD_SETTINGS_KEY = 'glance.settings.v1';
+const CHECKS_KEY = 'glance.checks.v1';
+
+/** Step checks allowed per problem, automatic and asked-for together. */
+export const MAX_CHECKS = 3;
 
 // Every access is wrapped: localStorage throws in private windows and in some
 // embedded webviews, and a storage failure must never take the app down.
@@ -108,6 +119,21 @@ export function clearProblem(): void {
   remove(PROBLEM_KEY);
   // A new problem means the old work no longer belongs to anything.
   remove(WORK_KEY);
+  remove(CHECKS_KEY);
+}
+
+/** How many step checks this problem has used. Survives a reload on purpose. */
+export function loadChecksUsed(): number {
+  const n = read<number>(CHECKS_KEY);
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/** Spend one check. False, and nothing spent, when the cap is already reached. */
+export function spendCheck(): boolean {
+  const used = loadChecksUsed();
+  if (used >= MAX_CHECKS) return false;
+  write(CHECKS_KEY, used + 1);
+  return true;
 }
 
 export function loadWork(): WorkLine[] {
@@ -120,7 +146,17 @@ export function saveWork(lines: WorkLine[]): void {
 }
 
 export function loadSettings(): Settings {
-  const settings = { ...defaultSettings, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
+  let stored = read<Partial<Settings>>(SETTINGS_KEY);
+  if (!stored) {
+    const old = read<Partial<Settings>>(OLD_SETTINGS_KEY);
+    if (old) {
+      // Keep reading preferences; the old mode was only ever the default.
+      const { mode: _dropped, ...keep } = old;
+      stored = keep;
+    }
+  }
+  const settings = { ...defaultSettings, ...(stored ?? {}) };
+  if (!MODE_VALUES.includes(settings.mode)) settings.mode = defaultSettings.mode;
   if (!TEXT_SCALES.includes(settings.textScale)) settings.textScale = defaultSettings.textScale;
   return settings;
 }

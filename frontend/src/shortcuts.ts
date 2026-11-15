@@ -99,7 +99,7 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'Shift R', does: 'read the whole problem' },
     { keys: 'N or P', does: 'next or previous maths line, skipping everything in between' },
     { keys: 'Enter', does: 'explore inside the line with the arrow keys; Escape to come out' },
-    { keys: 'W', does: 'what changed from the line before (not in exam mode)' },
+    { keys: 'W', does: 'what changed from the line before (only when your instructor allows step checks)' },
     { keys: 'L', does: 'low-vision mode' },
     { keys: 'S', does: 'start working' },
     { keys: 'U', does: 'capture another problem' },
@@ -120,7 +120,7 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
     { keys: 'X', does: 'hand in your work' },
     {
       keys: 'Say or type a command',
-      does: 'for example next line, read line two, delete line two, undo, check this step, change the three to a four, hand in, help',
+      does: 'for example next line, read line two, delete line two, undo, change the three to a four, hand in, help',
     },
     HELP,
   ],

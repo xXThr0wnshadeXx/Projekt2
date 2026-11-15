@@ -50,7 +50,7 @@ async function open(page: Page, reply: Reply, spoken?: unknown) {
     });
   });
   await page.route('**/api/diff', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ verified: true, method: 'ratio_constant', message: 'This step checks out.' }) }),
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ verified: true, message: 'This step checks out.' }) }),
   );
   await page.goto('/');
   await page.getByRole('button', { name: 'Back to your problem' }).click();
@@ -142,17 +142,37 @@ test.describe('@smoke commands', () => {
 
   test('check is off in exam mode', async ({ page }) => {
     await page.addInitScript(() =>
-      localStorage.setItem('glance.settings.v1', JSON.stringify({ mode: 'exam', selfVoicing: false })),
+      localStorage.setItem('glance.settings.v2', JSON.stringify({ mode: 'exam', selfVoicing: false })),
     );
     await open(page, { intent: 'check', target_line: 'W1', instruction: null });
     await say(page, 'check this step');
     await expect(polite(page)).toHaveText('Step checking is off in exam mode.');
   });
 
-  test('check reads the verdict for that line', async ({ page }) => {
+  test('check is refused in the default reader and scribe mode', async ({ page }) => {
+    await open(page, { intent: 'check', target_line: 'W2', instruction: null });
+    await say(page, 'check line two');
+    await expect(polite(page)).toHaveText(
+      'Step checking is off. Glance reads and writes; it does not check your work.',
+    );
+  });
+
+  test('check reads the verdict for that line when homework mode is on', async ({ page }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem('glance.settings.v2', JSON.stringify({ mode: 'homework', selfVoicing: false })),
+    );
+    await open(page, { intent: 'check', target_line: 'W2', instruction: null });
+    await say(page, 'check line two');
+    await expect(polite(page)).toHaveText('Line 2. This step checks out.');
+  });
+
+  test('check on the first line has nothing to compare with, never a problem line', async ({ page }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem('glance.settings.v2', JSON.stringify({ mode: 'homework', selfVoicing: false })),
+    );
     await open(page, { intent: 'check', target_line: 'W1', instruction: null });
     await say(page, 'check line one');
-    await expect(polite(page)).toHaveText('Line 1. This step checks out.');
+    await expect(polite(page)).toHaveText('I can only check a line against your previous line.');
   });
 
   test('"hand in" opens the hand-in screen', async ({ page }) => {

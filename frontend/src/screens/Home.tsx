@@ -101,9 +101,9 @@ export function Home({
 
       <p className="mt-6 rounded-lg border border-[--line] bg-[--surface] px-4 py-3">
         <strong>Glance never solves the problem.</strong> No answers, no hints,
-        no next steps. It reads, it writes down what you say, and it can check
-        a line you have written. The work stays yours, so it can be used in
-        class and in exams.
+        no next steps. It reads the problem and writes down what you say. The
+        work stays yours, so it can be used in class and in exams. Step checks
+        only if your instructor turns them on.
       </p>
 
       {/* How the page itself is read. Here, not only in Settings: a student

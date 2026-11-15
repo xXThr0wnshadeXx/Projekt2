@@ -200,7 +200,7 @@ test.describe('@smoke talking to Glance', () => {
 
   test('in exam mode words are not explained', async ({ page }) => {
     await page.addInitScript(() =>
-      window.localStorage.setItem('glance.settings.v1', JSON.stringify({ mode: 'exam' })),
+      window.localStorage.setItem('glance.settings.v2', JSON.stringify({ mode: 'exam' })),
     );
     await keyless(page);
     await openScratchpad(page);

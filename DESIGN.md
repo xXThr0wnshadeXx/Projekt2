@@ -21,7 +21,7 @@ Repo: `xXThr0wnshadeXx/Projekt2` · Team of 4 · Build window: Fri Nov 13, 5 PM 
 11. [Math engine](#11-math-engine)
 12. [Front end](#12-front-end)
 13. [Accessibility requirements](#13-accessibility-requirements)
-14. [Modes (study / homework / exam)](#14-modes-study--homework--exam)
+14. [Modes (reader / exam / homework / study)](#14-modes-reader--exam--homework--study)
 15. [Privacy and data](#15-privacy-and-data)
 16. [Performance budget](#16-performance-budget)
 17. [Repo structure](#17-repo-structure)
@@ -121,8 +121,8 @@ Math assumes you can **see** it and **write** it.
 4. `G` → structure summary. `Enter` → explore inside the equation with arrow keys.
 5. `S` → start working. Holds `Space`, says "two x equals eight", releases.
 6. App: "Your line 1: 2x equals 8. Save? Enter to save, E to edit." → `Enter`.
-7. (Homework mode) App: "This step checks out."
-8. Says "x equals four" → saved → "checks out."
+7. (Reader mode) App: "Saved as line 1." No check is made.
+8. Says "x equals four" → saved → "Saved as line 2."
 9. `X` → Export → downloads PDF + accessible HTML → submits on the LMS.
 
 ### Flow B — Blind student, iPhone + VoiceOver
@@ -268,9 +268,10 @@ Intents: `navigate | read | edit | delete | undo | new_line | check | what_chang
 
 ### `POST /api/diff`
 Request `{ "from_latex": "2x + 3 = 11", "to_latex": "2x = 8", "mode": "study" }`
-→ `{ "verified": true, "method": "ratio_constant", "message": "3 was subtracted from both sides." }`
+→ `{ "verified": true, "message": "3 was subtracted from both sides." }`
 - `homework`: message is "This step checks out." / "I couldn't confirm this step."
-- `exam`: `403`.
+- `reader` (the default when `mode` is omitted) and `exam`: `403 MODE_DISABLED`, before any work is done.
+- The response has no `method` field; it would tell a client why a step failed. `/api/diff` shares the 20/min model rate bucket.
 
 ### `POST /api/validate`
 Request `{ "latex": "2x = 8" }` → `{ "valid": true }`
@@ -388,7 +389,7 @@ Rules:
 ### Screens
 1. **Home** — Upload a file · Paste a screenshot · Take a photo · Open scratchpad · Settings. Mode badge.
 2. **Capture** — input controls, progress announcement ("Reading your problem…"), results summary.
-3. **Problem** — instructions + focusable MathJax lines; buttons: Glance · Read all · Low-vision · What changed? · Start working.
+3. **Problem** — instructions + focusable MathJax lines; buttons: Glance · Read all · Low-vision · Start working.
 4. **Scratchpad** — problem pinned (collapsible); numbered work lines; Record button; readback bar; clarify dialog; typed input.
 5. **Low-vision** — full-screen one line; theme + size controls; prev/next.
 6. **Export** — preview; Download PDF · Download accessible HTML · Download .tex · Show Nemeth.
@@ -411,7 +412,7 @@ Rules:
 | `Space` (hold) | Push-to-talk (desktop) |
 | `Enter` / `E` | Confirm / edit readback |
 | `1`–`3` | Pick ambiguity option |
-| `W` | What changed? |
+| `W` | What changed? (only when the instructor allows step checks; compares your own lines) |
 | `L` | Low-vision mode |
 | `X` | Export |
 | `?` | Speak help |
@@ -443,10 +444,23 @@ Shortcuts are disabled while focus is in a text field or the MathJax explorer.
 
 ---
 
-## 14. Modes (study / homework / exam)
+## 14. Modes (reader / exam / homework / study)
 
-| | Study | Homework | Exam |
-|---|---|---|---|
+Glance is a reader and scribe. It never solves, so it is safe in exams. Reader and scribe is the default; step checks exist only for students whose instructor turns them on.
+
+| | Reader and scribe (default) | Exam | Homework | Study |
+|---|---|---|---|---|
+| Capture / read / explore | ✅ | ✅ | ✅ | ✅ |
+| Scratchpad + readback | ✅ | ✅ | ✅ | ✅ |
+| Word meanings | ✅ | ❌ | ✅ | ✅ |
+| Step check on own work | ❌ | ❌ | ✅ "checks out" / "couldn't confirm" | ✅ with explanation |
+| Solve / hint / next step | ❌ never | ❌ never | ❌ never | ❌ never |
+
+Where checks are allowed (homework, study) they cannot hunt for answers: a check only compares a saved work line with the student's own previous work line, never a problem line, and at most 3 checks are allowed per problem (auto and asked-for together; the count survives a reload and resets with a new problem). After that: "I can't check more lines on this problem."
+
+Enforced in both UI (controls hidden/disabled) and API (`/diff` returns 403 in reader and exam).
+
+---|---|---|---|
 | Capture / read / explore | ✅ | ✅ | ✅ |
 | Scratchpad + readback | ✅ | ✅ | ✅ |
 | Step check on own work | ✅ with explanation | ✅ "checks out" / "couldn't confirm" | ❌ |
@@ -669,7 +683,7 @@ Teammate eyes-closed testing is QA, not user proof — label it that way.
 **0:30–2:45 — Live demo (one student's flow)**
 1. Upload a worksheet (or photo of the room's whiteboard).
 2. Structure summary → explore with arrows (subtitles on so judges see speech + braille).
-3. Speak "two x equals eight" → readback → save → "checks out."
+3. Speak "two x equals eight" → readback → save → "Saved as line 1."
 4. Say "x plus one over two" → clarifying question → pick 1. *(the wow)*
 5. Low-vision mode flip.
 6. Export → typed PDF + accessible HTML.

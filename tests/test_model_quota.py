@@ -64,7 +64,7 @@ def test_routes_and_study_explanations_share_an_upstream_budget(monkeypatch):
         assert response.json()["error"]["code"] == "RATE_LIMITED"
         assert int(response.headers["Retry-After"]) > 0
         assert client.get("/api/health").status_code == 200
-        assert client.post("/api/diff", json=step).json()["verified"]
+        assert client.post("/api/diff", json={**step, "mode": "homework"}).json()["verified"]
 
     assert calls == ["/v1/chat/completions"]
 

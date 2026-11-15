@@ -275,19 +275,18 @@ export async function validateLatex(latex: string): Promise<boolean | null> {
  *
  *  SymPy decides; the model only names the operation, and only in study mode
  *  after SymPy has verified the step. A step that isn't verified is always
- *  "I couldn't confirm this step." — never "wrong". Exam mode is refused by
- *  the server (403), and the UI never calls it there.
+ *  "I couldn't confirm this step." — never "wrong". Reader and exam modes are
+ *  refused by the server (403), and the UI never calls it there.
  */
 export interface DiffResponse {
   verified: boolean;
-  method: string;
   message: string;
 }
 
 export function diff(
   fromLatex: string,
   toLatex: string,
-  mode: 'study' | 'homework' | 'exam',
+  mode: 'study' | 'homework',
   signal?: AbortSignal,
 ): Promise<DiffResponse> {
   return request<DiffResponse>('/api/diff', {

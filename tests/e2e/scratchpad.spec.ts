@@ -222,7 +222,7 @@ test.describe('@smoke scratchpad', () => {
 
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByTestId('live-polite')).toHaveText(
-      'Saved as line 1. I could not check it.',
+      'Saved as line 1. I could not read it as math.',
     );
   });
 

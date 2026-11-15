@@ -102,7 +102,7 @@ test.describe('@smoke without a model', () => {
     await typeLine(page, 'x = 3 = y');
     await expect(polite(page)).toContainText('I read:');
     await page.keyboard.press('Enter');
-    await expect(polite(page)).toHaveText('Saved as line 1. I could not check it.');
+    await expect(polite(page)).toHaveText('Saved as line 1. I could not read it as math.');
     await expect(page.getByRole('group', { name: 'Your line 1, unsure' })).toBeVisible();
   });
 
@@ -127,7 +127,7 @@ test.describe('@smoke without a model', () => {
     for (const ask of asks) {
       await typeLine(page, ask);
       await expect(polite(page)).toHaveText(
-        'I cannot solve it, give the answer, or say what to do next. The work is yours. I can read the problem again, explain a math word, or check a line once you have written it.',
+        'I cannot solve it, give the answer, or say what to do next. The work is yours. I can read the problem again, or explain a math word.',
       );
       await expect(page.getByLabel('Or type your line')).toHaveValue('');
     }

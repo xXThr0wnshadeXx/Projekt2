@@ -48,6 +48,13 @@ def test_model_endpoints_have_a_tighter_budget():
     assert rl.check("2.2.2.2", "/api/capture") == 0
 
 
+def test_diff_uses_the_model_bucket():
+    assert "/api/diff" in guards.MODEL_PATHS
+    rl = limiter(Clock())
+    assert [rl.check("1.1.1.1", "/api/diff") for _ in range(3)] == [0, 0, 0]
+    assert rl.check("1.1.1.1", "/api/diff") > 0
+
+
 def test_window_slides():
     clock = Clock()
     rl = limiter(clock, model=1)
@@ -68,9 +75,9 @@ def test_forwarded_for_uses_the_address_the_proxy_recorded():
 def test_sweep_forgets_idle_clients():
     clock = Clock()
     rl = limiter(clock)
-    rl.check("a", "/api/diff")
+    rl.check("a", "/api/validate")
     clock.t += 3600
-    rl.check("b", "/api/diff")
+    rl.check("b", "/api/validate")
     assert ("a", "all") not in rl.hits
 
 

@@ -11,8 +11,8 @@
 // no model: that makes it instant, makes it work with no server, and makes it
 // impossible for an answer to contain a step or a solution, because none of
 // these answers is computed from the problem. The line this never crosses is
-// the same as everywhere else: it reads, describes, explains words and checks
-// a line the student wrote. It never says what to do next.
+// the same as everywhere else: it reads, describes, explains words and
+// writes down what they say. It never says what to do next.
 
 import { asksToSolve } from './commands';
 
@@ -136,6 +136,7 @@ export const GLOSSARY: [RegExp, string, string][] = [
   [/\bchecks? out\b/, 'checks out', 'It means your line follows from the one before it. It does not mean the problem is finished.'],
   [/\bunsure\b/, 'unsure', 'Unsure means I could not fully read that line as math. Check it before you rely on it.'],
   [/\bglance\b/, 'glance', 'A glance is the shape of a line before its details: whether it is an equation, and what it contains, such as fractions or roots.'],
+  [/\b(?:reader|scribe)(?: and scribe)?(?: mode)?\b/, 'reader and scribe', 'Reader and scribe is the default. I read the problem and write down your work. I never check, solve or hint.'],
   [/\bexam mode\b/, 'exam mode', 'In exam mode nothing is checked. You can still read, explore and write your work.'],
   [/\bhomework mode\b/, 'homework mode', 'In homework mode, after each line you save, you hear only whether it checks out or could not be confirmed.'],
   [/\bstudy mode\b/, 'study mode', 'In study mode, after each line you save, you hear whether it follows from the line before and which operation you used.'],
@@ -209,9 +210,9 @@ export const SAYS = {
   describes:
     'That says what you are going to do. Do it, then say or type the whole line you get, and I will write it down.',
   refuse:
-    'I cannot solve it, give the answer, or say what to do next. The work is yours. I can read the problem again, explain a math word, or check a line once you have written it.',
+    'I cannot solve it, give the answer, or say what to do next. The work is yours. I can read the problem again, or explain a math word.',
   capabilities:
-    'I read math aloud and write down what you say. Say or type a line and I read it back before saving it. You can also say: read the problem, where am I, what does numerator mean, check this step, delete line two, undo, or hand in. I never solve the problem or give hints.',
+    'I read math aloud and write down what you say. Say or type a line and I read it back before saving it. You can also say: read the problem, where am I, what does numerator mean, delete line two, undo, or hand in. I never solve the problem or give hints.',
   examNoMeanings: 'Explaining words is off in exam mode.',
   unknownTerm: (term: string) =>
     `I do not have a meaning for ${term}. I can read the problem again, or explain words like fraction, numerator, exponent or coefficient.`,
