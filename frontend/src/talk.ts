@@ -129,7 +129,7 @@ export const GLOSSARY: [RegExp, string, string][] = [
   [/\breciprocals?\b/, 'reciprocal', 'The reciprocal of a number is one divided by that number.'],
   [/\babsolute values?\b/, 'absolute value', 'The absolute value of a number is its size, ignoring whether it is negative.'],
   [/\b(?:parenthes[ie]s|brackets?)\b/, 'parentheses', 'Parentheses group part of a line so it is treated as one thing.'],
-  [/\bsolve\b/, 'solve', 'To solve for a letter means to find the value of the letter that makes the equation true. That part is yours to do.'],
+  [/\bsolve\b/, 'solve', 'Solving for a letter means working out which value of the letter makes the equation true. That part is yours to do.'],
   [/\bsimplify\b/, 'simplify', 'To simplify means to rewrite something in a shorter form that has the same value.'],
   // What this app itself says.
   [/\b(?:could ?n[o']t|can ?n[o']t|not) confirm(?:ed)?\b/, 'could not confirm', 'It means I could not verify that your line follows from the one before. It does not mean your line is wrong.'],
