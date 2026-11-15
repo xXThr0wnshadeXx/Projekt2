@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, StringConstraints
 
 from ..openai_client import ModelClient, ModelError
+from ..spoken_ambiguity import fraction_ambiguity
 
 SPOKEN_PROMPT = """Transcribe only the student's spoken math into LaTeX.
 Never fix, solve, or complete their work. Prior lines supply variable names only.
@@ -19,6 +20,9 @@ ask one short grouping question, and provide two or three distinct alternatives
 with short spoken readbacks. For clear math, return the LaTeX and speak grouping
 explicitly, such as 'all over' or 'end exponent'. Return no alternatives or
 question for clear math. Use null LaTeX and readback when there is no math.
+Standard algebra precedence does not resolve uncertainty in spoken grouping.
+For example, "x plus one over two" MUST ask about (x+1)/2 versus x+(1/2).
+An explicit "all over", "end fraction", or spoken parentheses may resolve it.
 """
 
 # Spoken aloud to a student, so the wording matters. "I couldn't confirm this
@@ -53,11 +57,13 @@ def spoken_router(
         except ValueError:
             return spoken_error(400, "BAD_INPUT", "Enter a spoken math line to transcribe.")
 
+        result = fraction_ambiguity(payload.text)
         try:
-            result = await models.interpret("spoken", [
-                {"role": "system", "content": SPOKEN_PROMPT},
-                {"role": "user", "content": json.dumps(payload.model_dump(), ensure_ascii=False)},
-            ])
+            if result is None:
+                result = await models.interpret("spoken", [
+                    {"role": "system", "content": SPOKEN_PROMPT},
+                    {"role": "user", "content": json.dumps(payload.model_dump(), ensure_ascii=False)},
+                ])
         except ModelError:
             return spoken_error(502, "MODEL_ERROR", "I couldn't interpret that line. Try again.")
 
