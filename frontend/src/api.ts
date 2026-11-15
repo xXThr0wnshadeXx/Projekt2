@@ -106,6 +106,9 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_
 
 export interface HealthResponse {
   ok: boolean;
+  /** Whether the server can read images and speech (#127). Older servers
+   *  leave it out, which is taken as yes. */
+  models?: boolean;
 }
 
 export function health(): Promise<HealthResponse> {

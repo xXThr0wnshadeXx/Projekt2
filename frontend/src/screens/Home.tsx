@@ -20,6 +20,8 @@ export interface HomeProps {
   onResume?: () => void;
   takeRestoredAnnouncement: () => string;
   onSettings: () => void;
+  /** Why capture cannot work right now, or undefined when it can (#127). */
+  captureUnavailable?: string;
   settings: Settings;
   onSettingsChange: (next: Settings) => void;
 }
@@ -34,6 +36,7 @@ export function Home({
   onResume,
   takeRestoredAnnouncement,
   onSettings,
+  captureUnavailable,
   settings,
   onSettingsChange,
 }: HomeProps) {
@@ -50,7 +53,18 @@ export function Home({
     return () => window.clearTimeout(timer);
   }, [onResume, takeRestoredAnnouncement]);
 
-  useShortcuts({ u: onCapture, c: onCapture });
+  // The button stays in the tab order when capture cannot work, so a student
+  // moving by Tab is told why instead of landing on a screen where every
+  // upload fails. `disabled` would drop it from the tab order and say nothing.
+  function capture() {
+    if (captureUnavailable) {
+      announce(`Capture is unavailable right now. ${captureUnavailable} Try the sample problem instead.`);
+      return;
+    }
+    onCapture();
+  }
+
+  useShortcuts({ u: capture, c: capture });
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
@@ -83,8 +97,13 @@ export function Home({
       </ol>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button type="button" className="btn-primary" onClick={onCapture}>
-          Capture a problem
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={capture}
+          aria-disabled={captureUnavailable ? 'true' : undefined}
+        >
+          {captureUnavailable ? 'Capture a problem - unavailable right now' : 'Capture a problem'}
         </button>
         <button type="button" className="btn" onClick={onSample}>
           Try a sample problem

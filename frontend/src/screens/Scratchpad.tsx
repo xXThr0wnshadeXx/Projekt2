@@ -48,6 +48,9 @@ export interface ScratchpadProps {
   /** The problem line the student was on; their first step follows from it. */
   startLine: number;
   onExport: () => void;
+  /** False when the server cannot turn speech into math (#127): no record
+   *  button, so Tab never lands on a control that can only fail. */
+  speechAvailable?: boolean;
 }
 
 interface Pending {
@@ -67,7 +70,14 @@ function newId(): string {
   return `W${nextId}`;
 }
 
-export function Scratchpad({ problem, onBack, mode, startLine, onExport }: ScratchpadProps) {
+export function Scratchpad({
+  problem,
+  onBack,
+  mode,
+  startLine,
+  onExport,
+  speechAvailable = true,
+}: ScratchpadProps) {
   const [lines, setLines] = useState<WorkLine[]>(() => loadWork());
   const [pending, setPending] = useState<Pending | null>(null);
   const [clarify, setClarify] = useState<Clarify | null>(null);
@@ -118,7 +128,9 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     announce(
       lines.length
         ? `Your work.${following} ${lines.length} ${lines.length === 1 ? 'line' : 'lines'} so far.`
-        : `Your work.${following} Record a line, or type one.`,
+        : speechAvailable
+          ? `Your work.${following} Record a line, or type one.`
+          : `Your work.${following} Type a line.`,
     );
   }, []);
 
@@ -531,7 +543,11 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         undo();
         return;
       case 'new_line':
-        announce('Ready for a new line. Hold Space and speak, or type it.');
+        announce(
+          speechAvailable
+            ? 'Ready for a new line. Hold Space and speak, or type it.'
+            : 'Ready for a new line. Type it.',
+        );
         return;
       case 'check':
       case 'what_changed': {
@@ -651,7 +667,9 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       <section aria-label="Your lines" className="mt-8">
         {lines.length === 0 ? (
           <p className="text-[--muted]">
-            Nothing yet. Record a line or type one below.
+            {speechAvailable
+              ? 'Nothing yet. Record a line or type one below.'
+              : 'Nothing yet. Type a line below.'}
           </p>
         ) : (
           <ol className="space-y-4">
@@ -706,6 +724,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         />
       )}
 
+      {speechAvailable && (
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -721,10 +740,17 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
           </p>
         )}
       </div>
+      )}
 
       {!pending && (
         <section aria-label="Add a line" className="mt-8 border-t border-[--line] pt-6">
-          <RecordButton onResult={onRecording} onError={fail} disabled={busy} onTap={activate} />
+          {speechAvailable ? (
+            <RecordButton onResult={onRecording} onError={fail} disabled={busy} onTap={activate} />
+          ) : (
+            <p data-testid="speech-unavailable" className="text-[--muted]">
+              Speaking a line is unavailable right now. Type it instead.
+            </p>
+          )}
 
           <form
             className="mt-5"
