@@ -30,7 +30,7 @@ def test_app_registers_model_routes_and_validates_transcriptions(monkeypatch):
     )
     with TestClient(main.create_app(settings)) as client:
         assert client.get("/api/health").json() == {"ok": True}
-        capture = client.post("/api/capture", files={"image": ("page.png", b"png", "image/png")})
+        capture = client.post("/api/capture", files={"image": ("page.png", b"\x89PNG\r\n\x1a\n", "image/png")})
         spoken = client.post("/api/spoken-to-latex", json={"text": "x equals two"})
         transcribe = client.post("/api/transcribe", files={"audio": ("bad.webm", b"bad", "audio/webm")})
 

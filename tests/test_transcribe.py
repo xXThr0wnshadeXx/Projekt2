@@ -51,3 +51,16 @@ def test_rejects_audio_longer_than_the_limit_before_model_call():
         })
     assert response.status_code == 400
     models.transcribe.assert_not_awaited()
+
+
+def test_empty_transcript_returns_retry_guidance():
+    models = AsyncMock()
+    models.transcribe.return_value = " \n"
+    app = FastAPI()
+    app.include_router(transcribe_router(models))
+    with TestClient(app) as client:
+        response = client.post("/api/transcribe", files={
+            "audio": ("clip.webm", recording("webm", "libopus", 1), "audio/webm"),
+        })
+    assert response.status_code == 422
+    assert "I didn't hear anything" in response.json()["error"]["message"]

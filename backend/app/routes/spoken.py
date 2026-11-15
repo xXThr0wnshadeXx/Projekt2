@@ -63,14 +63,20 @@ def spoken_router(
                 question and question.strip()
                 and has_readbacks and all(choices)
                 and 2 <= len(choices) == len(set(choices)) <= 3
-                and all(await asyncio.gather(*(validate_latex(choice) for choice in choices)))
             ):
-                return {**result, "latex": None, "readback": None, "valid": False}
-            return spoken_error(422, "UNPARSEABLE", "I couldn't confirm this step.")
+                validity = await asyncio.gather(*(validate_latex(choice) for choice in choices))
+                return {
+                    **result, "latex": None, "readback": None, "valid": False,
+                    "alternatives": [
+                        {**option, "valid": valid}
+                        for option, valid in zip(alternatives, validity, strict=True)
+                    ],
+                }
+            return spoken_error(422, "UNPARSEABLE", "I couldn't work out that line. Try saying it again.")
 
         latex, readback = result["latex"], result["readback"]
         if not latex or not latex.strip() or not readback or not readback.strip():
-            return spoken_error(422, "UNPARSEABLE", "I couldn't confirm this step.")
+            return spoken_error(422, "UNPARSEABLE", "I didn't catch any math in that. Try again.")
         return {
             "latex": latex,
             "ambiguous": False,

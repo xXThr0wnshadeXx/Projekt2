@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 from backend.app.routes.spoken import spoken_router
 
 
-@pytest.mark.parametrize("valid, status", [(True, 200), (False, 422)])
-def test_spoken_ambiguity_requires_two_valid_choices(valid, status):
+@pytest.mark.parametrize("validity", [(True, True), (True, False)])
+def test_spoken_ambiguity_keeps_unparseable_choices(validity):
     models = AsyncMock()
     alternatives = [
         {"latex": r"\frac{x+1}{2}", "readback": "x plus one, all over two"},
@@ -21,17 +21,19 @@ def test_spoken_ambiguity_requires_two_valid_choices(valid, status):
         "alternatives": alternatives,
         "readback": None,
     }
-    validate = AsyncMock(return_value=valid)
+    validate = AsyncMock(side_effect=validity)
     app = FastAPI()
     app.include_router(spoken_router(models, validate))
     with TestClient(app) as client:
         response = client.post("/api/spoken-to-latex", json={"text": "x plus one over two"})
 
-    assert response.status_code == status
+    assert response.status_code == 200
     assert validate.await_count == 2
-    if valid:
-        assert response.json()["alternatives"] == alternatives
-        assert response.json()["latex"] is None
+    assert response.json()["alternatives"] == [
+        {**option, "valid": valid}
+        for option, valid in zip(alternatives, validity, strict=True)
+    ]
+    assert response.json()["latex"] is None
 
 
 def test_spoken_line_returns_readback_and_validation():

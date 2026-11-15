@@ -94,6 +94,11 @@ def transcribe_router(models: ModelClient, max_audio_seconds: int = 30) -> APIRo
             text = await models.transcribe(f"recording.{extension}", data, content_type)
         except ModelError:
             return audio_error(502, "MODEL_ERROR", "I couldn't transcribe that recording. Try again.")
+        if not text.strip():
+            return audio_error(
+                422, "UNPARSEABLE",
+                "I didn't hear anything. Try again, a little closer to the microphone.",
+            )
         return {"text": text}
 
     return router

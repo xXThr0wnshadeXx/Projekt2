@@ -1,5 +1,6 @@
 """Server-side access to the configured interpretation and transcription models."""
 
+import asyncio
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -42,7 +43,7 @@ class ModelClient:
     def __init__(self, settings: ModelSettings):
         self.settings = settings
         self.client = instrument_openai(
-            AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value())
+            AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value(), timeout=10, max_retries=0)
         )
 
     async def close(self) -> None:
@@ -53,15 +54,15 @@ class ModelClient:
     ) -> dict:
         model = self.settings.model_vision if task == "capture" else self.settings.model_text
         try:
-            result = await self.client.chat.completions.create(
+            result = await asyncio.wait_for(self.client.chat.completions.create(
                 model=model,
                 messages=messages,
                 response_format={
                     "type": "json_schema",
                     "json_schema": {"name": task, "strict": True, "schema": load_schema(task)},
                 },
-            )
-        except OpenAIError:
+            ), timeout=10 if task == "capture" else 4)
+        except (OpenAIError, TimeoutError):
             raise ModelError("The interpretation service is unavailable.") from None
         if not result.choices:
             raise ModelError("The model returned no result.")
@@ -78,11 +79,11 @@ class ModelClient:
 
     async def transcribe(self, filename: str, audio: bytes, content_type: str) -> str:
         try:
-            result = await self.client.audio.transcriptions.create(
+            result = await asyncio.wait_for(self.client.audio.transcriptions.create(
                 model=self.settings.model_stt,
                 file=(filename, audio, content_type),
                 response_format="json",
-            )
-        except OpenAIError:
+            ), timeout=4)
+        except (OpenAIError, TimeoutError):
             raise ModelError("The transcription service is unavailable.") from None
         return result.text
