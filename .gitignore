@@ -40,3 +40,8 @@ Thumbs.db
 # Keep the folders, not their contents
 !eval/photos/.gitkeep
 !docs/evidence/.gitkeep
+
+# Local editor and tooling folders
+.claude/
+.vscode/
+.idea/
