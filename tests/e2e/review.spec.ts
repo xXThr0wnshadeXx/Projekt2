@@ -61,14 +61,15 @@ test.describe('@smoke one look over the work', () => {
     await expect(page.getByTestId('review-result')).toHaveText('Nothing stood out for another look.');
     const reviewed = page.getByRole('button', { name: 'Reviewed' });
     await expect(reviewed).toHaveAttribute('aria-disabled', 'true');
-    // Forced: Playwright will not click an aria-disabled control on its own.
-    await reviewed.click({ force: true });
+    // Enter, not a click: Playwright will not click an aria-disabled control,
+    // and on CI's Linux WebKit a control below the fold cannot be scrolled to.
+    await reviewed.press('Enter');
     await expect(polite(page)).toContainText("I can't review this problem again.");
 
     await page.reload();
     await page.getByRole('button', { name: 'Back to your problem' }).click();
     await page.keyboard.press('x');
-    await page.getByRole('button', { name: 'Reviewed' }).click({ force: true });
+    await page.getByRole('button', { name: 'Reviewed' }).press('Enter');
     await expect(polite(page)).toContainText("I can't review this problem again.");
     expect(calls).toBe(1);
   });
@@ -82,7 +83,7 @@ test.describe('@smoke one look over the work', () => {
     await openHandIn(page, 'homework');
     await page.getByRole('button', { name: 'Review my work' }).click();
     await expect(page.getByTestId('review-result')).toHaveText("I couldn't review your work right now. Nothing was checked.");
-    await page.getByRole('button', { name: 'Reviewed' }).click({ force: true });
+    await page.getByRole('button', { name: 'Reviewed' }).press('Enter');
     await expect(polite(page)).toContainText("I can't review this problem again.");
     expect(calls).toBe(1);
   });
