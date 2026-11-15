@@ -21,6 +21,8 @@ import { loadMathJax } from './math/mathjax';
 import { spokenMath } from './math/sre';
 import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
 import { Home } from './screens/Home';
+import { Welcome } from './screens/Welcome';
+import { hasBeenWelcomed, markWelcomed, WELCOME_SPOKEN } from './firstRun';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
 import { LowVision } from './screens/LowVision';
@@ -47,6 +49,8 @@ type BackEnd = 'checking' | 'up' | 'down';
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('home');
+  // First visit only (#200): a screen that lets Glance start talking.
+  const [welcomed, setWelcomed] = useState(() => hasBeenWelcomed());
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
   const [lineIndex, setLineIndex] = useState(0);
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
@@ -246,7 +250,23 @@ export function App() {
         />
       )}
 
-      {screen === 'home' && (
+      {screen === 'home' && !welcomed && (
+        <Welcome
+          onStartSpeaking={() => {
+            // Inside the key press or click, so the browser lets it speak.
+            updateSettings({ ...settings, selfVoicing: true });
+            announce(WELCOME_SPOKEN);
+            markWelcomed();
+            setWelcomed(true);
+          }}
+          onStartQuiet={() => {
+            markWelcomed();
+            setWelcomed(true);
+          }}
+        />
+      )}
+
+      {screen === 'home' && welcomed && (
         <Home
           onCapture={() => setScreen('capture')}
           onSample={() => openProblem(sampleProblem())}

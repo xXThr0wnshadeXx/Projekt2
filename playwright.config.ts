@@ -14,6 +14,9 @@ export default defineConfig({
     // the real network instead. Only the test that checks the worker itself
     // turns it back on (a11y.spec.ts, "progressive web app shell").
     serviceWorkers: 'block',
+    // Every test starts as a returning visitor, past the first-visit welcome
+    // (#200). tests/e2e/welcome.spec.ts clears this to test the welcome itself.
+    storageState: 'tests/e2e/welcomed.json',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
