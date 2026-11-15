@@ -29,6 +29,7 @@ API: https://glance-api-production-e9997db1.up.railway.app
 - Vercel reports the current production deployment Ready.
 - `/api/health` returned 200 with `{"ok":true}` and the exact Vercel origin in `Access-Control-Allow-Origin`.
 - `/api/validate` accepted `2x = 8`.
+- A synthetic PNG sent directly to `/api/capture` returned 200, the equation `2x + 3 = 11`, and the exact Vercel CORS origin. It also emitted the instruction as a math line; check instruction/line separation with real worksheets before calling the capture quality verified.
 - In the live browser: opened the sample, entered equation exploration, returned with Escape, opened the scratchpad with S, typed `2x = 8`, received readback, explicitly saved, received “This step checks out,” opened export with X, and downloaded accessible HTML.
 - The browser exposed equation speech in its accessibility tree. This is not a listening test with a screen reader.
 
