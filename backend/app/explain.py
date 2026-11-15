@@ -53,62 +53,12 @@ def _schema() -> dict:
     return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
-# A sentence must name one of these operations (past tense: it reports what
-# happened between the two lines, it never tells the student what to do).
-_OPERATIONS = re.compile(
-    r"\b(?:added|subtracted|multiplied|divided|expanded|factored|factorised|factorized|"
-    r"simplified|combined like terms|combined|moved|took (?:the|a) square root|took (?:the|a) root|"
-    r"distributed|cancelled|canceled|squared|cubed|rearranged|substituted|rewrote|"
-    r"collected like terms|taken|differentiated|integrated)\b",
-    re.IGNORECASE,
-)
-# Words that turn a description into a method or a next step.
-_METHOD_WORDS = re.compile(
-    r"\b(?:to isolate|isolat\w*|to solve|in order to|so that|to find|to get|next|then|first|"
-    r"afterwards?|now|you|your|we|let'?s|should|must|need|can|could|try|step)\b",
-    re.IGNORECASE,
-)
-_NUMBER_WORDS = {
-    "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4", "five": "5", "six": "6",
-    "seven": "7", "eight": "8", "nine": "9", "ten": "10", "eleven": "11", "twelve": "12",
-    "hundred": "100", "half": "1/2",
-}
-
-
-def _symbols(latex: str) -> tuple[set[str], set[str]]:
-    plain = re.sub(r"\\[A-Za-z]+", " ", latex)
-    return set(re.findall(r"\d+", plain)), set(re.findall(r"[A-Za-z]", plain))
-
-
-def _introduces_math(text: str, a_latex: str, b_latex: str) -> bool:
-    """True if the sentence mentions a number or variable not in line A or B."""
-    numbers_a, letters_a = _symbols(a_latex)
-    numbers_b, letters_b = _symbols(b_latex)
-    numbers, letters = numbers_a | numbers_b, letters_a | letters_b
-    if any(n not in numbers for n in re.findall(r"\d+", text)):
-        return True
-    for word in re.findall(r"[A-Za-z]+", text.lower()):
-        if word in _NUMBER_WORDS and _NUMBER_WORDS[word] not in numbers:
-            return True
-    # A lone letter other than the article "a" is a variable.
-    return any(v not in letters for v in re.findall(r"(?<![A-Za-z'])(?![aI](?![A-Za-z]))[A-Za-z](?![A-Za-z'])", text))
-
-
-def acceptable(text: str, a_latex: str = "", b_latex: str = "") -> bool:
-    """Accept only a one-sentence report of an operation done between A and B.
-
-    It must name an operation from the fixed list, add no number or variable
-    that is not already in line A or B, and use no method words (#188).
-    """
+def acceptable(text: str) -> bool:
     text = text.strip()
     if not text or len(text) > _MAX_CHARS:
         return False
     if text.count(".") > 1 or "\n" in text:
         return False  # more than one sentence
-    if not _OPERATIONS.search(text) or _METHOD_WORDS.search(text):
-        return False
-    if _introduces_math(text, a_latex, b_latex):
-        return False
     return not _FORBIDDEN.search(text) and not _STATES_A_RESULT.search(text)
 
 
@@ -163,6 +113,6 @@ def model_explainer(
         except (OpenAIError, ValueError, IndexError, AttributeError) as exc:
             log.warning("explain failed: %s", type(exc).__name__)
             return None
-        return text.strip() if acceptable(text, a_latex, b_latex) else None
+        return text.strip() if acceptable(text) else None
 
     return explain
