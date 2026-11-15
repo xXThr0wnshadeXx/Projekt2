@@ -82,7 +82,9 @@ export class Recorder {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      throw new Error('I could not use the microphone. Check the permission, or type your line.');
+      throw new Error(
+        'I could not use the microphone. To allow it, open this site\'s settings in your browser, turn the microphone on, and try again. Or type your line instead.',
+      );
     }
 
     this.stream = stream;
