@@ -161,13 +161,13 @@ export interface CaptureResponse {
 }
 
 /** Send an image for transcription. `context` is optional free text. */
-export function capture(image: Blob, context = ''): Promise<CaptureResponse> {
+export function capture(image: Blob, context = '', signal?: AbortSignal): Promise<CaptureResponse> {
   const form = new FormData();
   // A filename is required or some servers reject the part outright.
   form.append('image', image, 'capture.jpg');
   if (context) form.append('context', context);
   // No Content-Type header: the browser must set the multipart boundary.
-  return request<CaptureResponse>('/api/capture', { method: 'POST', body: form }, CAPTURE_MS);
+  return request<CaptureResponse>('/api/capture', { method: 'POST', body: form, signal }, CAPTURE_MS);
 }
 
 /** How many pages a PDF has, so the student can be asked which one. */

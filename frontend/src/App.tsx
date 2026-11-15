@@ -13,6 +13,7 @@ import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { KeyboardHelp } from './components/KeyboardHelp';
 import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
+import { InstallApp } from './components/InstallApp';
 import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
@@ -214,6 +215,7 @@ export function App() {
           >
             Keyboard shortcuts
           </button>
+          <InstallApp />
         </div>
       </header>
 
@@ -283,7 +285,7 @@ export function App() {
 
       {/* Only reachable if storage returned something unusable. */}
       {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
-        <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+        <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
           <h2 className="text-2xl font-semibold">No problem loaded</h2>
           <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
             Back to start
