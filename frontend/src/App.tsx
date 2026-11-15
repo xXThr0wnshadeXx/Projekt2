@@ -21,7 +21,8 @@ import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { spokenMath } from './math/sre';
-import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
+import { health, apiBase, apiConnected, ApiFailure, diagnoseUnreachable } from './api';
+import { UNCONNECTED_MESSAGE } from './apiBase';
 import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
@@ -127,6 +128,12 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    // A deployed build with no server address has nothing to ask (#135).
+    if (!apiConnected) {
+      setBackEnd('down');
+      setBackEndNote(UNCONNECTED_MESSAGE);
+      return;
+    }
     health()
       .then(() => {
         setBackEnd('up');
@@ -361,7 +368,7 @@ export function App() {
               <summary className="cursor-pointer">Why</summary>
               <p className="mt-2">{backEndNote}</p>
               <p className="mt-1">
-                Server address: <code>{apiBase}</code>
+                Server address: <code>{apiBase ?? 'not set'}</code>
               </p>
             </details>
           </div>
