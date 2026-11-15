@@ -2,7 +2,7 @@
 
 **Math for students who are blind or have low vision.** Glance reads a math problem aloud, lets a student explore it piece by piece, and writes down their own working as they say it or type it. **It never solves the problem**: no answers, no hints, no next steps, so it can be used in class and in exams.
 
-Try it: **https://glance-shreev2703.vercel.app**
+Try it: **https://glance-shreev2703.vercel.app** · Code: **https://github.com/xXThr0wnshadeXx/Projekt2**
 
 ### Try it in one minute
 
@@ -14,8 +14,6 @@ Try it: **https://glance-shreev2703.vercel.app**
 6. Type `what is x` and press Enter. Glance declines, because the work is the student's.
 
 No mouse is needed for any of it.
-
-**Try it:** https://glance-shreev2703.vercel.app (the sample problem works with no setup) · **Code:** https://github.com/xXThr0wnshadeXx/Projekt2
 
 ---
 
