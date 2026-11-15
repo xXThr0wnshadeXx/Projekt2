@@ -5,6 +5,8 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { KEYMAP, helpText } from '../../frontend/src/shortcuts';
+import { stubServerWithModels } from './server';
+
 
 async function openSample(page: Page) {
   await page.goto('/');
@@ -30,6 +32,7 @@ test.describe('@smoke keyboard help', () => {
   });
 
   test('the help changes with the screen', async ({ page }) => {
+    await stubServerWithModels(page); // capture needs the model (#127)
     await page.goto('/');
     // Let the welcome announcement land first, as it would for a person.
     await expect(polite(page)).toContainText('Glance.');
@@ -73,6 +76,7 @@ test.describe('@smoke keyboard help', () => {
   });
 
   test('U on the capture screen opens the file picker', async ({ page }) => {
+    await stubServerWithModels(page); // capture needs the model (#127)
     await page.goto('/');
     await page.getByRole('button', { name: 'Capture a problem' }).click();
     await expect(page.getByRole('heading', { name: 'Capture a problem' })).toBeFocused();
