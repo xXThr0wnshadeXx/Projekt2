@@ -44,6 +44,9 @@ def create_app(
             model_text=settings.model_text,
             model_stt=settings.model_stt,
         ))
+        # Every capture, spoken-line and transcription call adds its model,
+        # tokens and cost to the request's log line and /api/stats (issue #44).
+        observability.instrument_openai(models.client)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):

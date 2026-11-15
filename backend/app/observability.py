@@ -244,7 +244,7 @@ def instrument_openai(client: Any) -> Any:
     Works on an AsyncOpenAI instance without changing the code that calls it:
         instrument_openai(models.client)
     """
-    if getattr(client, "_glance_instrumented", False):
+    if getattr(client, "_glance_instrumented", False) is True:  # `is`: mocks answer any attribute
         return client
 
     chat_create = client.chat.completions.create
