@@ -4,6 +4,24 @@ Checked against the GitHub issues, open PRs, and [Glance board](https://github.c
 
 The demo to make dependable is **bring in a worksheet → hear and explore the math → type or speak your own line → confirm it → export accessible work**. Finish that flow before adding more features.
 
+## Ownership handoff to tuffling
+
+At Shreev's request on November 15, 2026, the remaining browser follow-through
+is split explicitly between transferred work and newly assigned development:
+
+| Order | Ticket | Origin | Current work for tuffling |
+|---|---|---|---|
+| 1 — P0 | #164 / PR #165 | Transferred from shreev2703 | Review the implemented request recovery, complete required checks/review, merge, deploy and verify. In Review. |
+| 2 — P1 | #176 | Newly assigned to tuffling; previously unassigned | Fix invented/duplicated capture instructions and add the two reported regression/evaluation fixtures. Todo. |
+| 3 — P1 | #109 / PR #174 | Transferred from shreev2703 | Review and merge the browser handoff documentation, then reconcile the release checklist with verified shipped work. In Review. |
+
+All three carry `new-for:tuffling`; only #164 and #109 carry
+`handoff:shreev-to-tuffling`. Their issue bodies preserve the original criteria
+and add the remaining work. PRs #165 and #174 are assigned to tuffling for
+follow-through with review requested. Existing PR authorship is unchanged.
+Shreev retains the hardware-dependent #154 and product/research tickets;
+available AI usage does not substitute for actual device or participant evidence.
+
 Most of Shreev's original implementation tickets (#9–#14, #16, #18, #19) are already Done. Several later fixes have open PRs but were missing from the board. Continue from those implementations rather than rebuilding them. Review requirements still apply; an open PR is not a shipped fix.
 
 ## Work in this order
@@ -11,7 +29,8 @@ Most of Shreev's original implementation tickets (#9–#14, #16, #18, #19) are a
 | Order | Work | Tickets / existing PRs | Owner and next action |
 |---|---|---|---|
 | Complete | Production deployment and worksheet upload | #3, #125, #123 | Closed with live evidence: a two-line PNG uploaded through the browser, results were announced, focus moved to Line 1, and keyboard exploration worked. Real microphone and iPhone testing remain separate. |
-| 1 — P0 | Recover from stalled browser requests | #164 → PR #165 | Implemented; merge conflict resolved against current main, including capture cancellation. PR is ready for review and still needs a teammate's approval before merge/deployment. |
+| 1 — P0 | Recover from stalled browser requests | #164 → PR #165 | Transferred to tuffling for review and release. Implemented; merge conflict resolved against current main, including capture cancellation. Required review/checks still apply. |
+| 2 — P1 | Preserve captured source instructions | #176 | Newly assigned to tuffling. Fix the two documented live capture-fidelity defects; keep the already-working upload/focus path intact. |
 | 3 — P0 for the demo | Keep work usable when the API is unavailable | #128, #131 → PR #136; #127 → PR #152 | Existing work by Nicolas: review the offline-command, unavailable-check announcement, and capability-gating fixes together with the typed fallback. Preserve saved work and explicit confirmation. |
 | 4 — P0 if voice is demonstrated | Make microphone lifecycle reliable | #16 follow-up → PR #119 | Existing work by Nicolas: review timed stop, permission-prompt cancellation, and cleanup. Test both desktop hold-Space and phone tap-to-toggle. |
 | 5 — P1 | Preserve speech continuity | #146 → PR #161; #132 → PR #139; #163 | Skip-link focus is now merged into main. Review the remaining speech fixes. Tuffling owns the speech/rebase coordination; avoid concurrent edits to those branches. |
