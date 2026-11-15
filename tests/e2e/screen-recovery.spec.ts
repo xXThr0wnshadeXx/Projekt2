@@ -73,10 +73,16 @@ test.describe('@smoke screen recovery', () => {
     await expect(polite(page)).not.toContainText('I restored your work');
   });
 
-  test('announces one restored problem line with the singular', async ({ page }) => {
-    await seed(page, { ...problem, lines: [problem.lines[0]] });
+  test('announces one restored work line with the singular', async ({ page }) => {
+    await seed(page, problem, [work[0]]);
     await page.goto('/');
     await expect(polite(page)).toHaveText(restored(1));
+  });
+
+  test('a reload on Home with a problem but no work announces the problem, not a line count', async ({ page }) => {
+    await seed(page, problem);
+    await page.goto('/');
+    await expect(polite(page)).toHaveText('I restored your problem from earlier.');
   });
 
   test('does not announce restoration in a fresh session', async ({ page }) => {
