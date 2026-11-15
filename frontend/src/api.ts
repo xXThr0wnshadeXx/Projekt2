@@ -103,6 +103,22 @@ async function request<T>(path: string, init?: RequestInit, timeoutMs = REQUEST_
 
 export interface HealthResponse {
   ok: boolean;
+  /** True when the server offers the natural voice (#182). */
+  voice?: boolean;
+}
+
+/** Natural speech for the app's own voice (#182). Short deadline: a voice
+ *  that answers late is worse than the browser's voice answering now. */
+export function speakAudio(text: string, voice: string, speed: number, signal?: AbortSignal): Promise<Blob> {
+  return withinDeadline('/api/speak', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voice, speed }),
+    signal,
+  }, async (res) => {
+    if (!res.ok) throw new ApiFailure('MODEL_ERROR', 'The voice is unavailable.');
+    return res.blob();
+  }, 2_500);
 }
 
 export function health(): Promise<HealthResponse> {

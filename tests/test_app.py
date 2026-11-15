@@ -29,7 +29,8 @@ def client():
 def test_health_returns_ok(client):
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"ok": True}
+    # `voice` is false with no speech model configured (#182).
+    assert response.json() == {"ok": True, "voice": False}
 
 
 def test_cors_allows_only_the_front_end_origin(client):

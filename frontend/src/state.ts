@@ -51,7 +51,16 @@ export interface Settings {
   selfVoicing: boolean;
   /** Size of all text, as a percentage of the browser's own size. */
   textScale: number;
+  /** The app's voice (#182): a natural voice when the server offers one, or
+   *  the browser's own. Falls back to the browser's voice automatically. */
+  voice: VoiceName;
+  /** Speaking speed: 0.85 slower, 1 normal, 1.2 faster. */
+  speechRate: number;
 }
+
+export type VoiceName = 'coral' | 'sage' | 'verse' | 'browser';
+export const VOICES: VoiceName[] = ['coral', 'sage', 'verse', 'browser'];
+export const SPEECH_RATES = [0.85, 1, 1.2];
 
 /** Large print is the default, not a mode to go and find. */
 export const TEXT_SCALES = [100, 125, 150, 175, 200];
@@ -60,6 +69,8 @@ export const defaultSettings: Settings = {
   mode: 'homework',
   selfVoicing: false,
   textScale: 125,
+  voice: 'coral',
+  speechRate: 1,
 };
 
 const PROBLEM_KEY = 'glance.problem.v1';
@@ -122,6 +133,8 @@ export function saveWork(lines: WorkLine[]): void {
 export function loadSettings(): Settings {
   const settings = { ...defaultSettings, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
   if (!TEXT_SCALES.includes(settings.textScale)) settings.textScale = defaultSettings.textScale;
+  if (!VOICES.includes(settings.voice)) settings.voice = defaultSettings.voice;
+  if (!SPEECH_RATES.includes(settings.speechRate)) settings.speechRate = defaultSettings.speechRate;
   return settings;
 }
 

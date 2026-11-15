@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { KeyboardHelp } from './components/KeyboardHelp';
-import { setSelfVoicing } from './audio/tts';
+import { setNaturalVoiceAvailable, setSelfVoicing, setVoicePrefs } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
 import { InstallApp } from './components/InstallApp';
 import { Settings } from './screens/Settings';
@@ -62,6 +62,10 @@ export function App() {
     setSelfVoicing(settings.selfVoicing);
   }, [settings.selfVoicing]);
 
+  useEffect(() => {
+    setVoicePrefs({ voice: settings.voice, rate: settings.speechRate });
+  }, [settings.voice, settings.speechRate]);
+
   // Every size in the app is in rem, so this one number is large print for
   // all of it — buttons, notes and maths alike.
   useEffect(() => {
@@ -110,7 +114,9 @@ export function App() {
 
   useEffect(() => {
     health()
-      .then(() => {
+      .then((status) => {
+        // The natural voice is only tried where the server offers it (#182).
+        setNaturalVoiceAvailable(status?.voice === true);
         setBackEnd('up');
         setBackEndNote('');
       })
