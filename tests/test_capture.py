@@ -35,6 +35,31 @@ def test_capture_preserves_transcription_and_adds_validation():
     assert models.interpret.await_args.args[0] == "capture"
 
 
+def test_capture_omits_pure_text_headings_from_reader_lines():
+    """A title is not a problem line just because the vision model used LaTeX."""
+    models = AsyncMock()
+    models.interpret.return_value = {
+        "instructions": "Solve each equation.",
+        "lines": [
+            {"latex": r"\text{Algebra practice 1}", "confidence": 1, "intent_notes": ""},
+            {"latex": "2x + 3 = 11", "confidence": 1, "intent_notes": ""},
+        ],
+        "diagrams": [], "warnings": [],
+    }
+    validate = AsyncMock(return_value=True)
+    app = FastAPI()
+    app.include_router(capture_router(models, validate))
+    with TestClient(app) as client:
+        response = client.post("/api/capture", files={"image": ("page.png", PNG, "image/png")})
+
+    assert response.status_code == 200
+    assert response.json()["instructions"] == "Solve each equation."
+    assert response.json()["lines"] == [
+        {"id": "L1", "latex": "2x + 3 = 11", "confidence": 1, "intent_notes": "", "valid": True}
+    ]
+    validate.assert_awaited_once_with("2x + 3 = 11")
+
+
 def test_capture_rejects_oversized_image_before_model_call():
     models = AsyncMock()
     app = FastAPI()
