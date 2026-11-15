@@ -7,15 +7,30 @@ const BASE = (import.meta.env.VITE_API_BASE ?? 'http://localhost:8000').replace(
   '',
 );
 
-/** The single error shape the back end returns (DESIGN.md section 9). */
+/** The single error shape the back end returns (DESIGN.md section 9).
+ *
+ * DESIGN.md section 9 lists four codes. The back end also returns
+ * MODE_DISABLED (exam mode), RATE_LIMITED, NOT_FOUND and INTERNAL, so they are
+ * included here. Keep this in step with `ErrorCode` in `backend/app/errors.py`.
+ */
+export type ApiErrorCode =
+  | 'UNPARSEABLE'
+  | 'TIMEOUT'
+  | 'MODEL_ERROR'
+  | 'BAD_INPUT'
+  | 'MODE_DISABLED'
+  | 'RATE_LIMITED'
+  | 'NOT_FOUND'
+  | 'INTERNAL';
+
 export interface ApiError {
-  code: 'UNPARSEABLE' | 'TIMEOUT' | 'MODEL_ERROR' | 'BAD_INPUT';
+  code: ApiErrorCode;
   message: string;
 }
 
 export class ApiFailure extends Error {
-  code: ApiError['code'] | 'NETWORK';
-  constructor(code: ApiError['code'] | 'NETWORK', message: string) {
+  code: ApiErrorCode | 'NETWORK';
+  constructor(code: ApiErrorCode | 'NETWORK', message: string) {
     super(message);
     this.code = code;
     this.name = 'ApiFailure';
