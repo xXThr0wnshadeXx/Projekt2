@@ -4,6 +4,7 @@
 // with MathML, or a printed / PDF copy through the browser's print dialog.
 // Everything happens in the browser; nothing is uploaded or stored.
 
+import { spokenMath } from '../math/sre';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
 import { ExportPreview } from '../components/ExportPreview';
@@ -46,9 +47,7 @@ export function Export({ problem, onBack }: ExportProps) {
 
   /** The spoken form of each problem line, taken from the rendered preview. */
   function spokenFor(id: string, fallback: string): string {
-    return (
-      document.querySelector(`#exp-${id} mjx-container`)?.getAttribute('aria-label') ?? fallback
-    );
+    return spokenMath(document.getElementById(`exp-${id}`)) || fallback;
   }
 
   async function downloadHtml() {

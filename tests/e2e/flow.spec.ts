@@ -53,8 +53,19 @@ test.describe('@smoke critical path', () => {
     await expect(l1).toBeFocused();
 
     // Enter hands control to the explorer, where arrow keys walk the tree.
+    // Assert focus moved *into* the equation rather than onto one particular
+    // element: once speech is attached MathJax focuses its own speech node
+    // inside the container, and which node holds focus is its business, not
+    // ours. What matters to a student is that they are now inside the maths.
     await page.keyboard.press('Enter');
-    await expect(page.locator('#L1 mjx-container')).toBeFocused();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const container = document.querySelector('#L1 mjx-container');
+          return !!container && container.contains(document.activeElement);
+        }),
+      )
+      .toBe(true);
   });
 
   test('capture results move focus to the first line and are announced', async ({ page }) => {
@@ -186,7 +197,7 @@ test.describe('@smoke critical path', () => {
     await expect(page.getByRole('button', { name: 'Take a photo' })).toBeVisible();
 
     // Back returns to the start without a reload.
-    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('button', { name: 'Back to the start' }).click();
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
   });
 
