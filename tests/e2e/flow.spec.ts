@@ -76,6 +76,15 @@ test.describe('@smoke critical path', () => {
     await expect(page.getByTestId('live-polite')).toContainText('2 lines');
   });
 
+  test('a student can discard an inaccurate captured line', async ({ page }) => {
+    await openSample(page);
+    await page.getByRole('button', { name: 'Discard problem line 1' }).click();
+
+    await expect(page.getByTestId('math-line-L1')).toHaveCount(0);
+    await expect(page.getByTestId('math-line-L2')).toBeVisible();
+    await expect(page.getByTestId('live-polite')).toContainText('Discarded line 1. 1 line remains.');
+  });
+
   test('state changes are announced to screen readers', async ({ page }) => {
     await openSample(page);
 
