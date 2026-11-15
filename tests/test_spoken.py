@@ -11,7 +11,7 @@ from backend.app.routes.spoken import spoken_router
 ROOT_FRACTION = "the square root of x plus one all over two equals five"
 ROOT_QUESTION = (
     "Is plus one under the root, as in the square root of the quantity x plus one, end root, "
-    "or outside the root, as in the square root of x, then plus one?"
+    "or outside the root, as in the square root of x, end root, plus one?"
 )
 ROOT_ALTERNATIVES = [
     {
@@ -20,7 +20,7 @@ ROOT_ALTERNATIVES = [
     },
     {
         "latex": r"\frac{\sqrt{x}+1}{2}=5",
-        "readback": "the square root of x, then plus one, all over two equals five",
+        "readback": "the square root of x, end root, plus one, all over two equals five",
     },
 ]
 
@@ -49,7 +49,7 @@ def test_spoken_root_clarifies_only_the_scope_of_the_root():
         assert "parentheses or quotation marks" in prompt
         assert "All over already fixes the numerator" in prompt
         assert "the quantity x plus one, end root" in prompt
-        assert "the square root of x, then plus one" in prompt
+        assert "the square root of x, end root, plus one" in prompt
         assert json.loads(messages[1]["content"]) == {
             "text": ROOT_FRACTION,
             "context_lines": ["2x + 3 = 11"],
@@ -86,12 +86,12 @@ def test_spoken_root_clarifies_only_the_scope_of_the_root():
 @pytest.mark.parametrize(("field", "value"), [
     ("readback", ROOT_ALTERNATIVES[0]["readback"]),
     ("readback", ROOT_ALTERNATIVES[0]["readback"].upper().replace(" ", "  ")),
-    ("clarifying_question", "Do you mean the square root of (x plus one), or then plus one?"),
-    ("clarifying_question", "Do you mean the square root of x plus one), or then plus one?"),
+    ("clarifying_question", "Do you mean the square root of (x plus one), or end root, plus one?"),
+    ("clarifying_question", "Do you mean the square root of x plus one), or end root, plus one?"),
     ("clarifying_question", 'Do you mean "x plus one" under the root?'),
     ("clarifying_question", "Is 'plus one' outside the root?"),
     ("readback", "the square root of (x plus one), all over two equals five"),
-    ("readback", "the square root of x, then plus one), all over two equals five"),
+    ("readback", "the square root of x, end root, plus one), all over two equals five"),
     ("readback", 'the square root of x, then "plus one", all over two equals five'),
     ("readback", "the square root of x, then ‘plus one’, all over two equals five"),
     ("readback", "the square root of x, then “plus one”, all over two equals five"),

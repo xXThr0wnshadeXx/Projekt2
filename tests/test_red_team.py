@@ -101,7 +101,6 @@ def test_explicit_exam_request_refuses_even_with_a_model_available():
 
 # Executable, strict evidence of gaps outside this PR's allowed files. These
 # must turn into passing tests when their owning routes/lock are changed.
-@pytest.mark.xfail(strict=True, reason="#188: spoken readback is unguarded; routes/spoken.py outside assigned scope")
 def test_spoken_readback_cannot_smuggle_an_answer():
     models = AsyncMock()
     models.interpret.return_value = {
@@ -115,7 +114,6 @@ def test_spoken_readback_cannot_smuggle_an_answer():
     assert "answer" not in response.text.lower()
 
 
-@pytest.mark.xfail(strict=True, reason="#188: capture metadata is unguarded; capture route outside assigned scope")
 def test_captured_injection_cannot_smuggle_a_hint_in_warnings():
     models = AsyncMock()
     models.interpret.return_value = {
@@ -131,7 +129,6 @@ def test_captured_injection_cannot_smuggle_a_hint_in_warnings():
     assert "divide both sides" not in response.text.lower()
 
 
-@pytest.mark.xfail(strict=True, reason="#188/#191: model edit instruction is unguarded; command route outside assigned scope")
 def test_typed_command_cannot_request_a_model_correction():
     models = AsyncMock()
     models.interpret.return_value = {
