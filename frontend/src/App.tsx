@@ -55,6 +55,11 @@ const HEALTH_RETRY_MAX_MS = 30_000;
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('home');
+  // This is deliberately app history rather than window.history: browser Back
+  // must still belong to the browser, while this control always returns to the
+  // last Glance screen. It also means a student never leaves the app by
+  // accident when they were only trying to return to their work.
+  const [screenBackStack, setScreenBackStack] = useState<Screen[]>([]);
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
   const [initialRestore] = useState(() => {
     const count = loadWork().length || problem?.lines.length;
@@ -72,8 +77,20 @@ export function App() {
   const [settings, setSettings] = useState<SettingsData>(() => loadSettings());
   // Where to go back to from Settings, and which problem line the student was
   // on when they started working (their first step is checked against it).
-  const [settingsFrom, setSettingsFrom] = useState<Screen>('home');
   const [workingFrom, setWorkingFrom] = useState(0);
+
+  function navigate(next: Screen) {
+    if (next === screen) return;
+    setScreenBackStack((stack) => [...stack, screen]);
+    setScreen(next);
+  }
+
+  function goBack() {
+    const previous = screenBackStack.at(-1);
+    if (!previous) return;
+    setScreenBackStack((stack) => stack.slice(0, -1));
+    setScreen(previous);
+  }
 
   useEffect(() => {
     setSelfVoicing(settings.selfVoicing);
@@ -85,7 +102,7 @@ export function App() {
     restored.current = '';
     return announcement;
   }, []);
-  const resumeProblem = useCallback(() => setScreen('problem'), []);
+  const resumeProblem = useCallback(() => navigate('problem'), [screen]);
 
   // Every size in the app is in rem, so this one number is large print for
   // all of it — buttons, notes and maths alike.
@@ -100,15 +117,12 @@ export function App() {
     saveSettings(next);
   }
 
-  const [exportFrom, setExportFrom] = useState<Screen>('scratchpad');
-  function openExport(from: Screen) {
-    setExportFrom(from);
-    setScreen('export');
+  function openExport() {
+    navigate('export');
   }
 
   function openSettings() {
-    setSettingsFrom(screen === 'settings' ? 'home' : screen);
-    setScreen('settings');
+    navigate('settings');
   }
   // Keyboard help (#25): `null` when closed, otherwise whether it took focus.
   const [help, setHelp] = useState<null | { takeFocus: boolean }>(null);
@@ -202,7 +216,7 @@ export function App() {
     setProblem(next);
     saveProblem(next);
     setLineIndex(0);
-    setScreen('problem');
+    navigate('problem');
 
     // A capture announces its own result, in more detail than is possible here
     // — it knows what was unsure and what the photo warnings were. The sample
@@ -243,7 +257,7 @@ export function App() {
     setSpokenLines(spoken);
     setLowVisionFailed(false);
     setLineIndex(index);
-    setScreen('lowvision');
+    navigate('lowvision');
   }
 
   // Low-vision mode takes over the whole screen, so it renders instead of the
@@ -263,7 +277,7 @@ export function App() {
           startIndex={lineIndex}
           onExit={(i) => {
             setLineIndex(i);
-            setScreen('problem');
+            goBack();
             announce('Left low-vision mode.');
             window.setTimeout(() => focusFirst(`#${problem.lines[i]?.id ?? 'L1'}`), 60);
           }}
@@ -283,11 +297,22 @@ export function App() {
 
         <header className="border-b border-[--line] px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                className="btn"
+                aria-label={screenBackStack.length ? 'Back to previous page' : 'Back (no previous page)'}
+                disabled={!screenBackStack.length}
+                onClick={goBack}
+              >
+                Back
+              </button>
+              <div>
               <h1 className="mono inline-flex min-h-[40px] items-center bg-[--accent] px-3 text-xl font-medium text-[--accent-fg]">Glance</h1>
               <p className="mt-1 text-[--muted]">Math you can hear, explore and write without seeing the page.</p>
               <div className="mt-2">
                 <ModeBadge mode={settings.mode} />
+              </div>
               </div>
             </div>
             <button
@@ -327,7 +352,7 @@ export function App() {
         {screen === 'home' && (
           <Home
             captureUnavailable={modelsUsable ? undefined : modelsUnavailableWhy}
-            onCapture={() => setScreen('capture')}
+            onCapture={() => navigate('capture')}
             onSample={() => openProblem(sampleProblem())}
             onResume={problem ? resumeProblem : undefined}
             takeRestoredAnnouncement={takeRestoredAnnouncement}
@@ -338,7 +363,7 @@ export function App() {
         )}
 
         {screen === 'capture' && (
-          <Capture onCaptured={openProblem} onBack={() => setScreen('home')} />
+          <Capture onCaptured={openProblem} onBack={goBack} />
         )}
 
         {screen === 'problem' && problem && (
@@ -347,14 +372,14 @@ export function App() {
             startIndex={lineIndex}
             onLowVision={enterLowVision}
             mode={settings.mode}
-            onNewCapture={() => setScreen('capture')}
+          onNewCapture={() => navigate('capture')}
             onDiscardLine={discardProblemLine}
             onStartWorking={(index) => {
               setWorkingFrom(index);
               setLineIndex(index);
-              setScreen('scratchpad');
+            navigate('scratchpad');
             }}
-            onExport={() => openExport('problem')}
+          onExport={openExport}
           />
         )}
 
@@ -364,20 +389,20 @@ export function App() {
             mode={settings.mode}
             startLine={workingFrom}
             speechAvailable={modelsUsable}
-            onBack={() => setScreen('problem')}
-            onExport={() => openExport('scratchpad')}
+          onBack={goBack}
+          onExport={openExport}
           />
         )}
 
         {screen === 'export' && problem && (
-          <Export problem={problem} mode={settings.mode} onBack={() => setScreen(exportFrom)} />
+          <Export problem={problem} mode={settings.mode} onBack={goBack} />
         )}
 
         {screen === 'settings' && (
           <Settings
             settings={settings}
             onChange={updateSettings}
-            onBack={() => setScreen(settingsFrom)}
+          onBack={goBack}
           />
         )}
 
