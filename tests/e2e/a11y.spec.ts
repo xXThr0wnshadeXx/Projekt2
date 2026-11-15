@@ -28,9 +28,8 @@ test.describe('@smoke progressive web app shell', () => {
     await page.goto('/');
     await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
     await expect(page.getByTestId('install-status')).toContainText('Install app option');
-    await expect
-      .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.active?.scriptURL ?? ''))
-      .toContain('/sw.js');
+    // The service worker is registered in production builds only; it is
+    // tested in install.spec.ts.
   });
 });
 
