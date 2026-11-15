@@ -38,3 +38,16 @@ export async function checkStep(
     window.clearTimeout(timer);
   }
 }
+
+/** Say what an unconfirmed step was compared with.
+ *
+ *  "I couldn't confirm this step" on its own leaves a student who cannot see
+ *  the screen with no way to tell why: a correct step is unconfirmed whenever
+ *  it is compared with the wrong line — the problem line they forgot they
+ *  started from, or two problem lines that are separate questions. Naming the
+ *  line is a fact about the check, not a hint about the maths. A confirmed
+ *  step, or a study-mode explanation, is passed through untouched.
+ */
+export function withBasis(verdict: string, basis: string): string {
+  return verdict.startsWith("I couldn't confirm") ? `${verdict} It was compared with ${basis}.` : verdict;
+}

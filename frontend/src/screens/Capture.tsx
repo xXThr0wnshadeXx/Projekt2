@@ -295,9 +295,14 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
             e.target.value = '';
           }}
         />
+        {/* Upload leads. It is the path that works on every machine, needs no
+            permission prompt, and is how a student actually receives course
+            material — a PDF or a screenshot, not a photo they took. A camera
+            also asks a blind user to aim it, which is the hardest thing on
+            this screen, so it should not read as the obvious first choice. */}
         <button
           type="button"
-          className="btn"
+          className="btn-primary"
           disabled={working}
           onClick={() => fileInput.current?.click()}
         >
@@ -306,8 +311,11 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
         <button type="button" className="btn" disabled={working} onClick={startCamera}>
           {cameraOn ? 'Restart camera' : 'Take a photo'}
         </button>
-        <button type="button" className="btn" disabled={working} onClick={onBack}>
-          Back
+      </div>
+
+      <div className="mt-6">
+        <button type="button" className="btn-quiet" disabled={working} onClick={onBack}>
+          Back to the start
         </button>
       </div>
 

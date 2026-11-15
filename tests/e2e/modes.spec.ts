@@ -58,7 +58,7 @@ async function setMode(page: Page, mode: 'Study' | 'Homework' | 'Exam') {
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeFocused();
   await page.getByRole('radio', { name: new RegExp(`^${mode}`) }).check();
   await expect(page.getByTestId('mode-badge')).toHaveText(`${mode} mode`);
-  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Back to the start' }).click();
 }
 
 async function openSample(page: Page) {
@@ -137,7 +137,12 @@ test.describe('@smoke modes', () => {
     await openSample(page);
     await page.keyboard.press('s');
     await saveTypedLine(page);
-    await expect(polite(page)).toHaveText("I couldn't confirm this step.");
+    // Never "wrong" — and it says which line it was compared with, because a
+    // student who cannot see the screen has no other way to know.
+    await expect(polite(page)).toHaveText(
+      "I couldn't confirm this step. It was compared with line 1 of the problem.",
+    );
+    await expect(page.getByRole('main')).not.toContainText(/wrong|incorrect|mistake/i);
     await expect(page.locator('main')).not.toContainText(/wrong/i);
   });
 
@@ -168,7 +173,7 @@ test.describe('@smoke modes', () => {
     await expect(polite(page)).toHaveText('This is the first line, so there is nothing before it to compare.');
 
     await page.keyboard.press('n');
-    await page.keyboard.press('w');
+    await page.getByRole('button', { name: 'What changed?' }).click();
     await expect(polite(page)).toHaveText('This step checks out.');
     expect(calls).toEqual([
       { from_latex: WORKED_BEFORE, to_latex: WORKED_AFTER, mode: 'homework' },

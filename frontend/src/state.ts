@@ -49,9 +49,18 @@ export interface Settings {
   /** The app's own speech. Off by default: a screen reader already reads the
    *  live regions, and two voices at once is unusable (DESIGN.md 13). */
   selfVoicing: boolean;
+  /** Size of all text, as a percentage of the browser's own size. */
+  textScale: number;
 }
 
-export const defaultSettings: Settings = { mode: 'homework', selfVoicing: false };
+/** Large print is the default, not a mode to go and find. */
+export const TEXT_SCALES = [100, 125, 150, 175, 200];
+
+export const defaultSettings: Settings = {
+  mode: 'homework',
+  selfVoicing: false,
+  textScale: 125,
+};
 
 const PROBLEM_KEY = 'glance.problem.v1';
 const WORK_KEY = 'glance.work.v1';
@@ -111,7 +120,9 @@ export function saveWork(lines: WorkLine[]): void {
 }
 
 export function loadSettings(): Settings {
-  return { ...defaultSettings, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
+  const settings = { ...defaultSettings, ...(read<Partial<Settings>>(SETTINGS_KEY) ?? {}) };
+  if (!TEXT_SCALES.includes(settings.textScale)) settings.textScale = defaultSettings.textScale;
+  return settings;
 }
 
 export function saveSettings(settings: Settings): void {
