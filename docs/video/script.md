@@ -19,4 +19,4 @@ parts only with things we can show or source.
 
 **8. (1:35)** When they're done, they hand in typed work: an accessible file their instructor can read, and their screen reader can too.
 
-**9. (1:45)** Glance. Math you can hear and speak. [Link.]
+**9. (1:45)** Glance. Math for students who are blind or have low vision. It never solves the problem. [Link.]
