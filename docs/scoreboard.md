@@ -1,22 +1,22 @@
 # Slide
 
-- 95% of lines read correctly on 30 synthetic worksheet pages.
+- 95% of lines matched in meaning (88% exactly) on 30 synthetic worksheet pages.
 - 1.3 seconds to read a typed page on the live server (median).
-- 209 milliseconds for a live step check.
+- 106 milliseconds for a live step check (median of 30).
 - 7 screens checked automatically for accessibility, in light and dark.
-- 296 back-end and 264 browser tests on every change.
+- 562 back-end tests and 504 browser checks across three browsers.
 
 ## Sources
 
-Test counts were collected on November 15, 2026 from `main` at `d50e3b4`.
+Test counts were collected on November 15, 2026 from `main` at `29170e3`. They are tests collected, not a record of a run.
 
 | Number | What it means | Source |
 | --- | --- | --- |
-| 95% | The live capture run matched 57 of 60 rendered worksheet lines after normalizing notation. | [eval/notes.md:28–42](../eval/notes.md#L28-L42), [eval/run_synthetic_eval.mjs:72–85](../eval/run_synthetic_eval.mjs#L72-L85) |
+| 95% (88%) | Equivalent match: 57 of 60 lines on 30 synthetic rendered pages after normalizing notation. Exact match was 53 of 60 (88.3%). Not real camera photos. | [eval/notes.md:28–42](../eval/notes.md#L28-L42), [eval/run_synthetic_eval.mjs:72–85](../eval/run_synthetic_eval.mjs#L72-L85) |
 | 1.3 s | Median time to read a slide-style typed page on the Railway capture endpoint (p50 1341 ms; p90 1578 ms), from the same synthetic run. | [eval/notes.md:36–42](../eval/notes.md#L36-L42) |
-| 209 ms | Elapsed time for the sample homework step check in the November 15 live preflight. | [Issue #34 preflight results](https://github.com/xXThr0wnshadeXx/Projekt2/issues/34#issuecomment-6891479938) |
-| 296 | Backend test cases collected. | `backend/.venv/bin/python -m pytest -q --co \| tail -1` → `296 tests collected in 0.89s` |
-| 264 | Browser smoke test cases listed across Chromium and mobile Safari. | `npx playwright test --grep @smoke --list \| tail -1` → `Total: 264 tests in 13 files` |
+| 106 ms | Median (p50) of 30 live step checks on the Railway API; p95 155 ms. | [docs/latency.md](latency.md) (#195) |
+| 562 | Back-end test cases collected. | `backend/.venv/bin/python -m pytest -q --co \| tail -1` → `562 tests collected` |
+| 504 | Browser smoke test cases listed across Chromium, mobile Safari and Firefox. | `npx playwright test --grep @smoke --list \| tail -1` → `Total: 504 tests in 20 files` |
 | 176 ms | First backend health response in the same live preflight. | [Issue #34 preflight results](https://github.com/xXThr0wnshadeXx/Projekt2/issues/34#issuecomment-6891479938) |
 | 7 | Screens with axe checks in both color schemes: Home, Capture, Problem, Low-vision mode, Scratchpad, Settings, and Hand-in. Capture and Scratchpad also have checks for temporary states. | [tests/e2e/a11y.spec.ts:87–205](../tests/e2e/a11y.spec.ts#L87-L205) |
 
