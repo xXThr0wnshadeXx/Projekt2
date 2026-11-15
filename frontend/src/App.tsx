@@ -51,6 +51,8 @@ export function App() {
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
   const [backEndNote, setBackEndNote] = useState('');
+  // Whether the server said it can read images and speech (#127).
+  const [models, setModels] = useState(true);
   const [settings, setSettings] = useState<SettingsData>(() => loadSettings());
   // Where to go back to from Settings, and which problem line the student was
   // on when they started working (their first step is checked against it).
@@ -108,15 +110,27 @@ export function App() {
       return;
     }
     health()
-      .then(() => {
+      .then((h) => {
         setBackEnd('up');
         setBackEndNote('');
+        setModels(h.models !== false);
       })
       .catch((e: unknown) => {
         setBackEnd('down');
         setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
       });
   }, []);
+
+  // Recording and capture need the server and its model. While the first
+  // health check is still out they are offered; it answers in well under a
+  // second, and hiding them until then would make every page load jump.
+  const modelsUsable = backEnd !== 'down' && models;
+  const modelsUnavailableWhy =
+    backEnd === 'down'
+      ? apiConnected
+        ? 'The server is not reachable.'
+        : UNCONNECTED_MESSAGE
+      : 'The server cannot read images or speech right now.';
 
   function openProblem(next: ProblemData) {
     setProblem(next);
@@ -223,6 +237,7 @@ export function App() {
         <Home
           backEndReachable={backEnd !== 'down'}
           connected={apiConnected}
+          captureUnavailable={modelsUsable ? undefined : modelsUnavailableWhy}
           onCapture={() => setScreen('capture')}
           onSample={() => openProblem(sampleProblem())}
           onResume={problem ? () => setScreen('problem') : undefined}
@@ -253,6 +268,7 @@ export function App() {
           problem={problem}
           mode={settings.mode}
           startLine={workingFrom}
+          speechAvailable={modelsUsable}
           onBack={() => setScreen('problem')}
           onExport={() => openExport('scratchpad')}
         />

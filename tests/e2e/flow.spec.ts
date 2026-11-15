@@ -12,6 +12,8 @@
 // and is covered by the back-end tests.
 
 import { test, expect, type Page } from '@playwright/test';
+import { stubServerWithModels } from './server';
+
 
 /** Open the sample problem and wait for MathJax to typeset it. */
 async function openSample(page: Page) {
@@ -175,6 +177,7 @@ test.describe('@smoke critical path', () => {
   });
 
   test('the capture screen offers every input by keyboard', async ({ page }) => {
+    await stubServerWithModels(page); // capture needs the model (#127)
     await page.goto('/');
     await page.getByRole('button', { name: 'Capture a problem' }).click();
 

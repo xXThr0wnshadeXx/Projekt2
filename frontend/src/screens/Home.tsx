@@ -16,6 +16,8 @@ export interface HomeProps {
   backEndReachable: boolean;
   /** False on a deployed build that was never given a server address (#135). */
   connected?: boolean;
+  /** Why capture cannot work right now, or undefined when it can (#127). */
+  captureUnavailable?: string;
   onSettings: () => void;
 }
 
@@ -25,6 +27,7 @@ export function Home({
   onResume,
   backEndReachable,
   connected = true,
+  captureUnavailable,
   onSettings,
 }: HomeProps) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -38,7 +41,18 @@ export function Home({
     );
   }, [onResume]);
 
-  useShortcuts({ u: onCapture, c: onCapture });
+  // The button stays in the tab order when capture cannot work, so a student
+  // moving by Tab is told why instead of landing on a screen where every
+  // upload fails. `disabled` would drop it from the tab order and say nothing.
+  function capture() {
+    if (captureUnavailable) {
+      announce(`Capture is unavailable right now. ${captureUnavailable} Try the sample problem instead.`);
+      return;
+    }
+    onCapture();
+  }
+
+  useShortcuts({ u: capture, c: capture });
 
   return (
     <main id="main" className="mx-auto max-w-3xl px-6 py-8">
@@ -55,8 +69,13 @@ export function Home({
       </p>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button type="button" className="btn" onClick={onCapture}>
-          Capture a problem
+        <button
+          type="button"
+          className="btn"
+          onClick={capture}
+          aria-disabled={captureUnavailable ? 'true' : undefined}
+        >
+          {captureUnavailable ? 'Capture a problem - unavailable right now' : 'Capture a problem'}
         </button>
         <button type="button" className="btn" onClick={onSample}>
           Try a sample problem
@@ -82,6 +101,16 @@ export function Home({
           The sample
           problem still works — you can explore it, glance at it, and read it in
           low-vision mode.
+        </p>
+      )}
+
+      {backEndReachable && captureUnavailable && (
+        <p
+          data-testid="models-notice"
+          className="mt-6 rounded-lg border border-[--warn] px-4 py-3 text-sm text-[--warn]"
+        >
+          Capture and speaking a line are unavailable on this server right now.
+          The sample problem, typing lines, and step checks still work.
         </p>
       )}
 
