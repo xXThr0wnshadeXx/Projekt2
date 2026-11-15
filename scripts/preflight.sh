@@ -29,11 +29,25 @@ pass() { printf '  PASS  %s\n' "$1"; }
 warn() { printf '  WARN  %s\n' "$1"; WARNS=$((WARNS + 1)); }
 fail() { printf '  FAIL  %s\n' "$1"; FAILS=$((FAILS + 1)); }
 
-# curl wrapper: prints "<status> <seconds>" and leaves the body in $BODY_FILE.
+# curl wrapper: prints "<status> <seconds> [transport error]" and saves the body.
 BODY_FILE="$(mktemp)"
 trap 'rm -f "$BODY_FILE"' EXIT
 req() {
-  curl -sS -o "$BODY_FILE" -w '%{http_code} %{time_total}' --max-time 15 "$@" 2>/dev/null || echo "000 0"
+  local result curl_status=0 timeout=15
+  : > "$BODY_FILE"
+  result=$(curl -sS -o "$BODY_FILE" -w '%{http_code} %{time_total}' --max-time "$timeout" "$@" 2>/dev/null) || curl_status=$?
+  if [ "$curl_status" -eq 0 ] && [ "${result%% *}" != "000" ]; then
+    printf '%s\n' "$result"
+    return
+  fi
+
+  : > "$BODY_FILE"
+  case "$curl_status" in
+    28) printf '000 0 no response (timed out after %s s)\n' "$timeout" ;;
+    7)  printf '000 0 no response (could not connect)\n' ;;
+    0)  printf '000 0 no response\n' ;;
+    *)  printf '000 0 no response (request error %s)\n' "$curl_status" ;;
+  esac
 }
 ms() { awk -v s="$1" 'BEGIN { printf "%d", s * 1000 }'; }
 body() { cat "$BODY_FILE"; }
@@ -68,11 +82,13 @@ else
 fi
 
 # 3. Step check: SymPy, warm, inside the 1.5 s budget (DESIGN.md 16).
-read -r code secs <<< "$(req -X POST "$API/api/diff" -H 'Content-Type: application/json' \
+read -r code secs transport_error <<< "$(req -X POST "$API/api/diff" -H 'Content-Type: application/json' \
   -d '{"from_latex":"2x + 3 = 11","to_latex":"2x = 8","mode":"homework"}')"
 if [ "$code" = "200" ] && body | grep -q '"verified":true'; then
   t="$(ms "$secs")"
   if [ "$t" -le 1500 ]; then pass "step check works (${t} ms)"; else warn "step check works but took ${t} ms (budget 1500) — run keep_warm.sh"; fi
+elif [ "$code" = "000" ]; then
+  fail "step check: $transport_error"
 else
   fail "step check returned $code: $(body | head -c 200)"
 fi

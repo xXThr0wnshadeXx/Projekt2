@@ -75,14 +75,36 @@ export function RecordButton({ onResult, onError, disabled = false, onTap }: Rec
   const [recording, setRecording] = useState(false);
   const recorder = useRef<Recorder | null>(null);
   const busy = useRef(false);
+  // Refs, not effect locals: the key effect re-runs on every render, and
+  // starting to record renders, which would forget that Space is held.
+  const holdingSpace = useRef(false);
+  const holdTimer = useRef<number | null>(null);
   const tapToggle = useRef(prefersTapToggle());
 
   useEffect(() => {
     const r = new Recorder();
     r.onCapped = () => announce('That is the longest line I can take. Stopping there.');
     recorder.current = r;
-    return () => r.cancel();
+    return () => {
+      if (holdTimer.current !== null) window.clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+      recorder.current = null;
+      r.cancel();
+    };
   }, []);
+
+  useEffect(() => {
+    const r = recorder.current;
+    if (!r) return;
+    r.onResult = (result) => {
+      setRecording(false);
+      onResult(result);
+    };
+    r.onError = (message) => {
+      setRecording(false);
+      onError(message);
+    };
+  }, [onResult, onError]);
 
   // Whether the browser will ask for the microphone (#200). Looked up ahead of
   // time, so the explanation is said inside the student's own press, before
@@ -108,31 +130,24 @@ export function RecordButton({ onResult, onError, disabled = false, onTap }: Rec
   }, []);
 
   async function start() {
-    if (busy.current || disabled || recording) return;
+    const r = recorder.current;
+    if (!r || busy.current || disabled || recording) return;
     busy.current = true;
     if (micState.current !== 'granted' && !micRemembered()) {
       announce(MIC_EXPLAINED, 'assertive');
     }
     try {
-      await recorder.current?.start();
+      const started = await r.start();
+      if (!started || recorder.current !== r) return;
       rememberMic();
       setRecording(true);
       announce('Recording. Speak your line.', 'assertive');
     } catch (e: unknown) {
-      onError(e instanceof Error ? e.message : 'Could not start recording.');
+      if (recorder.current === r) {
+        onError(e instanceof Error ? e.message : 'Could not start recording.');
+      }
     } finally {
       busy.current = false;
-    }
-  }
-
-  async function stop() {
-    if (!recorder.current?.recording) return;
-    setRecording(false);
-    try {
-      const result = await recorder.current.stop();
-      onResult(result);
-    } catch (e: unknown) {
-      onError(e instanceof Error ? e.message : 'Nothing was recorded.');
     }
   }
 
@@ -143,8 +158,6 @@ export function RecordButton({ onResult, onError, disabled = false, onTap }: Rec
 
     // Tap or hold (#236): a short tap reads the current line, holding records.
     // Recording starts once the key has been held for HOLD_MS.
-    let holdTimer: number | null = null;
-    let held = false;
     const ours = (e: KeyboardEvent) =>
       e.code === 'Space' &&
       !shouldIgnore(e) &&
@@ -155,43 +168,53 @@ export function RecordButton({ onResult, onError, disabled = false, onTap }: Rec
     function onDown(e: KeyboardEvent) {
       if (!ours(e)) return;
       e.preventDefault();
-      if (e.repeat || holdTimer !== null || held) return;
-      holdTimer = window.setTimeout(() => {
-        holdTimer = null;
-        held = true;
+      if (e.repeat || holdTimer.current !== null || holdingSpace.current) return;
+      holdTimer.current = window.setTimeout(() => {
+        holdTimer.current = null;
+        holdingSpace.current = true;
         void start();
       }, HOLD_MS);
+    }
+    function finishHold() {
+      holdingSpace.current = false;
+      const r = recorder.current;
+      if (r?.recording) {
+        r.stop();
+      } else if (r && busy.current) {
+        // Released while the microphone was still being opened.
+        r.cancel();
+        announce('Recording did not start. Hold Space again when you are ready.');
+      }
     }
     function onUp(e: KeyboardEvent) {
       if (!ours(e)) return;
       e.preventDefault();
-      if (holdTimer !== null) {
-        window.clearTimeout(holdTimer);
-        holdTimer = null;
+      if (holdTimer.current !== null) {
+        window.clearTimeout(holdTimer.current);
+        holdTimer.current = null;
         onTapRef.current?.();
         return;
       }
-      if (held) {
-        held = false;
-        void stop();
-      }
+      if (holdingSpace.current) finishHold();
     }
     // Releasing the key outside the window would otherwise leave it recording.
     function onBlur() {
-      if (holdTimer !== null) {
-        window.clearTimeout(holdTimer);
-        holdTimer = null;
+      if (holdTimer.current !== null) {
+        window.clearTimeout(holdTimer.current);
+        holdTimer.current = null;
       }
-      held = false;
-      if (recorder.current?.recording) void stop();
+      if (holdingSpace.current) finishHold();
+      else recorder.current?.stop();
     }
 
-    window.addEventListener('keydown', onDown);
-    window.addEventListener('keyup', onUp);
+    // Capture phase, so this runs before the page-wide keys (#236) and a held
+    // Space records instead of reading.
+    window.addEventListener('keydown', onDown, true);
+    window.addEventListener('keyup', onUp, true);
     window.addEventListener('blur', onBlur);
     return () => {
-      window.removeEventListener('keydown', onDown);
-      window.removeEventListener('keyup', onUp);
+      window.removeEventListener('keydown', onDown, true);
+      window.removeEventListener('keyup', onUp, true);
       window.removeEventListener('blur', onBlur);
     };
   });
@@ -217,7 +240,7 @@ export function RecordButton({ onResult, onError, disabled = false, onTap }: Rec
         onClick={() => {
           // Click is the tap-toggle path, and also what a screen reader sends
           // when it activates the button on either platform.
-          if (recording) void stop();
+          if (recording) recorder.current?.stop();
           else void start();
         }}
       >
