@@ -146,6 +146,22 @@ export function App() {
     }
   }
 
+  /** A capture is a suggestion, not a fact. Keep the student's correction in
+   * their local copy too, so an inaccurate line cannot return after reload. */
+  function discardProblemLine(id: string) {
+    setProblem((current) => {
+      if (!current || !current.lines.some((line) => line.id === id)) return current;
+      const next = { ...current, lines: current.lines.filter((line) => line.id !== id) };
+      saveProblem(next);
+      return next;
+    });
+    setSpokenLines((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
   function enterLowVision(index: number) {
     // Grab MathJax's speech strings while the Problem screen is still mounted.
     // Low-vision mode's optional self-voicing would otherwise fall back to
@@ -252,6 +268,7 @@ export function App() {
           onLowVision={enterLowVision}
           mode={settings.mode}
           onNewCapture={() => setScreen('capture')}
+          onDiscardLine={discardProblemLine}
           onStartWorking={(index) => {
             setWorkingFrom(index);
             setLineIndex(index);
