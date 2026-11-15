@@ -218,6 +218,9 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   async function startCamera() {
     setError('');
     setCameraStarting(true);
+    // Said before the browser's own prompt, so a student who cannot see it
+    // knows what is being asked and why (#200).
+    announce('To see your worksheet I need your camera. Your browser will ask for permission now.');
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         // The back camera is the one pointed at a page or a board.

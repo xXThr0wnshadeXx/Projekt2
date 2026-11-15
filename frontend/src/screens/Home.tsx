@@ -7,8 +7,9 @@
 // heading, in one sentence, and in three numbered steps. The steps are text,
 // not controls, so Tab still goes straight to the buttons.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
+import { setSelfVoicing, speakOnce } from '../audio/tts';
 import { useShortcuts } from '../shortcuts';
 import { ReadingControls } from '../components/ReadingControls';
 import type { Settings } from '../state';
@@ -27,6 +28,35 @@ export interface HomeProps {
 const WHAT =
   'Glance. Math for students who are blind or have low vision. It reads a problem aloud and writes down your own work as you say it. It never solves it for you.';
 
+// First visit (#200): one question, so a student arriving alone, with or
+// without a screen reader, can start with no one helping.
+const WELCOMED_KEY = 'glance.welcomed.v1';
+const ASK_VOICE = 'Press Y to hear Glance speak to you, or N if you use a screen reader.';
+const NEXT = 'Then press C to point your camera at a worksheet, or S to try a sample problem.';
+
+function welcomedBefore(): boolean {
+  try {
+    return window.localStorage.getItem(WELCOMED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function rememberWelcomed(): void {
+  try {
+    window.localStorage.setItem(WELCOMED_KEY, '1');
+  } catch {
+    // Private windows can refuse storage; the question is simply asked again.
+  }
+}
+
+// Keys a screen-reader user moves around with. The first-gesture voice waits
+// for something else, so it does not talk over a screen reader.
+const NAVIGATION_KEYS = new Set([
+  'Tab', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Escape',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown',
+]);
+
 export function Home({
   onCapture,
   onSample,
@@ -36,17 +66,71 @@ export function Home({
   onSettingsChange,
 }: HomeProps) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const [firstVisit, setFirstVisit] = useState(() => !welcomedBefore());
 
   useEffect(() => {
     heading.current?.focus();
-    announce(
-      onResume
-        ? `${WHAT} Capture a problem, try the sample, or go back to your problem.`
-        : `${WHAT} Capture a problem, or try the sample.`,
-    );
+    if (firstVisit) {
+      announce(`${WHAT} ${ASK_VOICE} ${NEXT}`);
+    } else if (onResume) {
+      announce(`Welcome back. ${WHAT} Press B to go back to your problem, C to capture a new one, or S for the sample.`);
+    } else {
+      announce(`${WHAT} Capture a problem, or try the sample.`);
+    }
+    // Announce once, on arrival.
   }, [onResume]);
 
-  useShortcuts({ u: onCapture, c: onCapture });
+  // A student with no screen reader hears nothing from a live region, and the
+  // browser will not let the page speak until they do something. So on a first
+  // visit, their first tap, click or key other than navigation says the
+  // question aloud, once.
+  useEffect(() => {
+    if (!firstVisit || settings.selfVoicing) return;
+    let done = false;
+    const CONTROLS = 'button, a, input, select, textarea, label';
+    function first(e: Event) {
+      if (done) return;
+      // Someone using a control has found their way already, and a screen
+      // reader activating one must never be talked over: stop listening.
+      const target = e instanceof KeyboardEvent ? document.activeElement : e.target;
+      if (target instanceof Element && target.closest(CONTROLS)) {
+        done = true;
+        return;
+      }
+      // Keys: only Space or Enter on the page itself. Navigation keys and the
+      // single-key shortcuts here mean the student already knows what to do.
+      if (e instanceof KeyboardEvent && (NAVIGATION_KEYS.has(e.key) || ![' ', 'Enter'].includes(e.key))) return;
+      done = true;
+      speakOnce(`Welcome to Glance. ${ASK_VOICE} ${NEXT}`);
+    }
+    window.addEventListener('pointerdown', first, true);
+    window.addEventListener('keydown', first, true);
+    return () => {
+      window.removeEventListener('pointerdown', first, true);
+      window.removeEventListener('keydown', first, true);
+    };
+  }, [firstVisit, settings.selfVoicing]);
+
+  function chooseVoice(on: boolean) {
+    rememberWelcomed();
+    setFirstVisit(false);
+    onSettingsChange({ ...settings, selfVoicing: on });
+    if (on) {
+      // Switched on here, before announcing, so this very sentence is spoken.
+      setSelfVoicing(true);
+      announce(`Okay, I will speak to you. ${NEXT}`);
+    } else {
+      announce(`Okay, your screen reader will do the talking. ${NEXT}`);
+    }
+  }
+
+  useShortcuts({
+    u: onCapture,
+    c: onCapture,
+    s: onSample,
+    ...(onResume ? { b: onResume } : {}),
+    ...(firstVisit ? { y: () => chooseVoice(true), n: () => chooseVoice(false) } : {}),
+  });
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
@@ -57,6 +141,18 @@ export function Home({
       >
         Math for students who are blind or have low vision
       </h2>
+      {firstVisit && (
+        // Text, not buttons: it adds no Tab stops, and Tab still goes
+        // straight to "Capture a problem". The Read aloud switch below does
+        // the same thing for anyone who prefers a control.
+        <p
+          className="mt-4 rounded-lg border-2 border-[--accent] bg-[--surface] px-4 py-3 text-xl font-semibold"
+          data-testid="welcome"
+        >
+          New here? Press <kbd className="kbd">Y</kbd> to hear Glance speak to you, or{' '}
+          <kbd className="kbd">N</kbd> if you use a screen reader.
+        </p>
+      )}
       <p className="mt-3 text-lg">
         Glance reads a math problem aloud, lets you explore it piece by piece,
         and writes down your own working as you say it or type it. No pencil,

@@ -78,7 +78,13 @@ export interface Shortcut {
 const HELP: Shortcut = { keys: 'Question mark', does: 'hear these shortcuts' };
 
 export const KEYMAP: Record<ScreenName, Shortcut[]> = {
-  home: [{ keys: 'U or C', does: 'capture a problem' }, HELP],
+  home: [
+    { keys: 'U or C', does: 'capture a problem' },
+    { keys: 'S', does: 'try a sample problem' },
+    { keys: 'B', does: 'go back to your problem, when there is one' },
+    { keys: 'Y or N', does: 'on your first visit: Y to hear Glance speak, N if you use a screen reader' },
+    HELP,
+  ],
   capture: [
     { keys: 'U', does: 'upload a file' },
     { keys: 'C', does: 'take a photo' },
