@@ -40,6 +40,9 @@ export interface WorkLine {
   readback: string;
   /** False when SymPy could not parse it. Saved anyway, flagged as unsure. */
   valid: boolean;
+  /** True when the student heard this line read back and confirmed it before
+   *  it was saved. Lines saved before this was recorded have no value. */
+  confirmed?: boolean;
 }
 
 export type Mode = 'study' | 'homework' | 'exam';

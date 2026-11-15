@@ -208,6 +208,18 @@ test.describe('@smoke talking to Glance', () => {
     await say(page, 'what does numerator mean');
     await expect(polite(page)).toHaveText('Explaining words is off in exam mode.');
   });
+
+  test('hand in and read my hand-in are understood without a server', () => {
+    for (const said of ['hand in', 'Hand in my work.', 'please hand it in', 'hand in now', 'submit my work']) {
+      expect(understandTalk(said), said).toEqual({ kind: 'handIn' });
+    }
+    for (const said of ['read my hand-in', 'Read my hand in', 'hear my hand-in first', 'read the hand-in please']) {
+      expect(understandTalk(said), said).toEqual({ kind: 'readHandIn' });
+    }
+    // A line of math, or another command, is not taken for either.
+    expect(understandTalk('hand in hand')).toBeNull();
+    expect(understandTalk('read line two')).toBeNull();
+  });
 });
 
 test.describe('@smoke the first screen', () => {
