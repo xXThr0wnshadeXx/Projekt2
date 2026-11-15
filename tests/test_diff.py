@@ -140,4 +140,4 @@ def test_timeout_returns_timeout_error(monkeypatch):
     ],
 )
 def test_explanation_guard(text, ok):
-    assert acceptable(text) is ok
+    assert acceptable(text, "2x + 3 = 11", "2x = 8") is ok

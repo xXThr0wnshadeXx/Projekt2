@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, StringConstraints
 
+from ..answer_language import gives_answer_or_method
 from ..openai_client import ModelClient, ModelError
 from ..spoken_ambiguity import fraction_ambiguity
 from ..spoken_guard import adds_to_what_was_said, text_adds_to_what_was_said
@@ -103,6 +104,8 @@ def spoken_router(
                 spoken_text = [question, result.get("readback")] + [
                     option["readback"] for option in alternatives
                 ]
+                if any(gives_answer_or_method(t) for t in spoken_text):
+                    return spoken_error(422, "UNPARSEABLE", NOT_WHAT_WAS_SAID)
                 if any(text_adds_to_what_was_said(t, payload.text) for t in spoken_text):
                     return spoken_error(422, "UNPARSEABLE", NOT_WHAT_WAS_SAID)
                 validity = await asyncio.gather(
@@ -129,6 +132,8 @@ def spoken_router(
         latex, readback = result["latex"], result["readback"]
         if not latex or not latex.strip() or not readback or not readback.strip():
             return spoken_error(422, "UNPARSEABLE", NO_MATH_HEARD)
+        if gives_answer_or_method(readback) or gives_answer_or_method(result.get("clarifying_question")):
+            return spoken_error(422, "UNPARSEABLE", NOT_WHAT_WAS_SAID)
         # Held to the transcript, not only told: a line that brings in a number
         # or a variable the student never spoke is the model doing their work.
         if adds_to_what_was_said(latex, payload.text) or text_adds_to_what_was_said(
