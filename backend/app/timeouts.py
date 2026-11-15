@@ -34,6 +34,7 @@ import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from concurrent.futures.process import BrokenProcessPool
 from typing import Any, TypeVar
 
@@ -55,9 +56,11 @@ class CasTimeout(ApiError):
 
 def _warm() -> bool:
     # Test and rehearsal hook: simulate a slow host (a 0.1-CPU free plan).
-    delay = float(os.environ.get("GLANCE_CAS_WARM_DELAY", "0") or 0)
-    if delay:
-        time.sleep(delay)
+    # Never honoured in production, so a stray variable can't slow the live app.
+    if os.environ.get("APP_ENV", "").strip().lower() != "production":
+        delay = float(os.environ.get("GLANCE_CAS_WARM_DELAY", "0") or 0)
+        if delay:
+            time.sleep(delay)
     from sympy.parsing.latex import parse_latex
 
     parse_latex("x + 1 = 2", strict=True)
@@ -83,15 +86,21 @@ class _Slot:
     def _warm_in_background(self, executor: ProcessPoolExecutor, ready: threading.Event) -> None:
         """Import SymPy in the worker, then let waiting callers through.
 
-        No time limit (#141): on a slow host warming takes minutes, and saying
-        "ready" before it is sends the first check to a worker still importing.
+        Warming may take minutes on a slow host (#141), so it isn't cut short
+        early. But a worker that hangs while warming would never be replaced,
+        so past a hard cap (three times `cas_warm_seconds`) it is stopped and a
+        fresh one started.
         """
         started = time.monotonic()
         try:
-            executor.submit(_warm).result()
+            executor.submit(_warm).result(timeout=_warm_cap())
             if executor is self.executor:  # not replaced while warming
                 self.warm = True
             log.info(json.dumps({"evt": "cas_warm", "seconds": round(time.monotonic() - started, 1)}))
+        except FutureTimeout:
+            log.warning(json.dumps({"evt": "cas_warm_timeout", "seconds": round(time.monotonic() - started, 1)}))
+            if executor is self.executor:
+                self.kill()  # replaces the hung worker and starts warming again
         except Exception as exc:  # broken worker: the next call that breaks on it replaces it
             log.warning(json.dumps({"evt": "cas_warm_failed", "error": type(exc).__name__}))
         finally:
@@ -124,7 +133,14 @@ def _budget(timeout: float | None) -> float:
 
 
 def _warm_limit() -> float:
+    """How long callers wait for a worker to warm."""
     return get_settings().cas_warm_seconds
+
+
+def _warm_cap() -> float:
+    """When a worker still warming is taken to be hung and replaced. Well past
+    the callers' wait, so a slow but healthy worker is never killed (#141)."""
+    return 3 * get_settings().cas_warm_seconds
 
 
 def _on_timeout(slot: _Slot) -> None:
@@ -136,11 +152,23 @@ def _on_timeout(slot: _Slot) -> None:
 
 
 def _submit(slot: _Slot, fn: Callable[..., T], args: tuple) -> Future:
+    """Blocking: for run_cas_sync only. Async callers use _submit_async."""
     try:
         return slot.executor.submit(fn, *args)
     except BrokenProcessPool:
         slot.kill()
         slot.ready.wait(_warm_limit())
+        return slot.executor.submit(fn, *args)
+
+
+async def _submit_async(slot: _Slot, fn: Callable[..., T], args: tuple) -> Future:
+    """As _submit, but the wait for a replacement worker happens off the event
+    loop, so one broken worker can't freeze every other request."""
+    try:
+        return slot.executor.submit(fn, *args)
+    except BrokenProcessPool:
+        slot.kill()
+        await asyncio.to_thread(slot.ready.wait, _warm_limit())
         return slot.executor.submit(fn, *args)
 
 
@@ -165,7 +193,7 @@ async def run_cas(fn: Callable[..., T], *args: Any, timeout: float | None = None
         if not slot.ready.is_set():
             # Waiting for the warm-up is not charged to the budget.
             await asyncio.to_thread(slot.ready.wait, _warm_limit())
-        future = _submit(slot, fn, args)
+        future = await _submit_async(slot, fn, args)
         try:
             return await asyncio.wait_for(asyncio.wrap_future(future), budget)
         except BrokenProcessPool:

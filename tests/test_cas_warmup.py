@@ -72,3 +72,67 @@ def test_a_stuck_check_on_a_warm_pool_is_still_stopped():
     after = [slot.executor for slot in timeouts._all_slots]
     # Only the stuck worker was replaced; the other slot kept its worker.
     assert sum(a is not b for a, b in zip(before, after)) == 1
+
+
+def test_a_worker_that_hangs_while_warming_is_replaced(slow_host, monkeypatch):
+    # Warming takes 3 s but the hard cap is 0.5 s: the hung worker must be
+    # stopped and a fresh one started, not left in place for ever.
+    slow_host(delay=3.0, warm_limit=0.5)
+    monkeypatch.setattr(timeouts, "_warm_cap", lambda: 0.5)
+    timeouts._idle_queue()
+    first = [slot.executor for slot in timeouts._all_slots]
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if all(a is not b for a, b in zip(first, [s.executor for s in timeouts._all_slots])):
+            break
+        time.sleep(0.1)
+    assert all(a is not b for a, b in zip(first, [s.executor for s in timeouts._all_slots]))
+
+
+def test_replacing_a_broken_worker_does_not_freeze_other_requests(monkeypatch):
+    """The wait for a replacement happens off the event loop (#143 review)."""
+    from concurrent.futures.process import BrokenProcessPool
+    import threading
+
+    class FakeExecutor:
+        def __init__(self, broken):
+            self.broken = broken
+
+        def submit(self, fn, *args):
+            if self.broken:
+                raise BrokenProcessPool()
+            from concurrent.futures import Future
+            f = Future()
+            f.set_result("ok")
+            return f
+
+    class FakeSlot:
+        def __init__(self):
+            self.executor = FakeExecutor(broken=True)
+            self.ready = threading.Event()
+
+        def kill(self):
+            # The replacement takes 0.5 s to warm.
+            self.executor = FakeExecutor(broken=False)
+            self.ready = threading.Event()
+            threading.Timer(0.5, self.ready.set).start()
+
+    monkeypatch.setattr(timeouts, "_warm_limit", lambda: 5.0)
+
+    async def both():
+        ticks = 0
+
+        async def ticker():
+            nonlocal ticks
+            for _ in range(20):
+                await asyncio.sleep(0.02)
+                ticks += 1
+
+        tick = asyncio.create_task(ticker())
+        future = await timeouts._submit_async(FakeSlot(), str, ())
+        await tick
+        return future.result(), ticks
+
+    result, ticks = asyncio.run(both())
+    assert result == "ok"
+    assert ticks == 20  # the loop kept running while the worker was replaced
