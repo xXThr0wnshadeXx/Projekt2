@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .config import Settings
+from .errors import ApiError
 from .model_quota import ModelQuota
 
 if TYPE_CHECKING:
@@ -73,7 +74,15 @@ def model_explainer(
 
     async def explain(a_latex: str, b_latex: str) -> str | None:
         if quota is not None:
-            quota.acquire()
+            try:
+                quota.acquire()
+            except ApiError:
+                # The explanation is optional by design (#20). SymPy has
+                # already verified the step by the time we get here, so
+                # running out of shared model budget must not turn a verified
+                # step into a 429 — the caller falls back to the plain
+                # "This step checks out."
+                return None
         try:
             result = await client.chat.completions.create(
                 model=settings.model_text,

@@ -67,3 +67,34 @@ def test_routes_and_study_explanations_share_an_upstream_budget(monkeypatch):
         assert client.post("/api/diff", json=step).json()["verified"]
 
     assert calls == ["/v1/chat/completions"]
+
+
+def test_a_verified_step_survives_an_exhausted_quota(monkeypatch):
+    """Reported by nicolashlam on #84.
+
+    SymPy has already verified the step by the time the explanation is asked
+    for, and the explanation is optional by design (#20). Running out of shared
+    model budget must therefore fall back to the plain confirmation, not turn a
+    verified step into a 429.
+    """
+    from fastapi.testclient import TestClient
+
+    from backend.app import main
+    from backend.app.config import Settings
+
+    settings = Settings(
+        _env_file=None, openai_api_key="test-value",
+        model_vision="v", model_text="t", model_stt="s",
+        model_call_limit=1, model_call_window_seconds=60,
+    )
+    step = {"from_latex": "2x + 3 = 11", "to_latex": "2x = 8", "mode": "study"}
+
+    with TestClient(main.create_app(settings, warm_cas=False)) as client:
+        first = client.post("/api/diff", json=step)
+        second = client.post("/api/diff", json=step)
+
+    # Whatever happens to the optional explanation, neither call may 429.
+    for response in (first, second):
+        assert response.status_code == 200, response.text
+        assert response.json()["verified"] is True
+        assert "couldn't confirm" not in response.json()["message"]
