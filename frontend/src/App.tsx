@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { ScreenBoundary } from './components/ScreenBoundary';
 import { KeyboardHelp } from './components/KeyboardHelp';
+import { useTraversal } from './traverse';
 import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
 import { InstallApp } from './components/InstallApp';
@@ -202,6 +203,10 @@ export function App() {
   // unmounted and remounted on the way in or out, the announcement made during
   // that same switch would be delivered to a component that is going away, and
   // the student would hear nothing at the exact moment the screen changed.
+  // The whole page by Up/Down and Space, with no scrolling (#236). Low-vision
+  // mode has its own one-line-at-a-time arrows.
+  useTraversal(screen !== 'lowvision');
+
   const lowVision = screen === 'lowvision' && problem
     ? (
         <LowVision
