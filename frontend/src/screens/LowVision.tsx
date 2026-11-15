@@ -10,7 +10,7 @@ import type { CSSProperties } from 'react';
 import { MathLine } from '../components/MathLine';
 import { announce } from '../components/LiveRegion';
 import { LOW_VISION_THEMES } from '../lowVisionThemes';
-import { isSupported, setSelfVoicing, speak, cancel } from '../audio/tts';
+import { cancel, isSelfVoicingEnabled, isSupported, setSelfVoicing, speak } from '../audio/tts';
 
 export interface LowVisionLine {
   id: string;
@@ -30,13 +30,20 @@ export interface LowVisionProps {
 const SIZES = [4, 6, 8, 11, 15, 20];
 const DEFAULT_SIZE = 2;
 
+function announceLine(line: LowVisionLine, count: number, voicing: boolean) {
+  const position = `${line.label} of ${count}.`;
+  const text = voicing ? `${position} ${line.spoken ?? line.latex}` : position;
+  announce(text);
+  if (voicing) speak(text);
+}
+
 export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
   const [index, setIndex] = useState(() =>
     Math.min(Math.max(startIndex, 0), Math.max(lines.length - 1, 0)),
   );
   const [sizeStep, setSizeStep] = useState(DEFAULT_SIZE);
   const [themeIndex, setThemeIndex] = useState(0);
-  const [voicing, setVoicing] = useState(false);
+  const [voicing, setVoicing] = useState(isSelfVoicingEnabled);
   const stage = useRef<HTMLDivElement>(null);
 
   const theme = LOW_VISION_THEMES[themeIndex];
@@ -51,9 +58,7 @@ export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
         return;
       }
       setIndex(next);
-      const l = lines[next];
-      announce(`${l.label} of ${lines.length}.`);
-      if (voicing) speak(l.spoken ?? l.label);
+      announceLine(lines[next], lines.length, voicing);
     },
     [lines, voicing],
   );
@@ -111,8 +116,15 @@ export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
       `Low-vision mode. ${lines.length} line${lines.length === 1 ? '' : 's'}. ` +
         'Arrow keys move, plus and minus change size, T changes theme, Escape leaves.',
     );
-    return cancel;
   }, [lines.length]);
+
+  useEffect(() => {
+    const previousVoicing = isSelfVoicingEnabled();
+    return () => {
+      setSelfVoicing(previousVoicing);
+      if (previousVoicing) cancel();
+    };
+  }, []);
 
   useEffect(() => {
     const t = LOW_VISION_THEMES[themeIndex];
@@ -123,8 +135,8 @@ export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
     const next = !voicing;
     setVoicing(next);
     setSelfVoicing(next);
-    announce(next ? 'Reading aloud on.' : 'Reading aloud off.');
-    if (next && line) speak(line.spoken ?? line.label);
+    if (next && line) announceLine(line, lines.length, true);
+    if (!next) announce('Reading aloud off.');
   }
 
   if (!line) {

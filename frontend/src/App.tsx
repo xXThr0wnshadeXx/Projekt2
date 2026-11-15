@@ -129,15 +129,12 @@ export function App() {
 
   function enterLowVision(index: number) {
     // Grab MathJax's speech strings while the Problem screen is still mounted.
-    // Low-vision mode's optional self-voicing would otherwise fall back to
-    // "Line 2", which is not worth hearing. These come from the same engine the
-    // explorer uses, so the two read the expression identically.
     const spoken: Record<string, string> = {};
     for (const line of problem?.lines ?? []) {
-      const label = document
-        .querySelector(`#${line.id} mjx-container`)
-        ?.getAttribute('aria-label');
-      if (label) spoken[line.id] = label;
+      const math = document.querySelector(`#${line.id} mjx-container`);
+      const reading = math?.getAttribute('data-semantic-speech-none')?.trim()
+        || math?.getAttribute('aria-label')?.trim();
+      if (reading) spoken[line.id] = reading;
     }
     setSpokenLines(spoken);
     setLineIndex(index);
