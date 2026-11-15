@@ -95,7 +95,9 @@ test.describe('@smoke keyboard help', () => {
   test('? also works when a keyboard reports it as Shift and slash', async ({ page }) => {
     await openSample(page);
     await page.evaluate(() =>
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: '/', shiftKey: true })),
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '/', shiftKey: true, bubbles: true }),
+      ),
     );
     await expect(polite(page)).toHaveText(helpText('problem'));
   });

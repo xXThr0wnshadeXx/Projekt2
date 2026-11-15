@@ -15,7 +15,9 @@ import { useEffect } from 'react';
  */
 export function shouldIgnore(e: KeyboardEvent): boolean {
   if (e.ctrlKey || e.metaKey || e.altKey) return true;
-  const target = e.target as HTMLElement | null;
+  // Events aimed at the window or document have no `closest`; treat them as
+  // ordinary page keystrokes rather than throwing inside every shortcut.
+  const target = e.target instanceof Element ? e.target : null;
   return Boolean(
     target?.closest('input, textarea, select, [contenteditable], mjx-container'),
   );
