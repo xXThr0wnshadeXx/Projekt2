@@ -23,6 +23,7 @@ export interface ProblemProps {
   /** Called with the line the student was on, which their first step follows. */
   onStartWorking: (index: number) => void;
   mode: Mode;
+  onExport: () => void;
 }
 
 export function Problem({
@@ -31,6 +32,7 @@ export function Problem({
   onNewCapture,
   onStartWorking,
   mode,
+  onExport,
 }: ProblemProps) {
   const [index, setIndex] = useState(0);
   const [summary, setSummary] = useState('');
@@ -124,6 +126,7 @@ export function Problem({
     l: () => onLowVision(index),
     s: () => onStartWorking(index),
     w: () => void whatChanged(),
+    x: onExport,
     u: onNewCapture,
   });
 
