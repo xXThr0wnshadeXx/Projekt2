@@ -133,7 +133,7 @@ export function understandTalk(text: string): Talk | null {
       if (pattern.test(lower)) return { kind: 'define', term, meaning };
     }
   }
-  if (asksToSolve(said)) return { kind: 'refuse' };
+  if (lower === 'just tell me' || asksToSolve(said)) return { kind: 'refuse' };
   if (DESCRIBES_A_STEP.test(lower)) return { kind: 'describes' };
   if (ASKS_CAPABILITIES.test(lower)) return { kind: 'capabilities' };
   if (ASKS_FOR_PROBLEM.test(lower)) return { kind: 'readProblem' };

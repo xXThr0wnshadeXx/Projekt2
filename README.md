@@ -135,6 +135,7 @@ Glance is built on open-source work by people who have been making math accessib
 | [Tailwind CSS](https://tailwindcss.com/) | MIT |
 | [axe-core](https://github.com/dequelabs/axe-core) | MPL-2.0 |
 | [Playwright](https://playwright.dev/) | Apache-2.0 |
+| [Vitest](https://vitest.dev/) | MIT |
 | [pytest](https://pytest.org/) | MIT |
 
 [MathCAT](https://nsoiffer.github.io/MathCAT/) (DAISY Consortium) was a reference for math speech and braille behaviour.

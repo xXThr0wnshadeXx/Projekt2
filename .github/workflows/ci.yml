@@ -56,6 +56,10 @@ jobs:
         working-directory: frontend
         run: npm install --no-audit --no-fund
 
+      - name: Run front-end unit tests
+        working-directory: frontend
+        run: npm test
+
       - name: Make front-end packages resolvable from the root Playwright config
         run: ln -sfn frontend/node_modules node_modules
 
