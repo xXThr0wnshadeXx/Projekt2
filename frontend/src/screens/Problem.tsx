@@ -6,14 +6,16 @@
 //   Enter  the explorer — arrow keys walk the expression tree
 //   L      low-vision mode — one line, full screen, high contrast
 //
-// Nothing here solves, hints, or checks the student's answer, in any mode.
+// Nothing here solves, hints, or checks the student's answer, in any mode
+// (reader, study, homework, exam). Step checks, where an instructor allows
+// them, live in the scratchpad and only compare the student's own lines.
 
 import { useEffect, useRef, useState } from 'react';
 import { announce, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
 import { spokenMath, structureSummary } from '../math/sre';
 import { useShortcuts } from '../shortcuts';
-import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
+import { checksOffMessage, stepChecksAllowed } from '../stepCheck';
 import type { Mode, Problem as ProblemData } from '../state';
 
 export interface ProblemProps {
@@ -117,30 +119,14 @@ export function Problem({
     window.setTimeout(() => focusFirst(next ? `#${next.id}` : '#no-problem-lines'), 80);
   }
 
-  /** "What changed?" on the source (DESIGN.md 14): how this line follows from
-   *  the one before. Study mode names the operation; homework only says
-   *  whether it checks out. Off in exam mode. Never solves or hints. */
-  async function whatChanged() {
-    if (!stepChecksAllowed(mode)) {
-      announce('What changed is off in exam mode.');
-      return;
-    }
-    if (!current) return;
-    if (index === 0) {
-      announce('This is the first line, so there is nothing before it to compare.');
-      return;
-    }
-    const before = lines[index - 1];
-    if (!before.valid || !current.valid) {
-      announce('I couldn\'t confirm this step. One of these lines could not be read as math.');
-      return;
-    }
-    announce('Checking…');
-    const message = await checkStep(before.latex, current.latex, mode);
+  /** W. A step check only ever compares a line of the student's own work
+   *  with their previous work line, never a problem line, so there is nothing
+   *  to check here. Say so rather than compare problem lines with each other. */
+  function whatChanged() {
     announce(
-      message
-        ? withBasis(message, `line ${index}`)
-        : 'I couldn\'t check that right now. Try again in a moment.',
+      stepChecksAllowed(mode)
+        ? 'Step checks compare a line of your work with your previous line. Open your work to check one.'
+        : checksOffMessage(mode),
     );
   }
 
@@ -152,7 +138,7 @@ export function Problem({
     p: () => goTo(index - 1, 'previous'),
     l: () => onLowVision(index),
     s: () => onStartWorking(index),
-    w: () => void whatChanged(),
+    w: whatChanged,
     x: onExport,
     u: onNewCapture,
   });
@@ -275,11 +261,6 @@ export function Problem({
             <button type="button" className="btn" onClick={() => onLowVision(index)}>
               Low-vision mode
             </button>
-            {stepChecksAllowed(mode) && lines.length > 1 && (
-              <button type="button" className="btn" onClick={() => void whatChanged()}>
-                What changed?
-              </button>
-            )}
           </div>
         </section>
         </>}

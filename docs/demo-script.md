@@ -80,13 +80,13 @@ Then, in order:
 > problem line you pressed `S` on. Press `S` on line 2 and "two x equals eight"
 > is checked against the fraction, which correctly comes back *"I couldn't
 > confirm this step."* — contradicting the narration a sentence later. Press
-> `S` on line 1 and it checks out. nicolashlam ran both through the real
-> checker to confirm.
+> `S` on line 2 or line 1, nothing is checked: the demo runs in the default
+> reader and scribe mode, which never checks a step.
 
 Now the student's own work. Hold `Space`, say **"two x equals eight"**, release.
 
 > *"I heard: 2 x equals 8. Enter to save, E to edit."* → press `Enter` →
-> *"Saved as line 1."* → *"This step checks out."*
+> *"Saved as line 1."* (reader and scribe mode never checks or confirms a step)
 
 > "Nothing is saved until I confirm it. The model does not get the last word —
 > I do. And a computer algebra system just checked that step. It did not solve
@@ -161,9 +161,10 @@ Read these before rehearsing, because two of them change the script.
    registered. The sample problem, glance, explore and low-vision mode all work
    regardless, so a key failure is survivable: switch to "Try a sample problem"
    and keep going. Know this path cold.
-3. **The step check works now** (#92). After you save a line in homework mode
-   you get "This step checks out." In study mode it names the operation. In
-   exam mode it is off — in the interface *and* at the server, which is the
+3. **The demo runs in reader and scribe mode** (#207). Nothing is checked, so
+   Glance cannot be used as an answer oracle. Step checks exist only in homework
+   and study mode, for an instructor who allows them; in reader and exam modes
+   they are off in the interface *and* at the server, which is the
    thing an instructor is actually relying on. Say that out loud if a judge
    asks about cheating; it is a stronger answer than a promise.
 4. **Handwriting is out of demo scope** unless the go/no-go test (#5) says

@@ -1,8 +1,11 @@
-// Modes: study / homework / exam — issue #21, DESIGN.md 14.
+// Modes: reader (default) / exam / homework / study — issues #21 and #207,
+// DESIGN.md 14.
 //
-// What is asserted is what an instructor relies on: exam mode never checks a
-// step (no request leaves the browser), homework only says whether a step
-// checks out, study may name the operation, and no mode ever says "wrong".
+// What is asserted is what an instructor relies on: reader and exam modes never
+// check a step (no request leaves the browser), homework only says whether a
+// step checks out, study may name the operation, no mode ever says "wrong", a
+// check only compares a student's own consecutive lines, and at most three
+// checks are made per problem.
 // The step check itself is SymPy's job and is covered by the back-end tests;
 // here /api/diff is stubbed so the front end's behaviour is what is tested.
 
@@ -36,7 +39,6 @@ async function stubDiff(page: Page, stub: DiffStub = {}) {
       contentType: 'application/json',
       body: JSON.stringify({
         verified,
-        method: verified ? 'ratio_constant' : 'not_verified',
         message: stub.message ?? (verified ? 'This step checks out.' : "I couldn't confirm this step."),
       }),
     });
@@ -64,13 +66,13 @@ async function openSample(page: Page) {
   await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
 }
 
-/** Type a line in the scratchpad and confirm it. */
-async function saveTypedLine(page: Page) {
+/** Type a line in the scratchpad and confirm it; `n` is its line number. */
+async function saveTypedLine(page: Page, n = 1) {
   await page.getByLabel('Or type your line').fill('two x equals eight');
   await page.getByRole('button', { name: 'Add line' }).click();
   await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
+  await expect(page.getByRole('group', { name: `Your line ${n}` })).toBeVisible();
 }
 
 const polite = (page: Page) => page.getByTestId('live-polite');
@@ -85,17 +87,18 @@ test.describe('@smoke modes', () => {
     });
   });
 
-  test('homework is the default and the badge says so', async ({ page }) => {
+  test('reader and scribe is the default and the badge says so', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByTestId('mode-badge')).toHaveText('Homework mode');
+    await expect(page.getByTestId('mode-badge')).toHaveText('Reader and scribe');
   });
 
   test('settings: modes are a labelled radio group, changes are announced and remembered', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Settings' }).click();
     const group = page.getByRole('group', { name: 'Mode' });
-    await expect(group.getByRole('radio')).toHaveCount(3);
-    await expect(page.getByRole('radio', { name: /^Homework/ })).toBeChecked();
+    await expect(group.getByRole('radio')).toHaveCount(4);
+    await expect(page.getByRole('radio', { name: /^Reader and scribe/ })).toBeChecked();
+    await expect(group).toContainText('Only if your instructor allows step checks');
 
     await page.getByRole('radio', { name: /^Exam/ }).check();
     await expect(polite(page)).toContainText('Exam mode. No step checking at all.');
@@ -105,17 +108,117 @@ test.describe('@smoke modes', () => {
     await expect(page.getByTestId('mode-badge')).toHaveText('Exam mode');
   });
 
-  test('homework: a saved step is checked against the problem line and only told checks out', async ({ page }) => {
+  test('an old stored homework mode is not carried over, reading preferences are', async ({ page }) => {
+    await page.addInitScript(() =>
+      localStorage.setItem('glance.settings.v1', JSON.stringify({ mode: 'homework', textScale: 150, selfVoicing: false })),
+    );
+    await page.goto('/');
+    await expect(page.getByTestId('mode-badge')).toHaveText('Reader and scribe');
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByRole('radio', { name: /^Reader and scribe/ })).toBeChecked();
+  });
+
+  test('reader: ten guesses in a row are never checked, announced, or sent anywhere', async ({ page }) => {
     const calls = await stubDiff(page);
     await stubSpoken(page);
     await page.goto('/');
     await openSample(page);
+    // No "What changed?" button in reader and scribe mode.
+    await expect(page.getByRole('button', { name: 'What changed?' })).toHaveCount(0);
     await page.keyboard.press('s');
-    await saveTypedLine(page);
+    for (let n = 1; n <= 10; n += 1) {
+      await page.getByLabel('Or type your line').fill(`x = ${n - 1}`);
+      await page.getByRole('button', { name: 'Add line' }).click();
+      await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('group', { name: `Your line ${n}` })).toBeVisible();
+      await expect(polite(page)).toHaveText(`Saved as line ${n}.`);
+    }
+    await page.waitForTimeout(500);
+    await expect(page.locator('body')).not.toContainText(/checks out|couldn.t confirm/i);
+    await expect(polite(page)).not.toContainText(/checks out|couldn.t confirm/i);
+    expect(calls).toHaveLength(0);
+  });
 
+  test('reader: W says step checking is off', async ({ page }) => {
+    const calls = await stubDiff(page);
+    await page.goto('/');
+    await openSample(page);
+    await page.keyboard.press('w');
+    await expect(polite(page)).toHaveText(
+      'Step checking is off. Glance reads and writes; it does not check your work.',
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  test('homework: the first line is never checked, the next one is checked against it', async ({ page }) => {
+    await setMode(page, 'Homework');
+    const calls = await stubDiff(page);
+    await stubSpoken(page);
+    await openSample(page);
+    await page.keyboard.press('s');
+    await saveTypedLine(page, 1);
+    await page.waitForTimeout(500);
+    // Never against a problem line: the first line has nothing before it.
+    await expect(polite(page)).toHaveText('Saved as line 1.');
+    expect(calls).toHaveLength(0);
+
+    await saveTypedLine(page, 2);
     await expect(polite(page)).toHaveText('This step checks out.');
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('This step checks out.');
-    expect(calls).toEqual([{ from_latex: '2x + 3 = 11', to_latex: '2x = 8', mode: 'homework' }]);
+    expect(calls).toEqual([{ from_latex: '2x = 8', to_latex: '2x = 8', mode: 'homework' }]);
+  });
+
+  test('homework: the first line starting from a later problem line is still not checked', async ({ page }) => {
+    await setMode(page, 'Homework');
+    const calls = await stubDiff(page);
+    await stubSpoken(page);
+    await openSample(page);
+    await page.keyboard.press('n');
+    await page.keyboard.press('s');
+    await saveTypedLine(page);
+    await page.waitForTimeout(500);
+    await expect(polite(page)).toHaveText('Saved as line 1.');
+    expect(calls).toHaveLength(0);
+  });
+
+  test('homework: W on the problem compares no problem lines', async ({ page }) => {
+    await setMode(page, 'Homework');
+    const calls = await stubDiff(page);
+    await openSample(page);
+    await expect(page.getByRole('button', { name: 'What changed?' })).toHaveCount(0);
+    await page.keyboard.press('n');
+    await page.keyboard.press('w');
+    await expect(polite(page)).toHaveText(
+      'Step checks compare a line of your work with your previous line. Open your work to check one.',
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  test('homework: at most three checks per problem, and a reload does not reset them', async ({ page }) => {
+    await setMode(page, 'Homework');
+    const calls = await stubDiff(page);
+    await stubSpoken(page);
+    await openSample(page);
+    await page.keyboard.press('s');
+    await saveTypedLine(page, 1);
+    await saveTypedLine(page, 2);
+    await expect(polite(page)).toHaveText('This step checks out.');
+    await saveTypedLine(page, 3);
+    await expect(polite(page)).toHaveText('This step checks out.');
+    await saveTypedLine(page, 4);
+    await expect(polite(page)).toHaveText('This step checks out.');
+    expect(calls).toHaveLength(3);
+
+    // A reload must not hand out fresh checks.
+    await page.reload();
+    await page.getByRole('button', { name: 'Back to your problem' }).click();
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('s');
+    await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
+    await saveTypedLine(page, 5);
+    await expect(polite(page)).toHaveText("I can't check more lines on this problem.");
+    expect(calls).toHaveLength(3);
   });
 
   test('study: the explanation from the server is read out', async ({ page }) => {
@@ -124,24 +227,25 @@ test.describe('@smoke modes', () => {
     await stubSpoken(page);
     await openSample(page);
     await page.keyboard.press('s');
-    await saveTypedLine(page);
+    await saveTypedLine(page, 1);
+    await saveTypedLine(page, 2);
     await expect(polite(page)).toHaveText('3 was subtracted from both sides.');
   });
 
   test('a step that is not verified is "couldn\'t confirm", never "wrong"', async ({ page }) => {
+    await setMode(page, 'Homework');
     await stubDiff(page, { verified: false });
     await stubSpoken(page);
-    await page.goto('/');
     await openSample(page);
     await page.keyboard.press('s');
-    await saveTypedLine(page);
+    await saveTypedLine(page, 1);
+    await saveTypedLine(page, 2);
     // Never "wrong" — and it says which line it was compared with, because a
     // student who cannot see the screen has no other way to know.
     await expect(polite(page)).toHaveText(
-      "I couldn't confirm this step. It was compared with line 1 of the problem.",
+      "I couldn't confirm this step. It was compared with your line 1.",
     );
     await expect(page.getByRole('main')).not.toContainText(/wrong|incorrect|mistake/i);
-    await expect(page.locator('main')).not.toContainText(/wrong/i);
   });
 
   test('exam: nothing is checked, and no request is even sent', async ({ page }) => {
@@ -152,7 +256,7 @@ test.describe('@smoke modes', () => {
 
     await expect(page.getByRole('button', { name: 'What changed?' })).toHaveCount(0);
     await page.keyboard.press('w');
-    await expect(polite(page)).toHaveText('What changed is off in exam mode.');
+    await expect(polite(page)).toHaveText('Step checking is off in exam mode.');
 
     await page.keyboard.press('s');
     await saveTypedLine(page);
@@ -162,56 +266,28 @@ test.describe('@smoke modes', () => {
     expect(calls).toHaveLength(0);
   });
 
-  test('what changed: W compares the current problem line with the one before', async ({ page }) => {
-    const calls = await stubDiff(page, { verified: false });
-    await page.goto('/');
-    await openSample(page);
-
-    await page.keyboard.press('w');
-    await expect(polite(page)).toHaveText('This is the first line, so there is nothing before it to compare.');
-
-    await page.keyboard.press('n');
-    await page.getByRole('button', { name: 'What changed?' }).click();
-    await expect(polite(page)).toHaveText(
-      "I couldn't confirm this step. It was compared with line 1.",
-    );
-    expect(calls).toEqual([
-      { from_latex: '2x + 3 = 11', to_latex: '\\frac{\\sqrt{x + 1}}{2} = 5', mode: 'homework' },
-    ]);
-  });
-
-  test('the first step follows the problem line the student started from', async ({ page }) => {
-    const calls = await stubDiff(page);
-    await stubSpoken(page);
-    await page.goto('/');
-    await openSample(page);
-    await page.keyboard.press('n');
-    await page.keyboard.press('s');
-    await saveTypedLine(page);
-    await expect(polite(page)).toHaveText('This step checks out.');
-    expect(calls[0].from_latex).toBe('\\frac{\\sqrt{x + 1}}{2} = 5');
-  });
-
   test('a slow check never talks over what the student did next', async ({ page }) => {
+    await setMode(page, 'Homework');
     await stubDiff(page, { delayMs: 800 });
     await stubSpoken(page);
-    await page.goto('/');
     await openSample(page);
     await page.keyboard.press('s');
-    await saveTypedLine(page);
-    await page.getByRole('button', { name: 'Delete your line 1' }).click();
-    await expect(polite(page)).toHaveText('Deleted line 1. Press U to undo.');
+    await saveTypedLine(page, 1);
+    await saveTypedLine(page, 2);
+    await page.getByRole('button', { name: 'Delete your line 2' }).click();
+    await expect(polite(page)).toHaveText('Deleted line 2. Press U to undo.');
     await page.waitForTimeout(1200);
-    await expect(polite(page)).toHaveText('Deleted line 1. Press U to undo.');
+    await expect(polite(page)).toHaveText('Deleted line 2. Press U to undo.');
   });
 
   test('an unreachable checker still saves the line', async ({ page }) => {
+    await setMode(page, 'Homework');
     await page.route('**/api/diff', (route) => route.abort());
     await stubSpoken(page);
-    await page.goto('/');
     await openSample(page);
     await page.keyboard.press('s');
-    await saveTypedLine(page);
-    await expect(polite(page)).toHaveText('Saved as line 1.');
+    await saveTypedLine(page, 1);
+    await saveTypedLine(page, 2);
+    await expect(polite(page)).toHaveText('Saved as line 2.');
   });
 });

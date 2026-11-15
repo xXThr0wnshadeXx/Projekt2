@@ -41,7 +41,6 @@ def test_study_mode_explains_a_verified_step():
     assert r.status_code == 200
     assert r.json() == {
         "verified": True,
-        "method": "ratio_constant",
         "message": "3 was subtracted from both sides.",
     }
     assert explainer.calls == [("2x + 3 = 11", "2x = 8")]
@@ -77,12 +76,37 @@ def test_exam_mode_is_403_and_does_no_work():
     assert explainer.calls == []
 
 
+def test_default_request_without_mode_is_403():
+    explainer = FakeExplainer()
+    with make_client(explainer) as client:
+        r = client.post("/api/diff", json={"from_latex": "2x = 8", "to_latex": "x = 4"})
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "MODE_DISABLED"
+    assert "checks out" not in r.text
+    assert explainer.calls == []
+
+
+def test_reader_mode_is_403_and_does_no_work():
+    explainer = FakeExplainer()
+    with make_client(explainer) as client:
+        r = post(client, "2x = 8", "x = 4", "reader")
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "MODE_DISABLED"
+    assert explainer.calls == []
+
+
+def test_response_never_reveals_the_method():
+    with make_client() as client:
+        ok = post(client, "2x = 8", "x = 4", "homework")
+        bad = post(client, "2x = 8", "x = 3", "homework")
+    assert "method" not in ok.json() and "method" not in bad.json()
+
+
 def test_unparseable_line_is_couldnt_confirm():
     with make_client() as client:
         r = post(client, "2x + 3 = 11", "x +", "homework")
     assert r.json() == {
         "verified": False,
-        "method": "unparseable",
         "message": "I couldn't confirm this step.",
     }
 
