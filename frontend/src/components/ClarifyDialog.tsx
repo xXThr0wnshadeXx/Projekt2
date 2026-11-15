@@ -37,11 +37,33 @@ export function ClarifyDialog({
     return () => restoreTo.current?.focus?.();
   }, []);
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+  // The keys are heard on the whole document, not only inside the dialog.
+  // Focus does not always land on the first option: WebKit sometimes leaves it
+  // on the button that opened the dialog, and a screen reader's virtual cursor
+  // can sit outside it too. If the keys only worked with focus inside, Escape
+  // and 1 to 3 would go dead exactly then, with the dialog still open. The
+  // dialog is modal, so while it is open every one of these keys is its own.
+  // Capture phase, so the screen's shortcuts behind it never see them.
+  const latest = useRef({ alternatives, onChoose, onCancel });
+  latest.current = { alternatives, onChoose, onCancel };
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (handleKey(e)) e.stopPropagation();
+    }
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, []);
+
+  /** Returns true when the key was the dialog's to handle. */
+  function handleKey(e: KeyboardEvent): boolean {
+    const { alternatives, onChoose, onCancel } = latest.current;
+
     if (e.key === 'Escape') {
       e.preventDefault();
       onCancel();
-      return;
+      return true;
     }
 
     // 1 to 3 pick an option directly (DESIGN.md 12).
@@ -49,10 +71,10 @@ export function ClarifyDialog({
     if (Number.isInteger(n) && n >= 1 && n <= alternatives.length) {
       e.preventDefault();
       onChoose(alternatives[n - 1]);
-      return;
+      return true;
     }
 
-    if (e.key !== 'Tab') return;
+    if (e.key !== 'Tab') return false;
 
     // Focus trap. Without it, Tab walks out of the dialog into the page behind
     // and a screen-reader user has no idea the dialog is still open.
@@ -65,13 +87,14 @@ export function ClarifyDialog({
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       ) ?? [],
     ).filter((el) => !el.hasAttribute('disabled'));
-    if (focusables.length === 0) return;
+    if (focusables.length === 0) return false;
     e.preventDefault();
     const at = focusables.indexOf(document.activeElement as HTMLElement);
     const next = e.shiftKey
       ? at <= 0 ? focusables.length - 1 : at - 1
       : at === -1 || at === focusables.length - 1 ? 0 : at + 1;
     focusables[next].focus();
+    return true;
   }
 
   return (
@@ -83,7 +106,6 @@ export function ClarifyDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="clarify-question"
-        onKeyDown={onKeyDown}
         data-testid="clarify-dialog"
         className="w-full max-w-lg rounded-lg border border-[--line] bg-[--surface] p-6"
       >
