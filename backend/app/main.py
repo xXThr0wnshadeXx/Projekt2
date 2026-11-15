@@ -19,6 +19,7 @@ from .explain import Explainer, model_explainer
 from .mathcheck import validate_latex
 from .model_quota import ModelQuota
 from .openai_client import ModelClient, ModelSettings
+from .exam_lock import HEADER as EXAM_HEADER, ExamLock, exam_router
 from .routes.capture import capture_router
 from .routes.command import command_router
 from .routes.diff import diff_router
@@ -88,7 +89,7 @@ def create_app(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", EXAM_HEADER],
         expose_headers=["Retry-After"],
         max_age=600,
     )
@@ -96,7 +97,9 @@ def create_app(
     # Outermost, so CORS preflights and error responses are timed and logged too.
     app.add_middleware(observability.RequestLogMiddleware)
 
-    app.include_router(diff_router(explainer))
+    lock = ExamLock(settings.exam_link_secret.get_secret_value() if settings.exam_link_secret else None)
+    app.include_router(diff_router(explainer, lock))
+    app.include_router(exam_router(lock))
     # Commands work without a model: rules handle the fixed set (issue #24).
     app.include_router(command_router(models))
     # PDFs need no model: page count and page render work without keys (issue #26).

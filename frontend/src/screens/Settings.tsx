@@ -5,6 +5,7 @@
 
 import { useEffect, useRef } from 'react';
 import { announce } from '../components/LiveRegion';
+import { ExamLinkMaker } from '../components/ExamLinkMaker';
 import { ReadingControls } from '../components/ReadingControls';
 import type { Mode, Settings as SettingsData } from '../state';
 
@@ -12,6 +13,8 @@ export interface SettingsProps {
   settings: SettingsData;
   onChange: (next: SettingsData) => void;
   onBack: () => void;
+  /** Set when an instructor's exam link has locked the mode (#189). */
+  lockedUntil?: string;
 }
 
 export const MODE_INFO: Record<Mode, { name: string; detail: string }> = {
@@ -33,16 +36,27 @@ export const MODE_INFO: Record<Mode, { name: string; detail: string }> = {
 
 const MODES: Mode[] = ['study', 'homework', 'exam'];
 
-export function Settings({ settings, onChange, onBack }: SettingsProps) {
+export function Settings({ settings, onChange, onBack, lockedUntil }: SettingsProps) {
+  const shownMode: Mode = lockedUntil ? 'exam' : settings.mode;
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     heading.current?.focus();
-    announce(`Settings. ${MODE_INFO[settings.mode].name} mode is on.`);
+    announce(
+      lockedUntil
+        ? `Settings. Exam mode is on, set by your instructor until ${lockedUntil}.`
+        : `Settings. ${MODE_INFO[settings.mode].name} mode is on.`,
+    );
     // Announce once, on arrival.
   }, []);
 
   function setMode(mode: Mode) {
+    // Not disabled: a disabled control drops out of the tab order and says
+    // nothing. It stays reachable and says why it will not change.
+    if (lockedUntil) {
+      announce(`Exam mode is set by your instructor until ${lockedUntil}, so it cannot be changed.`);
+      return;
+    }
     onChange({ ...settings, mode });
     announce(`${MODE_INFO[mode].name} mode. ${MODE_INFO[mode].detail}`);
   }
@@ -62,6 +76,11 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
         <p className="mt-1 text-sm text-[--muted]">
           In every mode, Glance never solves a problem or tells you what to do next.
         </p>
+        {lockedUntil && (
+          <p className="mt-2 rounded-lg border-2 border-[--accent] px-4 py-2 font-semibold" data-testid="exam-locked">
+            Exam mode is set by your instructor until {lockedUntil}.
+          </p>
+        )}
         <div className="mt-4 space-y-3">
           {MODES.map((mode) => (
             <label
@@ -72,7 +91,7 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
                 type="radio"
                 name="mode"
                 value={mode}
-                checked={settings.mode === mode}
+                checked={shownMode === mode}
                 onChange={() => setMode(mode)}
                 aria-describedby={`mode-${mode}-detail`}
                 className="mt-1 h-5 w-5"
@@ -96,6 +115,8 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
           <ReadingControls settings={settings} onChange={onChange} />
         </div>
       </section>
+
+      <ExamLinkMaker />
 
       {/* "Back" alone says nothing when it is read out with no screen to look
           at. Every way out of a screen now names where it goes. */}

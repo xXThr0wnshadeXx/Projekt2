@@ -34,7 +34,7 @@ _RECENT: deque[dict[str, Any]] = deque(maxlen=2000)
 KNOWN_PATHS = {
     "/api/health", "/api/capture", "/api/transcribe", "/api/spoken-to-latex",
     "/api/command", "/api/diff", "/api/summary", "/api/stats",
-    "/api/pdf/pages", "/api/pdf/page", "/api/validate",
+    "/api/pdf/pages", "/api/pdf/page", "/api/validate", "/api/exam/link", "/api/exam/check",
 }
 
 
