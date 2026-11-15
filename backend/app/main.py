@@ -17,6 +17,7 @@ from .config import Settings, get_settings
 from .errors import ApiError, install_error_handlers
 from .explain import Explainer, model_explainer
 from .mathcheck import validate_latex
+from .model_quota import ModelQuota
 from .openai_client import ModelClient, ModelSettings
 from .routes.capture import capture_router
 from .routes.diff import diff_router
@@ -32,7 +33,11 @@ def create_app(
     explainer: Explainer | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
-    explainer = explainer or model_explainer(settings)
+    quota = (
+        ModelQuota(settings.model_call_limit, settings.model_call_window_seconds)
+        if settings.model_call_limit else None
+    )
+    explainer = explainer or model_explainer(settings, quota=quota)
 
     # Without model credentials the app still starts and serves /api/health and
     # /api/diff; the model-backed routes are simply not registered (issue #4).
@@ -43,7 +48,7 @@ def create_app(
             model_vision=settings.model_vision,
             model_text=settings.model_text,
             model_stt=settings.model_stt,
-        ))
+        ), quota=quota)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -78,6 +83,7 @@ def create_app(
         allow_origins=settings.allowed_origins,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type"],
+        expose_headers=["Retry-After"],
         max_age=600,
     )
     install_error_handlers(app)

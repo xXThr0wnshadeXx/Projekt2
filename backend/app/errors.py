@@ -29,11 +29,15 @@ ErrorCode = Literal[
 
 
 class ApiError(Exception):
-    def __init__(self, code: ErrorCode, message: str, status: int = 400):
+    def __init__(
+        self, code: ErrorCode, message: str, status: int = 400,
+        *, headers: dict[str, str] | None = None,
+    ):
         super().__init__(message)
         self.code = code
         self.message = message
         self.status = status
+        self.headers = headers or {}
 
 
 def error_body(code: ErrorCode, message: str) -> dict:
@@ -57,7 +61,9 @@ _HTTP_CODES: dict[int, tuple[ErrorCode, str]] = {
 
 
 async def _api_error(_: Request, exc: ApiError) -> JSONResponse:
-    return error_response(exc.code, exc.message, exc.status)
+    response = error_response(exc.code, exc.message, exc.status)
+    response.headers.update(exc.headers)
+    return response
 
 
 async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:

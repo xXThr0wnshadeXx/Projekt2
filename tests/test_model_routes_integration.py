@@ -23,7 +23,7 @@ def test_app_registers_model_routes_and_validates_transcriptions(monkeypatch):
             "readback": "x equals two",
         },
     ]
-    monkeypatch.setattr(main, "ModelClient", lambda settings: models)
+    monkeypatch.setattr(main, "ModelClient", lambda settings, **kwargs: models)
     settings = Settings(
         _env_file=None, openai_api_key="test-value",
         model_vision="vision", model_text="text", model_stt="speech",
