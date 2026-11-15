@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .config import Settings
+from .errors import ApiError
+from .model_quota import ModelQuota
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
@@ -61,7 +63,8 @@ def acceptable(text: str) -> bool:
 
 
 def model_explainer(
-    settings: Settings, timeout_s: float = 2.0, client: "AsyncOpenAI | None" = None
+    settings: Settings, timeout_s: float = 2.0, client: "AsyncOpenAI | None" = None,
+    *, quota: ModelQuota | None = None,
 ) -> Explainer | None:
     """An explainer backed by MODEL_TEXT, or None when models aren't configured."""
     if not settings.models_configured:
@@ -80,6 +83,16 @@ def model_explainer(
     )
 
     async def explain(a_latex: str, b_latex: str) -> str | None:
+        if quota is not None:
+            try:
+                quota.acquire()
+            except ApiError:
+                # The explanation is optional by design (#20). SymPy has
+                # already verified the step by the time we get here, so
+                # running out of shared model budget must not turn a verified
+                # step into a 429 — the caller falls back to the plain
+                # "This step checks out."
+                return None
         try:
             result = await client.chat.completions.create(
                 model=settings.model_text,
