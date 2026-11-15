@@ -5,6 +5,7 @@
 
 import { useEffect, useRef } from 'react';
 import { announce } from '../components/LiveRegion';
+import { InstallApp } from '../components/InstallApp';
 import { ReadingControls } from '../components/ReadingControls';
 import type { Mode, Settings as SettingsData } from '../state';
 
@@ -96,6 +97,8 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
           <ReadingControls settings={settings} onChange={onChange} />
         </div>
       </section>
+
+      <InstallApp />
 
       {/* "Back" alone says nothing when it is read out with no screen to look
           at. Every way out of a screen now names where it goes. */}
