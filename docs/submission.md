@@ -39,7 +39,7 @@ Math assumes you can see it and write it. A screen reader reads an equation one 
 - **Scratchpad:** say or type each line. Every line is read back and confirmed before it's saved, and when speech is ambiguous Glance asks instead of guessing.
 - **Checked steps:** a computer algebra system (SymPy) checks that each step follows from the last. A step it can't verify is "couldn't confirm", never "wrong".
 - **Hand-in:** numbered typed work as PDF, accessible HTML with MathML, LaTeX or Nemeth.
-- **It never solves the problem.** No answers, hints or next steps in any mode, enforced in the interface and in the API, so it can be used in class and in exams.
+- **It never solves the problem.** No answers, hints or next steps in any mode, enforced in the interface and in the API. An exam lock set by an instructor's link is in review (#224), so a school can decide whether it fits its exam rules; we don't claim exam approval.
 
 Built with React, MathJax and the Speech Rule Engine in the browser, and FastAPI, SymPy and the OpenAI API on the server. It runs on Vercel and Railway.
 
@@ -49,10 +49,12 @@ Say this plainly if the form asks about limitations. Testing with real screen re
 
 ## Team
 
-- Nicolas Lam: back end, step checking, deploy, pitch
-- Shaswath: AI pipeline, evals, user research
-- Shreevatson Babu Sreegeetha: front end, accessibility, export
-- tuffling: testing, rehearsal, front-end fixes
+Roles follow `docs/owners.md`, and match the README's team table.
+
+- Shreevatson Babu Sreegeetha (lead): front end, accessibility, product, export, user research, pitch, submission
+- Nicolas Lam: back end and math: FastAPI app and deploy, step checking (SymPy), timeouts, mode enforcement, latency, CI, request guards
+- Shaswath: capture and interpretation: photo and speech reading, prompts, schemas, both evaluation sets
+- tuffling: testing, rehearsal and the hardest open technical work (see #162)
 
 ## Credits and licences
 
