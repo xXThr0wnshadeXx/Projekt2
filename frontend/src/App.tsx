@@ -269,11 +269,6 @@ export function App() {
           )}
 
           <main id="main" tabIndex={-1} className="page">
-            <p className="lead">
-              Glance reads your maths worksheet aloud and writes down your own work as you say it.{' '}
-              <strong>It never solves it for you.</strong>
-            </p>
-
             <ol className="progress" aria-label="Steps">
               <li data-done={problem ? 'true' : undefined}>Worksheet</li>
               <li data-done={problem && loadWork().length > 0 ? 'true' : undefined}>Your work</li>

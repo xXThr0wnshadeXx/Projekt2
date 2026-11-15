@@ -14,7 +14,7 @@ const CLEAR = {
   ambiguous: false,
   clarifying_question: null,
   alternatives: [],
-  readback: '2 x equals 8',
+  readback: 'two x equals eight',
   valid: true,
 };
 
@@ -24,7 +24,7 @@ const AMBIGUOUS = {
   clarifying_question: 'Did you mean x plus one, all over two, or x plus one half?',
   alternatives: [
     { latex: '\\frac{x+1}{2}', readback: 'x plus one, all over two', valid: true },
-    { latex: 'x + \\frac{1}{2}', readback: 'x plus one half', valid: true },
+    { latex: 'x + \\frac{1}{2}', readback: 'x plus the fraction one over two', valid: true },
   ],
   readback: null,
   valid: false,
@@ -116,6 +116,41 @@ test.describe('@smoke scratchpad', () => {
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
   });
 
+  test('the spoken endpoint reads back and saves speech from the LaTeX', async ({ page }) => {
+    await stubSpoken(page, CLEAR);
+    await openScratchpad(page);
+
+    await page.getByLabel('Or type your line').fill('two x equals eight');
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await expect(page.getByTestId('live-polite')).toHaveText(
+      'I heard: 2 x equals 8. Enter to save, E to edit.',
+    );
+
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect.poll(() => page.evaluate(() =>
+      JSON.parse(localStorage.getItem('glance.work.v1') ?? '[]'),
+    )).toEqual([expect.objectContaining({ latex: '2x = 8', readback: '2 x equals 8' })]);
+  });
+
+  test('the spoken endpoint falls back to the server wording when there is no speech', async ({ page }) => {
+    await stubSpoken(page, CLEAR);
+    await openScratchpad(page);
+    await page.evaluate((latex) => {
+      const mathJax = (window as Window & {
+        MathJax: { tex2chtmlPromise: (input: string, options: { display: boolean }) => Promise<Element> };
+      }).MathJax;
+      const convert = mathJax.tex2chtmlPromise.bind(mathJax);
+      mathJax.tex2chtmlPromise = (input, options) =>
+        input === latex ? Promise.resolve(document.createElement('mjx-container')) : convert(input, options);
+    }, CLEAR.latex);
+
+    await page.getByLabel('Or type your line').fill('two x equals eight');
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await expect(page.getByTestId('live-polite')).toHaveText(
+      'I heard: two x equals eight. Enter to save, E to edit.',
+    );
+  });
+
   test('an ambiguous line asks instead of guessing', async ({ page }) => {
     await stubSpoken(page, AMBIGUOUS);
     await openScratchpad(page);
@@ -160,6 +195,9 @@ test.describe('@smoke scratchpad', () => {
     const readback = page.getByRole('region', { name: 'Confirm your line' });
     await expect(readback).toBeVisible();
     await expect(readback).toContainText('x plus one half');
+    await expect(page.getByTestId('live-polite')).toHaveText(
+      'You chose: x plus one half. Enter to save, E to edit.',
+    );
   });
 
   test('an option the parser could not read is still offered, and flagged', async ({ page }) => {
@@ -179,7 +217,7 @@ test.describe('@smoke scratchpad', () => {
 
     await page.keyboard.press('2');
     const readback = page.getByRole('region', { name: 'Confirm your line' });
-    await expect(readback).toContainText('x goes to two');
+    await expect(readback).toContainText('x right arrow 2');
     await expect(readback).toContainText('I could not check this line');
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();

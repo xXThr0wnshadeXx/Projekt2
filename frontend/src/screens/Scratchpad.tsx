@@ -29,7 +29,7 @@ import {
 } from '../api';
 import { readTyped } from '../math/typed';
 import { speechFor } from '../math/sre';
-import { applyEdit, lineNumber, looksLikeCommand } from '../commands';
+import { applyEdit, asksForCorrection, EDIT_REFUSAL, lineNumber, looksLikeCommand } from '../commands';
 import { SAYS, stripFiller, understandTalk, type Talk } from '../talk';
 import { helpText, useShortcuts } from '../shortcuts';
 import { activate } from '../traverse';
@@ -155,13 +155,15 @@ export function Scratchpad({ problem, mode, startLine, onExport }: ScratchpadPro
         return;
       }
 
-      if (!result.latex || !result.readback) {
+      const latex = result.latex;
+      const readback = latex ? (await speechFor(latex)) || result.readback : null;
+      if (!latex || !readback) {
         fail("I couldn't confirm this step. Say it again, or type it.");
         return;
       }
 
-      setPending({ latex: result.latex, readback: result.readback, valid: result.valid });
-      announce(`I heard: ${result.readback}. Enter to save, E to edit.`);
+      setPending({ latex, readback, valid: result.valid });
+      announce(`I heard: ${readback}. Enter to save, E to edit.`);
     } catch (e: unknown) {
       fail(
         e instanceof ApiFailure
@@ -377,6 +379,13 @@ export function Scratchpad({ problem, mode, startLine, onExport }: ScratchpadPro
     }
     // "Uh, okay, two x equals eight" is the line "two x equals eight".
     const text = stripFiller(heard);
+    if (asksForCorrection(text)) {
+      lastAction.current = 'talk';
+      setError('');
+      setReply(EDIT_REFUSAL);
+      announce(EDIT_REFUSAL);
+      return;
+    }
     if (looksLikeCommand(text)) await runCommand(text);
     else await interpret(text);
   }
@@ -457,6 +466,11 @@ export function Scratchpad({ problem, mode, startLine, onExport }: ScratchpadPro
       setBusy(false);
     }
 
+    if (result.message) {
+      setReply(result.message);
+      announce(result.message);
+      return;
+    }
     const n = lineNumber(result.target_line);
     const target = n !== null ? lines[n - 1] : undefined;
     const needsLine = ['navigate', 'delete', 'edit', 'check', 'what_changed'].includes(result.intent)
@@ -766,19 +780,22 @@ export function Scratchpad({ problem, mode, startLine, onExport }: ScratchpadPro
         <ClarifyDialog
           question={clarify.question}
           alternatives={clarify.alternatives}
-          onChoose={(choice) => {
+          onChoose={async (choice) => {
+            setBusy(true);
             setClarify(null);
             // The student has told us which grouping they meant, so this is
             // theirs now — it goes straight to the readback to be confirmed.
             // The option carries its own `valid`: an alternative SymPy could
             // not read is still offered, and saving it marks the line unsure
             // rather than silently claiming it was checked.
+            const readback = (await speechFor(choice.latex)) || choice.readback;
             setPending({
               latex: choice.latex,
-              readback: choice.readback,
+              readback,
               valid: choice.valid,
             });
-            announce(`You chose: ${choice.readback}. Enter to save, E to edit.`);
+            announce(`You chose: ${readback}. Enter to save, E to edit.`);
+            setBusy(false);
           }}
           onCancel={() => {
             setClarify(null);

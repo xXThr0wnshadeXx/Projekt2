@@ -233,11 +233,10 @@ mjx-container:focus-visible {
 .glance-current {
   outline: 4px solid var(--accent) !important;
   outline-offset: 4px;
-  border-radius: 6px;
 }
-/* A tint behind text and maths lines only: on a button it would fight the
-   button's own colours and make its label hard to read. */
-.glance-current:where(h1, h2, h3, h4, h5, h6, p, li, dt, dd, figcaption, th, td, [data-testid^='math-line-']) {
+/* A tint behind every line of text and maths, but not controls: on a button
+   it would fight the button's own colours and make its label hard to read. */
+.glance-current:not(button, a, input, select, textarea, summary, [role='button']) {
   background-color: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
@@ -328,5 +327,74 @@ mjx-container:focus-visible {
   }
   details[open].step > summary::after {
     content: ' −';
+  }
+}
+
+/* Get started (#240): one obvious action, then three clear ways in. */
+@layer components {
+  .get-started-lead {
+    margin: 1rem auto 0;
+    max-width: 38rem;
+    font-size: 1.25rem;
+    line-height: 1.45;
+  }
+  .hero-action {
+    margin: 2.5rem 0 1rem;
+    display: flex;
+    justify-content: center;
+  }
+  .btn-hero {
+    min-height: 88px;
+    min-width: min(100%, 22rem);
+    border: 2px solid var(--fg);
+    background: var(--accent);
+    color: var(--accent-fg);
+    padding: 1.25rem 2.5rem;
+    font-size: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .btn-hero:hover {
+    filter: brightness(1.08);
+  }
+  .btn-hero:disabled {
+    opacity: 0.6;
+  }
+  .capture-choices {
+    margin: 2rem auto 0.5rem;
+    display: grid;
+    max-width: 40rem;
+    gap: 1rem;
+  }
+  .choice {
+    display: flex;
+    min-height: 96px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border: 2px solid var(--fg);
+    background: var(--block);
+    color: var(--fg);
+    padding: 1.25rem 1.5rem;
+    text-align: center;
+  }
+  .choice:first-child {
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .choice:hover {
+    filter: brightness(1.05);
+  }
+  .choice:disabled {
+    opacity: 0.6;
+  }
+  .choice-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+  .choice-desc {
+    font-size: 1rem;
+    opacity: 0.9;
   }
 }

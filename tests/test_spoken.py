@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock
 
 import pytest
@@ -5,6 +6,23 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from backend.app.routes.spoken import spoken_router
+
+
+ROOT_FRACTION = "the square root of x plus one all over two equals five"
+ROOT_QUESTION = (
+    "Is plus one under the root, as in the square root of the quantity x plus one, end root, "
+    "or outside the root, as in the square root of x, end root, plus one?"
+)
+ROOT_ALTERNATIVES = [
+    {
+        "latex": r"\frac{\sqrt{x+1}}{2}=5",
+        "readback": "the square root of the quantity x plus one, end root, all over two equals five",
+    },
+    {
+        "latex": r"\frac{\sqrt{x}+1}{2}=5",
+        "readback": "the square root of x, end root, plus one, all over two equals five",
+    },
+]
 
 
 def ambiguous_payload(alternatives):
@@ -21,6 +39,82 @@ def spoken_client(models, validate):
     app = FastAPI()
     app.include_router(spoken_router(models, validate))
     return TestClient(app)
+
+
+def test_spoken_root_clarifies_only_the_scope_of_the_root():
+    async def interpret(kind, messages):
+        assert kind == "spoken"
+        prompt = " ".join(messages[0]["content"].split())
+        assert "sound different" in prompt
+        assert "parentheses or quotation marks" in prompt
+        assert "All over already fixes the numerator" in prompt
+        assert "the quantity x plus one, end root" in prompt
+        assert "the square root of x, end root, plus one" in prompt
+        assert json.loads(messages[1]["content"]) == {
+            "text": ROOT_FRACTION,
+            "context_lines": ["2x + 3 = 11"],
+        }
+        return {
+            **ambiguous_payload(ROOT_ALTERNATIVES),
+            "clarifying_question": ROOT_QUESTION,
+        }
+
+    models = AsyncMock()
+    models.interpret.side_effect = interpret
+    validate = AsyncMock(return_value=True)
+    with spoken_client(models, validate) as client:
+        response = client.post("/api/spoken-to-latex", json={
+            "text": ROOT_FRACTION,
+            "context_lines": ["2x + 3 = 11"],
+        })
+
+    assert response.status_code == 200
+    result = response.json()
+    assert result["ambiguous"] is True
+    assert result["latex"] is None
+    assert result["readback"] is None
+    question = result["clarifying_question"]
+    assert question == ROOT_QUESTION
+    assert "all over" not in question
+    assert result["alternatives"] == [{**option, "valid": True} for option in ROOT_ALTERNATIVES]
+    readbacks = [option["readback"] for option in result["alternatives"]]
+    assert len(readbacks) == len(set(readbacks))
+    assert all(set(text).isdisjoint("()\"'“”‘’") for text in [question, *readbacks])
+    models.interpret.assert_awaited_once()
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("readback", ROOT_ALTERNATIVES[0]["readback"]),
+    ("readback", ROOT_ALTERNATIVES[0]["readback"].upper().replace(" ", "  ")),
+    ("clarifying_question", "Do you mean the square root of (x plus one), or end root, plus one?"),
+    ("clarifying_question", "Do you mean the square root of x plus one), or end root, plus one?"),
+    ("clarifying_question", 'Do you mean "x plus one" under the root?'),
+    ("clarifying_question", "Is 'plus one' outside the root?"),
+    ("readback", "the square root of (x plus one), all over two equals five"),
+    ("readback", "the square root of x, end root, plus one), all over two equals five"),
+    ("readback", 'the square root of x, then "plus one", all over two equals five'),
+    ("readback", "the square root of x, then ‘plus one’, all over two equals five"),
+    ("readback", "the square root of x, then “plus one”, all over two equals five"),
+])
+def test_spoken_rejects_choices_the_student_cannot_tell_apart(field, value):
+    result = ambiguous_payload([dict(option) for option in ROOT_ALTERNATIVES])
+    result["clarifying_question"] = ROOT_QUESTION
+    if field == "readback":
+        result["alternatives"][1]["readback"] = value
+    else:
+        result[field] = value
+    models = AsyncMock()
+    models.interpret.return_value = result
+    validate = AsyncMock(return_value=True)
+
+    with spoken_client(models, validate) as client:
+        response = client.post("/api/spoken-to-latex", json={"text": ROOT_FRACTION})
+
+    assert response.status_code == 422
+    assert response.json() == {"error": {
+        "code": "UNPARSEABLE", "message": "I couldn't work out that line. Try saying it again.",
+    }}
+    validate.assert_not_awaited()
 
 
 @pytest.mark.parametrize("valid", [True, False])
