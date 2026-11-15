@@ -53,14 +53,27 @@ def test_rejects_audio_longer_than_the_limit_before_model_call():
     models.transcribe.assert_not_awaited()
 
 
-def test_empty_transcript_returns_retry_guidance():
+@pytest.mark.parametrize("text", ["", "   ", "\n"])
+def test_a_silent_recording_is_not_reported_as_success(text):
+    """Issue #79.3.
+
+    A blank transcript used to come back as 200 with an empty string. The front
+    end passed that on, and the student — who had just held Space and spoken —
+    was told to "enter a spoken math line to transcribe", which describes
+    neither what happened nor what to do about it.
+    """
     models = AsyncMock()
-    models.transcribe.return_value = " \n"
+    models.transcribe.return_value = text
     app = FastAPI()
     app.include_router(transcribe_router(models))
+
     with TestClient(app) as client:
         response = client.post("/api/transcribe", files={
             "audio": ("clip.webm", recording("webm", "libopus", 1), "audio/webm"),
         })
+
     assert response.status_code == 422
-    assert "I didn't hear anything" in response.json()["error"]["message"]
+    assert response.json()["error"] == {
+        "code": "UNPARSEABLE",
+        "message": "I didn't hear anything. Try again, a little closer to the microphone.",
+    }

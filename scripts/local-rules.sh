@@ -28,7 +28,10 @@ fi
 
 [ -f CONTRIBUTING.md ] || { echo "Run this from inside the repository." >&2; exit 1; }
 
-BODY="$(cat <<'RULES'
+# Read the rules with `read` rather than "$(cat <<...)": macOS still ships
+# bash 3.2, which mis-parses parentheses inside a heredoc that sits in a
+# command substitution and aborts setup.
+IFS= read -r -d '' BODY <<'RULES' || true
 # Project rules — Glance
 
 Authoritative sources in this repository, in order:
@@ -177,7 +180,7 @@ rather than starting three.
 - Placeholder modules name the issue that implements them. If you are not on
   that issue, leave the file alone and talk to its owner in `docs/owners.md`.
 RULES
-)"
+BODY="${BODY%$'\n'}"
 
 EXCLUDE=".git/info/exclude"
 mkdir -p "$(dirname "$EXCLUDE")"

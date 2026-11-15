@@ -55,6 +55,23 @@ class ModelSettings(BaseSettings):
     model_text: ModelId
     model_stt: ModelId
 
+    # The SDK defaults are a 600 s read timeout and 2 retries. One stalled
+    # upstream call would then hold a capture for ten minutes while the student
+    # hears nothing, against a 12 s hard limit (DESIGN.md 16). These are
+    # settings rather than constants so the budget can be widened from the
+    # deploy dashboard during judging without shipping a change.
+    #
+    # The budgets differ because the steps do. A capture is one big image and
+    # DESIGN.md 16 allows it 6 s at p50 and 12 s at worst. A spoken line has to
+    # come back in 3 s at p50 and 6 s at worst, and the model call is only part
+    # of that — transcription, CAS validation and the network all come out of
+    # the same budget — so giving it the capture's timeout would let a single
+    # slow call blow the step on its own. Retries are bounded by the same
+    # deadline, since it wraps the whole attempt sequence rather than one try.
+    model_timeout_seconds: float = 10.0
+    model_fast_timeout_seconds: float = 4.0
+    model_max_retries: int = 1
+
 
 @lru_cache
 def load_schema(task: StructuredTask) -> dict:
@@ -65,25 +82,43 @@ class ModelClient:
     def __init__(self, settings: ModelSettings):
         self.settings = settings
         self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key.get_secret_value(), timeout=10, max_retries=0
+            api_key=settings.openai_api_key.get_secret_value(),
+            timeout=settings.model_timeout_seconds,
+            max_retries=settings.model_max_retries,
         )
 
     async def close(self) -> None:
         await self.client.close()
 
+    @staticmethod
+    async def _bounded(seconds: float, call):
+        """Hold `call` to a deadline, retries and all.
+
+        The SDK's own `timeout` applies per attempt, so with retries enabled the
+        total can still run past the step's budget. This caps the whole thing.
+        """
+        return await asyncio.wait_for(call, timeout=seconds)
+
     async def interpret(
         self, task: StructuredTask, messages: list[ChatCompletionMessageParam]
     ) -> dict:
         model = self.settings.model_vision if task == "capture" else self.settings.model_text
+        # Vision gets the long budget; everything else is on the spoken-line
+        # path and gets the short one.
+        budget = (
+            self.settings.model_timeout_seconds
+            if task == "capture"
+            else self.settings.model_fast_timeout_seconds
+        )
         try:
-            result = await asyncio.wait_for(self.client.chat.completions.create(
+            result = await self._bounded(budget, self.client.chat.completions.create(
                 model=model,
                 messages=messages,
                 response_format={
                     "type": "json_schema",
                     "json_schema": {"name": task, "strict": True, "schema": load_schema(task)},
                 },
-            ), timeout=10 if task == "capture" else 4)
+            ))
         except (OpenAIError, TimeoutError) as error:
             _log_provider_failure(task, error)
             raise ModelError("The interpretation service is unavailable.") from None
@@ -102,11 +137,14 @@ class ModelClient:
 
     async def transcribe(self, filename: str, audio: bytes, content_type: str) -> str:
         try:
-            result = await asyncio.wait_for(self.client.audio.transcriptions.create(
-                model=self.settings.model_stt,
-                file=(filename, audio, content_type),
-                response_format="json",
-            ), timeout=4)
+            result = await self._bounded(
+                self.settings.model_fast_timeout_seconds,
+                self.client.audio.transcriptions.create(
+                    model=self.settings.model_stt,
+                    file=(filename, audio, content_type),
+                    response_format="json",
+                ),
+            )
         except (OpenAIError, TimeoutError) as error:
             _log_provider_failure("transcribe", error)
             raise ModelError("The transcription service is unavailable.") from None

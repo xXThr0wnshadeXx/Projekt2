@@ -9,8 +9,8 @@ from fastapi.responses import JSONResponse
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 
-from ..errors import ApiError
-from ..guards import check_image
+from .. import guards
+from ..errors import ApiError, error_response
 from ..openai_client import ModelClient, ModelError
 from ..prompts import CAPTURE_PROMPT
 
@@ -56,21 +56,33 @@ def capture_router(
             image = form.get("image")
             context = form.get("context", "")
             if not isinstance(image, UploadFile):
-                return bad_input("Upload a JPEG, PNG, or WebP image.")
+                return bad_input("Upload a JPEG, PNG or WebP image.")
             if not isinstance(context, str) or len(context) > 4096:
                 return bad_input("Image context must be at most 4,096 characters.")
             data = await image.read()
         finally:
             await form.close()
 
+        # The declared content type is just a string the client chose, so it is
+        # not evidence of anything: bytes labelled `image/png` were forwarded to
+        # the paid vision model whatever they actually were. `check_image`
+        # decides from the file signature instead, and returns the real type,
+        # which is also what the data URL below has to carry to be read
+        # correctly. It raises ApiError, which the app's handlers render in the
+        # DESIGN.md 9 error shape.
         try:
-            kind = check_image(data, max_image_bytes)
-        except ApiError as error:
-            return JSONResponse(status_code=error.status, content={
-                "error": {"code": error.code, "message": error.message}
-            })
+            kind = guards.check_image(data, max_image_bytes)
+        except ApiError as rejected:
+            # Returned rather than raised, so this router reports its own
+            # rejections in the DESIGN.md 9 shape whether or not the app it is
+            # mounted in installed the error handlers.
+            return error_response(rejected.code, rejected.message, rejected.status)
         if kind == "application/pdf":
-            return bad_input("Upload a page as an image for now. PDF support is coming.")
+            # The allowlist includes PDF because the guard is shared, but a page
+            # has to be rasterised before a vision model can read it, which is
+            # issue #26. Say so plainly rather than failing further in.
+            return bad_input("Upload a page as an image for now; PDF support is coming.")
+
         encoded = base64.b64encode(data).decode("ascii")
         try:
             result = await models.interpret("capture", [

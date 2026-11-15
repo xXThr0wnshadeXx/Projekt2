@@ -21,6 +21,13 @@ explicitly, such as 'all over' or 'end exponent'. Return no alternatives or
 question for clear math. Use null LaTeX and readback when there is no math.
 """
 
+# Spoken aloud to a student, so the wording matters. "I couldn't confirm this
+# step" is reserved for the step check (DESIGN.md 11), where the student did
+# submit a step. Saying it here, when they only spoke a line, tells them their
+# work was judged and found wanting — which is both wrong and discouraging.
+NO_MATH_HEARD = "I didn't catch any math in that. Try again."
+UNUSABLE_QUESTION = "I couldn't work out that line. Try saying it again."
+
 Line = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4096)]
 
 
@@ -57,26 +64,46 @@ def spoken_router(
         if result["ambiguous"]:
             alternatives = result["alternatives"]
             choices = [option["latex"].strip() for option in alternatives]
-            question = result["clarifying_question"]
+            question = (result["clarifying_question"] or "").strip()
             has_readbacks = all(option["readback"].strip() for option in alternatives)
+
+            # Asking rather than guessing is the point of this route, so the
+            # question survives an alternative SymPy cannot read. Requiring all
+            # of them to parse threw the whole question away and returned an
+            # error instead — and DESIGN.md 27 is explicit that a line the
+            # parser cannot read is marked unsure, not dropped. Each option
+            # carries its own `valid`, so the student still chooses and an
+            # unreadable choice is flagged rather than hidden.
             if (
-                question and question.strip()
-                and has_readbacks and all(choices)
+                question
+                and has_readbacks
+                and all(choices)
                 and 2 <= len(choices) == len(set(choices)) <= 3
             ):
-                validity = await asyncio.gather(*(validate_latex(choice) for choice in choices))
+                validity = await asyncio.gather(
+                    *(validate_latex(choice) for choice in choices)
+                )
+                options = [
+                    {**option, "latex": choice, "valid": valid}
+                    for option, choice, valid in zip(
+                        alternatives, choices, validity, strict=True
+                    )
+                ]
                 return {
-                    **result, "latex": None, "readback": None, "valid": False,
-                    "alternatives": [
-                        {**option, "valid": valid}
-                        for option, valid in zip(alternatives, validity, strict=True)
-                    ],
+                    **result,
+                    "clarifying_question": question,
+                    "alternatives": options,
+                    "latex": None,
+                    "readback": None,
+                    "valid": False,
                 }
-            return spoken_error(422, "UNPARSEABLE", "I couldn't work out that line. Try saying it again.")
+            # The question itself was unusable — too few or duplicate options,
+            # or no readbacks — so there is nothing coherent to ask.
+            return spoken_error(422, "UNPARSEABLE", UNUSABLE_QUESTION)
 
         latex, readback = result["latex"], result["readback"]
         if not latex or not latex.strip() or not readback or not readback.strip():
-            return spoken_error(422, "UNPARSEABLE", "I didn't catch any math in that. Try again.")
+            return spoken_error(422, "UNPARSEABLE", NO_MATH_HEARD)
         return {
             "latex": latex,
             "ambiguous": False,

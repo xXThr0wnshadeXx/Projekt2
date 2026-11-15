@@ -127,6 +127,9 @@ Glance is built on open-source work by people who have been making math accessib
 | [openai-python](https://github.com/openai/openai-python) | Apache-2.0 |
 | [PyAV](https://github.com/PyAV-Org/PyAV) | BSD-3-Clause |
 | [FFmpeg](https://ffmpeg.org/legal.html) (bundled by PyAV) | LGPL/GPL, depending on build |
+| [pypdfium2](https://github.com/pypdfium2-team/pypdfium2) | BSD-3-Clause / Apache-2.0 |
+| [PDFium](https://pdfium.googlesource.com/pdfium/) (bundled by pypdfium2) | BSD-3-Clause |
+| [Pillow](https://python-pillow.github.io/) | MIT-CMU |
 | [React](https://react.dev/) | MIT |
 | [Vite](https://vite.dev/) | MIT |
 | [Tailwind CSS](https://tailwindcss.com/) | MIT |
