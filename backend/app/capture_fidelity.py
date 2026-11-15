@@ -22,11 +22,15 @@ _TEXT = re.compile(r"\\(?:text|textrm|mathrm|textit|mbox|operatorname)\s*\{([^{}
 # Spacing commands and math-mode wrappers that carry no content of their own.
 _NOISE = re.compile(r"\\[,;:! ]|\\quad|\\qquad|\$")
 
-# Instructions that talk about the picture or the act of transcribing were
-# written by the model, not printed on a worksheet.
+# Clear directions for processing the image itself. Worksheet tasks can
+# still refer to a graph or shape in the image.
 _INVENTED = re.compile(
-    r"\b(?:transcrib\w*|the (?:uploaded |attached |given |provided )?(?:image|picture|photo|screenshot)"
-    r"|(?:from|in|on) (?:the|this) (?:image|picture|photo|screenshot))\b",
+    r"\btranscrib\w*\b"
+    r"|^(?:please\s+)?(?:read|copy|convert)\s+"
+    r"(?:the\s+(?:text|equations?|instructions?)\s+(?:from|in)\s+)?"
+    r"(?:the|this)\s+(?:(?:uploaded|attached|given|provided)\s+)?"
+    r"(?:image|picture|photo|screenshot)"
+    r"(?:\s+(?:as|in|into|to)\s+(?:LaTeX|(?:plain\s+)?text)(?:\s+format)?)?[.!]?$",
     re.IGNORECASE,
 )
 

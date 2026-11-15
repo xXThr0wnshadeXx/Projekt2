@@ -28,3 +28,11 @@ services:
         value: https://glance-shreev2703.vercel.app
       - key: TRUSTED_PROXY_HOPS
         value: "1"
+      # Startup refuses to run in production without the proxy setting and a cap.
+      - key: APP_ENV
+        value: production
+      # Daily ceiling on model calls for the whole service (issue #209).
+      - key: MODEL_CALL_LIMIT
+        value: "2000"
+      - key: MODEL_CALL_WINDOW_SECONDS
+        value: "86400"
