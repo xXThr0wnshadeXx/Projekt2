@@ -131,6 +131,19 @@ def test_tidy_changes_no_equation():
     assert result["lines"] == lines
 
 
+@pytest.mark.parametrize(("instructions", "keep"), [
+    ("Transcribe the following equations in LaTeX format.", False),
+    ("Transcribe the algebraic equation and instruction.", False),
+    ("Find the area of the shape in the picture.", True),
+    ("Use the graph in the image to find the slope.", True),
+    ("Write an equation for the triangle on this page.", True),
+])
+def test_tidy_keeps_worksheet_tasks_and_clears_transcription_directions(instructions, keep):
+    result = tidy_capture({"instructions": instructions, "lines": [line("2x + 3 = 11")]})
+    assert result["instructions"] == (instructions if keep else "")
+    assert result["lines"] == [line("2x + 3 = 11")]
+
+
 # What the production capture API returned for the two fixtures in
 # eval/run_instruction_fidelity.mjs before this fix (2026-11-15).
 @pytest.mark.parametrize(("model_output", "instructions", "lines"), [
