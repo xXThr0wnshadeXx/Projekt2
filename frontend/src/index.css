@@ -630,3 +630,338 @@ header h1 a {
   font-size: 1.25rem;
   gap: 0.75rem;
 }
+
+/* ---------------------------------------------------------------------------
+   Accessibility pass. WCAG 2.1 AAA for text (7:1 or better), 60px targets,
+   no thin borders or light weights, 20px body text, a 4px focus ring.
+   Light: black on white, deep blue actions. Dark: white on black, light blue.
+   --------------------------------------------------------------------------- */
+:root {
+  --bg: #ffffff;
+  --surface: #f2f2f7;
+  --block: #e5e5ea;
+  --fg: #000000;
+  --muted: #3a3a3c;
+  --line: #3a3a3c;
+  --accent: #003f88;
+  --accent-fg: #ffffff;
+  --teal: #003f88;
+  --warn: #6b3800;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --block: #2c2c2e;
+    --fg: #ffffff;
+    --muted: #d1d1d6;
+    --line: #aeaeb2;
+    --accent: #8ac4ff;
+    --accent-fg: #000000;
+    --teal: #8ac4ff;
+    --warn: #ffcc66;
+  }
+}
+:root[data-theme='dark'] {
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --block: #2c2c2e;
+  --fg: #ffffff;
+  --muted: #d1d1d6;
+  --line: #aeaeb2;
+  --accent: #8ac4ff;
+  --accent-fg: #000000;
+  --teal: #8ac4ff;
+  --warn: #ffcc66;
+}
+
+body {
+  font-size: 1.25rem;
+  line-height: 1.6;
+  font-weight: 450;
+}
+strong,
+b {
+  font-weight: 700;
+}
+
+:focus-visible {
+  outline: 4px solid var(--accent) !important;
+  outline-offset: 4px !important;
+}
+
+@layer components {
+  /* Every button: 60px tall, bold, a thick edge, never a hairline. */
+  .btn,
+  .btn-primary,
+  .btn-hero,
+  .btn-quiet {
+    display: inline-flex;
+    min-height: 60px;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 3px solid var(--fg);
+    border-radius: 16px;
+    background: var(--bg);
+    padding: 0 1.75rem;
+    color: var(--fg);
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+  }
+  .btn:hover,
+  .btn-quiet:hover {
+    background: var(--fg);
+    color: var(--bg);
+    text-decoration: none;
+  }
+  .btn-primary,
+  .btn-hero {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .btn-primary:hover,
+  .btn-hero:hover {
+    filter: none;
+    background: var(--fg);
+    border-color: var(--fg);
+    color: var(--bg);
+  }
+  .btn-hero {
+    min-height: 76px;
+    padding: 0 2.5rem;
+    font-size: 1.6rem;
+  }
+  .btn-quiet {
+    border-color: transparent;
+    text-decoration: underline;
+    text-underline-offset: 6px;
+    text-decoration-thickness: 3px;
+  }
+
+  /* Header: name on the left, reading tools on the right, one clean row. */
+  .app-bar {
+    position: sticky;
+    top: 0;
+    border-bottom: 3px solid var(--fg);
+    background: var(--bg);
+    backdrop-filter: none;
+  }
+  .app-bar-inner {
+    max-width: 76rem;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+  }
+  header h1 a {
+    font-size: 1.75rem !important;
+    font-weight: 800 !important;
+  }
+  .reading-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .reading-size {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .reading-size .btn {
+    min-width: 60px;
+    padding: 0 1rem;
+  }
+  .reading-scale {
+    min-width: 4.5rem;
+    text-align: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  /* The page uses the width it has. */
+  .page {
+    max-width: 76rem;
+    padding: 2.5rem 1.5rem 6rem;
+  }
+
+  /* Landing. */
+  .landing {
+    display: grid;
+    gap: 3rem;
+  }
+  .landing-hero {
+    display: grid;
+    justify-items: center;
+    gap: 1.5rem;
+    padding: 2rem 0 0.5rem;
+    text-align: center;
+  }
+  .landing-title {
+    max-width: 18ch;
+    font-size: clamp(2.75rem, 6vw, 5rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+  }
+  .landing-lead {
+    max-width: 40rem;
+    color: var(--muted);
+    font-size: 1.6rem;
+    line-height: 1.45;
+  }
+  .landing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 0.5rem;
+  }
+  .landing-actions .btn {
+    min-height: 76px;
+    font-size: 1.4rem;
+  }
+  .step-cards {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  }
+  .step-card {
+    display: grid;
+    align-content: start;
+    gap: 0.75rem;
+    border: 3px solid var(--fg);
+    border-radius: 24px;
+    background: var(--surface);
+    padding: 2rem;
+    font-size: 1.3rem;
+  }
+  .step-card-number {
+    display: inline-grid;
+    width: 3.5rem;
+    height: 3.5rem;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-size: 1.6rem;
+    font-weight: 800;
+  }
+  .step-card-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+  .promise {
+    border-left: 8px solid var(--accent);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 1.5rem 1.75rem;
+    font-size: 1.4rem;
+  }
+
+  /* Sections of the worksheet page. */
+  .step {
+    margin-top: 2.5rem;
+    border: 3px solid var(--fg);
+    border-radius: 28px;
+    background: var(--surface);
+    padding: 2.5rem 2rem;
+  }
+  .step-title {
+    font-weight: 800;
+  }
+  .choice {
+    border: 3px solid var(--fg);
+    background: var(--bg);
+    color: var(--fg);
+  }
+  .choice:first-child {
+    border-color: var(--accent);
+  }
+  .choice-desc {
+    opacity: 1;
+  }
+
+  /* Small screens: actions stack full width. */
+  @media (max-width: 640px) {
+    .landing-actions,
+    .landing-actions > * {
+      width: 100%;
+    }
+    .app-bar-inner nav {
+      width: 100%;
+      margin-left: 0;
+    }
+  }
+}
+
+@layer components {
+  /* No dead space above the first section. */
+  .page > .step:first-child,
+  .page > section:first-child,
+  .page > div:first-child > .step:first-child {
+    margin-top: 0;
+  }
+  details.step > summary.step-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+  }
+  .chip {
+    min-height: 40px;
+    padding: 0 1rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--fg);
+    background: var(--block);
+  }
+  .page > p,
+  .page > div > p {
+    font-size: 1.15rem;
+    color: var(--muted);
+  }
+  /* The discard and delete buttons on a line: still 60px targets. */
+  [data-walk='skip'].btn {
+    min-width: 60px;
+    min-height: 60px;
+  }
+
+  /* Phones: Read aloud on its own row, then size and Keys together. */
+  @media (max-width: 640px) {
+    .app-bar-inner nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .reading-toolbar {
+      display: contents;
+    }
+    .reading-toolbar > .btn:first-child {
+      flex: 1 1 100%;
+    }
+    .reading-size {
+      flex: 1 1 auto;
+      justify-content: space-between;
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .app-bar-inner nav .btn {
+    padding: 0 0.9rem;
+  }
+  .reading-size {
+    gap: 0.25rem;
+  }
+  .reading-scale {
+    min-width: 3.5rem;
+  }
+}
+@media (max-width: 640px) {
+  .reading-size {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}

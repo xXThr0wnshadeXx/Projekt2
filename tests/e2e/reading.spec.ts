@@ -148,7 +148,8 @@ test.describe('@smoke reading controls', () => {
 
   test('the reading controls are on the page, with no settings screen', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'How Glance reads to you' })).toBeVisible();
+    // In the top bar, on every page, as a labelled toolbar.
+    await expect(page.getByRole('banner').getByRole('toolbar', { name: 'Reading controls' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Settings' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Read aloud/ })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Text size' })).toBeVisible();

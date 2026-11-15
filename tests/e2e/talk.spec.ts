@@ -216,14 +216,14 @@ test.describe('@smoke the first screen', () => {
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     const main = page.getByRole('main');
-    await expect(main).toContainText('It never solves anything for you');
+    await expect(main).toContainText('Glance never solves the problem.');
     await expect(main.getByRole('list').getByRole('listitem')).toHaveCount(3);
     await expect(main.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
     await expect(polite(page)).toContainText('It never solves it for you.');
-    // The explanation costs no extra Tab stops: the way in is right after the
-    // skip link and the Keys button.
+    // The explanation costs no extra Tab stops: the way in comes straight after
+    // the skip link, the name and the reading tools in the top bar.
     const start = page.getByRole('button', { name: 'Get started' });
-    for (let i = 0; i < 4 && !(await start.evaluate((el) => el === document.activeElement)); i += 1) {
+    for (let i = 0; i < 8 && !(await start.evaluate((el) => el === document.activeElement)); i += 1) {
       await page.keyboard.press('Tab');
     }
     await expect(start).toBeFocused();

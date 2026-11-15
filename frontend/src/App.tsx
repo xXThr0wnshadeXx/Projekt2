@@ -356,7 +356,8 @@ export function App() {
                 </a>
               </h1>
               <ModeBadge mode={settings.mode} />
-              <div className="ml-auto flex flex-wrap items-center gap-2">
+              <nav aria-label="Reading tools" className="ml-auto flex flex-wrap items-center gap-3">
+                <ReadingControls settings={settings} onChange={updateSettings} />
                 <button
                   type="button"
                   className="btn"
@@ -367,7 +368,7 @@ export function App() {
                 >
                   Keys
                 </button>
-              </div>
+              </nav>
             </div>
           </header>
 
@@ -393,36 +394,53 @@ export function App() {
                 />
               </ScreenBoundary>
             ) : showStart ? (
-              <section aria-labelledby="start-heading" className="step get-started">
-                <h2 id="start-heading" tabIndex={-1} className="display text-center">
-                  Maths you can hear, explore and write
-                </h2>
-                <p className="get-started-lead text-center">
-                  Glance reads your maths worksheet aloud, lets you explore each line
-                  piece by piece, and writes down your own working as you say it.{' '}
-                  <strong>It never solves anything for you</strong>, so the work stays
-                  yours, in class and in exams.
+              <section aria-labelledby="start-heading" className="landing">
+                <div className="landing-hero">
+                  <h2 id="start-heading" tabIndex={-1} className="landing-title">
+                    Maths you can hear, explore and write
+                  </h2>
+                  <p className="landing-lead">
+                    Glance reads your maths worksheet aloud, lets you explore each line,
+                    and writes down your own working as you say it.
+                  </p>
+                  <div className="landing-actions">
+                    <button
+                      type="button"
+                      className="btn-hero"
+                      onClick={openCapturePage}
+                      aria-disabled={modelsUsable ? undefined : 'true'}
+                    >
+                      {modelsUsable ? 'Get started' : 'Get started - capture is unavailable right now'}
+                    </button>
+                    <button type="button" className="btn" onClick={() => openProblem(sampleProblem())}>
+                      Try a sample problem
+                    </button>
+                  </div>
+                </div>
+
+                <h3 className="sr-only">How it works</h3>
+                <ol className="step-cards">
+                  <li className="step-card">
+                    <span className="step-card-number" aria-hidden="true">1</span>
+                    <h4 className="step-card-title">Bring in a problem</h4>
+                    <p>Upload a photo, a screenshot or a PDF, or point your camera at the page.</p>
+                  </li>
+                  <li className="step-card">
+                    <span className="step-card-number" aria-hidden="true">2</span>
+                    <h4 className="step-card-title">Hear it and explore it</h4>
+                    <p>Every line is read aloud. Move with the arrow keys, and press Space to hear one.</p>
+                  </li>
+                  <li className="step-card">
+                    <span className="step-card-number" aria-hidden="true">3</span>
+                    <h4 className="step-card-title">Do the work yourself</h4>
+                    <p>Say or type each step, hear it read back, and hand it in as typed work.</p>
+                  </li>
+                </ol>
+
+                <p className="promise">
+                  <strong>Glance never solves the problem.</strong> No answers, no hints,
+                  no next steps. The work stays yours, in class and in exams.
                 </p>
-                <ul className="get-started-points">
-                  <li><strong>Hear it.</strong> Every line is read aloud, with the maths said properly.</li>
-                  <li><strong>Explore it.</strong> Move through the page with the arrow keys and Space.</li>
-                  <li><strong>Write it.</strong> Say or type your own steps and hand them in as typed work.</li>
-                </ul>
-                <div className="hero-action">
-                  <button
-                    type="button"
-                    className="btn-hero"
-                    onClick={openCapturePage}
-                    aria-disabled={modelsUsable ? undefined : 'true'}
-                  >
-                    {modelsUsable ? 'Get started' : 'Get started - capture is unavailable right now'}
-                  </button>
-                </div>
-                <div className="text-center">
-                  <button type="button" className="btn-quiet" onClick={() => openProblem(sampleProblem())}>
-                    Try a sample problem
-                  </button>
-                </div>
               </section>
             ) : problem ? (
               <>
@@ -470,12 +488,6 @@ export function App() {
               </>
             ) : null}
 
-            <section aria-labelledby="reading-heading" className="step">
-              <h2 id="reading-heading" className="step-title">How Glance reads to you</h2>
-              <div className="mt-4">
-                <ReadingControls settings={settings} onChange={updateSettings} />
-              </div>
-            </section>
 
             <details className="step no-print">
               <summary className="step-title cursor-pointer">More settings</summary>
