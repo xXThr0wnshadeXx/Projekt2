@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     max_image_bytes: int = 8 * 1024 * 1024
     max_audio_seconds: int = 30
     cas_timeout_seconds: float = 2.0
+    # How long startup and the first callers wait for the SymPy workers to warm
+    # (process spawn + SymPy import). Render's free plan (0.1 CPU) needs 60 s+.
+    cas_warm_seconds: float = 180.0
+    # Worker processes. 2 by default; 1 warms twice as fast on a tiny CPU.
+    cas_workers: int = 2
 
     # Per-IP request budgets. Model-backed endpoints share the tighter one.
     rate_limit_model_per_minute: int = 20
