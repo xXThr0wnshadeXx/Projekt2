@@ -102,11 +102,19 @@ export function MathLine({ id, latex, label, unsure = false }: MathLineProps) {
       role="group"
       onKeyDown={onKeyDown}
       aria-label={unsure ? `${label}, unsure` : label}
+      aria-describedby={`${id}-hint`}
       data-testid={`math-line-${id}`}
       className="rounded-lg border border-[--line] bg-[--surface] px-4 py-3
                  focus-visible:ring-4 focus-visible:ring-[--accent]"
     >
-      <span className="sr-only">{label}. Press Enter to explore.</span>
+      {/* #133: the group's label already says "Line 1". Repeating it in
+          hidden text made screen readers say the number twice. The
+          instruction is a description instead, read after a pause; `hidden`
+          keeps it from also being read as content, and aria-describedby
+          still reads hidden elements. */}
+      <span id={`${id}-hint`} hidden>
+        Press Enter to explore.
+      </span>
       <div ref={host} aria-hidden="false" />
       {unsure && (
         <p className="mt-2 text-sm text-[--warn]">
