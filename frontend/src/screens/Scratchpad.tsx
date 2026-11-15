@@ -18,6 +18,7 @@ import { MathLine } from '../components/MathLine';
 import { RecordButton } from '../components/RecordButton';
 import { ReadbackBar } from '../components/ReadbackBar';
 import { ClarifyDialog } from '../components/ClarifyDialog';
+import { MathExports } from '../components/MathExports';
 import { transcribe, spokenToLatex, ApiFailure, type SpokenAlternative } from '../api';
 import { useShortcuts } from '../shortcuts';
 import type { Recording } from '../audio/recorder';
@@ -372,6 +373,8 @@ export function Scratchpad({ problem, onBack, mode, startLine }: ScratchpadProps
           Back to the problem
         </button>
       </div>
+
+      <MathExports lines={lines} />
 
       {clarify && (
         <ClarifyDialog
