@@ -55,7 +55,10 @@ export function applyEdit(latex: string, instruction: string | null): string | n
   const from = toLatexToken(m[1]);
   const to = toLatexToken(m[2]);
   if (!from || from === to) return null;
-  const parts = latex.split(from);
-  if (parts.length !== 2) return null; // not there, or more than once
-  return parts.join(to);
+  // Match complete tokens so editing 1 cannot alter 12 or a command name.
+  const tokens = latex.match(/\\[a-zA-Z]+|\\[^a-zA-Z]|(?:\d+(?:\.\d+)?|\.\d+)|[a-zA-Z]|[\s\S]/g) ?? [];
+  const positions = tokens.flatMap((token, index) => token === from ? [index] : []);
+  if (positions.length !== 1) return null;
+  tokens[positions[0]] = to;
+  return tokens.join('');
 }
