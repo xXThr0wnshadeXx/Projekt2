@@ -5,13 +5,15 @@
 /* Tokens. Dark is the default here because low-vision users overwhelmingly
    prefer light-on-dark for long derivations; the three high-contrast themes in
    issue #12 build on these. Contrast is checked against WCAG AA, AAA in
-   low-vision mode (DESIGN.md 13). */
+   low-vision mode (DESIGN.md 13). --line is the edge of every button and box;
+   it is held to 3:1 against the page (WCAG 1.4.11), because an outline a
+   low-vision student cannot see is a control with no shape. */
 :root {
   --bg: #0b0f14;
   --surface: #141b24;
   --fg: #f2f6fa;
   --muted: #a3b2c2;
-  --line: #2a3644;
+  --line: #5f7186;
   --accent: #7cc4ff;
   --accent-fg: #06121d;
   --warn: #ffc46b;
@@ -23,7 +25,7 @@
     --surface: #f4f7fa;
     --fg: #0c1218;
     --muted: #4a5a6a;
-    --line: #cdd8e3;
+    --line: #76838f;
     --accent: #0b5fa5;
     --accent-fg: #ffffff;
     --warn: #7a4b00;
@@ -35,7 +37,7 @@
   --surface: #f4f7fa;
   --fg: #0c1218;
   --muted: #4a5a6a;
-  --line: #cdd8e3;
+  --line: #76838f;
   --accent: #0b5fa5;
   --accent-fg: #ffffff;
   --warn: #7a4b00;

@@ -8,6 +8,7 @@
 // reads these regions, and two voices at once is unusable (DESIGN.md 13).
 
 import { useEffect, useRef, useState } from 'react';
+import { say } from '../audio/tts';
 
 type Urgency = 'polite' | 'assertive';
 
@@ -41,6 +42,9 @@ export function LiveRegion() {
   useEffect(() => {
     announceImpl = (message, urgency = 'polite') => {
       const set = urgency === 'assertive' ? setAssertive : setPolite;
+      // The app's own voice, for a student with no screen reader. Silent
+      // unless they have switched it on.
+      say(message, urgency === 'assertive');
       // Clearing first guarantees the same message announces twice if repeated;
       // without this, an identical string is silently ignored.
       set('');

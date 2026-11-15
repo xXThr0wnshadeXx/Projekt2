@@ -7,17 +7,27 @@
 import { useEffect, useRef } from 'react';
 import { announce } from '../components/LiveRegion';
 import { useShortcuts } from '../shortcuts';
+import { ReadingControls } from '../components/ReadingControls';
+import type { Settings } from '../state';
 
 export interface HomeProps {
   onCapture: () => void;
   onSample: () => void;
   /** Present only when a problem from earlier in the session is still loaded. */
   onResume?: () => void;
-  backEndReachable: boolean;
   onSettings: () => void;
+  settings: Settings;
+  onSettingsChange: (next: Settings) => void;
 }
 
-export function Home({ onCapture, onSample, onResume, backEndReachable, onSettings }: HomeProps) {
+export function Home({
+  onCapture,
+  onSample,
+  onResume,
+  onSettings,
+  settings,
+  onSettingsChange,
+}: HomeProps) {
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -62,13 +72,14 @@ export function Home({ onCapture, onSample, onResume, backEndReachable, onSettin
         </button>
       </div>
 
-      {!backEndReachable && (
-        <p className="mt-6 rounded-lg border border-[--warn] px-4 py-3 text-sm text-[--warn]">
-          The server is not reachable, so capture is unavailable. The sample
-          problem still works — you can explore it, glance at it, and read it in
-          low-vision mode.
-        </p>
-      )}
+      {/* How the page itself is read. Here, not only in Settings: a student
+          who cannot yet read the screen cannot go looking for the setting
+          that would let them. The notice about a server that is down lives
+          in one place, the footer; it used to be said here as well, twice
+          over, in two different wordings. */}
+      <div className="mt-8 border-t border-[--line] pt-6">
+        <ReadingControls settings={settings} onChange={onSettingsChange} />
+      </div>
 
       {/* DESIGN.md 15 asks for this notice on Home, in one line. */}
       <p className="mt-10 text-sm text-[--muted]">

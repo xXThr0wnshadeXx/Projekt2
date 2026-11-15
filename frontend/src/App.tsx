@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { KeyboardHelp } from './components/KeyboardHelp';
-import { speak, setSelfVoicing } from './audio/tts';
+import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
 import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
@@ -61,7 +61,15 @@ export function App() {
     setSelfVoicing(settings.selfVoicing);
   }, [settings.selfVoicing]);
 
+  // Every size in the app is in rem, so this one number is large print for
+  // all of it — buttons, notes and maths alike.
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${settings.textScale}%`;
+  }, [settings.textScale]);
+
   function updateSettings(next: SettingsData) {
+    // Applied before anything is announced, so switching the voice on is heard.
+    setSelfVoicing(next.selfVoicing);
     setSettings(next);
     saveSettings(next);
   }
@@ -83,7 +91,6 @@ export function App() {
   function showHelp(takeFocus: boolean) {
     const text = helpText(screen);
     announce(text);
-    speak(text); // only when the student has turned self-voicing on
     setHelp({ takeFocus });
   }
 
@@ -223,10 +230,11 @@ export function App() {
 
       {screen === 'home' && (
         <Home
-          backEndReachable={backEnd !== 'down'}
           onCapture={() => setScreen('capture')}
           onSample={() => openProblem(sampleProblem())}
           onResume={problem ? () => setScreen('problem') : undefined}
+          settings={settings}
+          onSettingsChange={updateSettings}
           onSettings={openSettings}
         />
       )}

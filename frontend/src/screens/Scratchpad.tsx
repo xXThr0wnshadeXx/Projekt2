@@ -31,7 +31,6 @@ import { readTyped } from '../math/typed';
 import { speechFor } from '../math/sre';
 import { applyEdit, asksToSolve, lineNumber, looksLikeCommand } from '../commands';
 import { helpText, useShortcuts } from '../shortcuts';
-import { speak } from '../audio/tts';
 import type { Recording } from '../audio/recorder';
 import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
 import { loadWork, saveWork, type Mode, type Problem, type WorkLine } from '../state';
@@ -384,7 +383,6 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       case 'help': {
         const help = helpText('scratchpad');
         announce(help);
-        speak(help);
         return;
       }
       case 'edit': {
