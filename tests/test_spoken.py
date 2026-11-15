@@ -7,6 +7,28 @@ from fastapi.testclient import TestClient
 from backend.app.routes.spoken import spoken_router
 
 
+def test_long_work_history_keeps_accepting_new_lines():
+    import json
+
+    models = AsyncMock()
+    models.interpret.return_value = {
+        "latex": "x=2", "ambiguous": False, "clarifying_question": None,
+        "alternatives": [], "readback": "x equals two",
+    }
+    app = FastAPI()
+    app.include_router(spoken_router(models, AsyncMock(return_value=True)))
+    history = [f"x={index}" for index in range(40)]
+    with TestClient(app) as client:
+        response = client.post('/api/spoken-to-latex', json={
+            'text': 'x equals two', 'context_lines': history,
+        })
+    assert response.status_code == 200
+    messages = models.interpret.await_args.args[1]
+    forwarded = json.loads(messages[1]['content'])
+    assert forwarded['text'] == 'x equals two'
+    assert forwarded['context_lines'] == history[-32:]
+
+
 def ambiguous_payload(alternatives):
     return {
         "latex": None,

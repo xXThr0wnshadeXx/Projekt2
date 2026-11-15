@@ -33,7 +33,7 @@ Line = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max
 
 class SpokenInput(BaseModel):
     text: Line
-    context_lines: list[Line] = Field(default_factory=list, max_length=32)
+    context_lines: list[Line] = Field(default_factory=list)
 
 
 def spoken_error(status: int, code: str, message: str) -> JSONResponse:
@@ -52,6 +52,10 @@ def spoken_router(
             payload = SpokenInput.model_validate(await request.json())
         except ValueError:
             return spoken_error(400, "BAD_INPUT", "Enter a spoken math line to transcribe.")
+
+        # The client sends the problem plus saved work. Keep recent variable
+        # context without rejecting the student's next line after 32 entries.
+        payload.context_lines = payload.context_lines[-32:]
 
         try:
             result = await models.interpret("spoken", [

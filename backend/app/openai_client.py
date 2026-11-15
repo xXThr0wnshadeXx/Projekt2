@@ -125,4 +125,7 @@ class ModelClient:
             )
         except (OpenAIError, TimeoutError):
             raise ModelError("The transcription service is unavailable.") from None
-        return result.text
+        text = getattr(result, "text", None)
+        if not isinstance(text, str):
+            raise ModelError("The transcription service returned an unreadable result.")
+        return text

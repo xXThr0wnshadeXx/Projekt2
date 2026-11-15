@@ -40,6 +40,22 @@ async def test_invalid_provider_shape_becomes_model_error(task, payload):
         await client.close()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("response", [SimpleNamespace(), SimpleNamespace(text=None),
+                                       SimpleNamespace(text=123)])
+async def test_invalid_transcript_becomes_model_error(response):
+    client = ModelClient(ModelSettings(
+        _env_file=None, openai_api_key="test-value", model_vision="vision",
+        model_text="text", model_stt="speech",
+    ))
+    client.client.audio.transcriptions.create = AsyncMock(return_value=response)
+    try:
+        with pytest.raises(ModelError, match="unreadable"):
+            await client.transcribe("sample.mp4", b"audio", "audio/mp4")
+    finally:
+        await client.close()
+
+
 def test_malformed_capture_response_returns_retry_message():
     client = ModelClient(ModelSettings(
         _env_file=None, openai_api_key="test-value", model_vision="vision",
