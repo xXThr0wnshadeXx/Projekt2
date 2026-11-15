@@ -85,6 +85,56 @@ test.describe('@smoke critical path', () => {
     await expect(page.getByTestId('live-polite')).toContainText('Discarded line 1. 1 line remains.');
   });
 
+  test('a discarded line can be put back, and that survives a reload', async ({ page }) => {
+    // The Discard button follows every line in the Tab order, so one stray
+    // Enter must not lose a captured line for good.
+    await openSample(page);
+    await page.getByRole('button', { name: 'Discard problem line 1' }).click();
+    await expect(page.getByTestId('live-polite')).toContainText('To undo, use Put line 1 back');
+
+    await page.getByRole('button', { name: 'Put line 1 back' }).click();
+    await expect(page.getByTestId('live-polite')).toHaveText('Line 1 is back.');
+    await expect(page.locator('#L1')).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Put line 1 back' })).toHaveCount(0);
+
+    await page.reload();
+    await page.getByRole('button', { name: 'Back to your problem' }).click();
+    await expect(page.getByTestId('math-line-L1')).toBeVisible();
+    await expect(page.getByTestId('math-line-L2')).toBeVisible();
+  });
+
+  test('the discard button sits beside the maths, never on top of it', async ({ page }) => {
+    await openSample(page);
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+    const math = await page.locator('#L1').boundingBox();
+    const button = await page.getByRole('button', { name: 'Discard problem line 1' }).boundingBox();
+    expect(math && button).toBeTruthy();
+    const overlaps = math!.x < button!.x + button!.width && button!.x < math!.x + math!.width
+      && math!.y < button!.y + button!.height && button!.y < math!.y + math!.height;
+    expect(overlaps).toBe(false);
+    expect(button!.width).toBeGreaterThanOrEqual(48);
+    expect(button!.height).toBeGreaterThanOrEqual(48);
+  });
+
+  test('discarding an earlier line keeps the student on the same maths', async ({ page }) => {
+    await openSample(page);
+    // Work from line 2, then come back and discard line 1.
+    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.keyboard.press('s');
+    await expect(page.getByRole('heading', { name: 'Your work' })).toBeFocused();
+    await page.getByRole('button', { name: 'Leave and read the problem again' }).click();
+    await expect(page.locator('#L2')).toBeFocused();
+    await page.getByRole('button', { name: 'Discard problem line 1' }).click();
+    await expect(page.locator('#L2')).toBeFocused();
+
+    // Leaving and coming back lands on the same maths, now numbered line 1.
+    await page.keyboard.press('x');
+    await expect(page.getByRole('heading', { name: /hand in/i }).first()).toBeVisible();
+    await page.getByRole('main').getByRole('button', { name: /^Back/ }).click();
+    await expect(page.locator('#L2')).toBeFocused();
+    await expect(page.getByRole('group', { name: 'Line 1', exact: true })).toHaveAttribute('id', 'L2');
+  });
+
   test('state changes are announced to screen readers', async ({ page }) => {
     await openSample(page);
 
