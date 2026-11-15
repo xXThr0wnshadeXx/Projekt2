@@ -129,9 +129,26 @@ def test_timeout_returns_timeout_error(monkeypatch):
         ("Now you should subtract 3.", False),
         ("The answer is x = 4.", False),
         ("Try dividing both sides by 2.", False),
+        # No forbidden word, and still a value handed over.
+        ("3 was subtracted from both sides, giving x = 4.", False),
+        ("Both sides were divided by 2 to get x equals 4.", False),
+        ("Dividing by 2 leaves x alone, which is 4.", False),
+        ("The left side was factored.", True),
+        ("Like terms were combined on the left side.", True),
         ("", False),
         ("x" * 200, False),
     ],
 )
 def test_explanation_guard(text, ok):
     assert acceptable(text) is ok
+
+
+def test_inequality_steps_reach_the_student():
+    """End to end through /api/diff: a correct inequality step checks out, and
+    forgetting to flip the sign is "couldn't confirm", never "wrong"."""
+    with make_client() as client:
+        ok = post(client, "-2x > 6", "x < -3", "homework")
+        slip = post(client, "-2x > 6", "x > -3", "homework")
+    assert ok.json() == {"verified": True, "method": "same_solutions", "message": "This step checks out."}
+    assert slip.json()["message"] == "I couldn't confirm this step."
+    assert "wrong" not in slip.text.lower()
