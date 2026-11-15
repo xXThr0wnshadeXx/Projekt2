@@ -129,14 +129,14 @@ export async function structureSummary(latex: string): Promise<string> {
  *  when the build cannot produce it — wrong braille is worse than none.
  */
 export async function nemeth(latex: string): Promise<string | null> {
-  await loadMathJax();
-  const mj = window.MathJax;
   try {
-    if (!mj?.texReset || !mj?.tex2chtmlPromise) return null;
+    await loadMathJax();
+    const mj = window.MathJax;
+    if (!mj?.tex2chtmlPromise) return null;
     const node = await mj.tex2chtmlPromise(latex, { display: true });
-    const braille = node?.querySelector?.('[data-semantic-braille]');
-    const label = braille?.getAttribute('data-semantic-braille');
-    return label ?? null;
+    if (node?.querySelector('mjx-merror')) return null;
+    const label = node?.getAttribute('data-semantic-braille')?.trim();
+    return label || null;
   } catch {
     return null;
   }

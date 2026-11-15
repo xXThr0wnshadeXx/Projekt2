@@ -21,7 +21,13 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -u
-          TEAM='sshreev2703@gmail\.com|users\.noreply\.github\.com'
+          # Everyone who actually works on this. The check exists to keep
+          # machine-generated attribution out of the history, not to reject the
+          # team: GitHub adds a `Co-authored-by` trailer automatically when a
+          # pull request is squash-merged, so anyone whose work is merged that
+          # way has to be listed or their own merge fails on `main`.
+          # nicolashlam commits under two accounts, personal and Cal Poly.
+          TEAM='sshreev2703@gmail\.com|shaswatharun1@gmail\.com|nlam30@calpoly\.edu|nicolas\.h\.lam@gmail\.com|users\.noreply\.github\.com'
           FOOTER='^[[:space:]]*((generated|written|authored|created|produced|assisted)[[:space:]]+(with|by|using)[[:space:]]|(assisted|generated)-by:|(tool|agent|model|assistant):[[:space:]])'
 
           if [ -n "${BASE:-}" ] && [ -n "${HEAD:-}" ]; then RANGE="$BASE..$HEAD"; else RANGE="HEAD~1..HEAD"; fi
