@@ -10,6 +10,12 @@
 
 import { useEffect, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
+import { KeyboardHelp } from './components/KeyboardHelp';
+import { speak, setSelfVoicing } from './audio/tts';
+import { ModeBadge } from './components/ModeBadge';
+import { Settings } from './screens/Settings';
+import { Export } from './screens/Export';
+import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { health, apiBase, ApiFailure } from './api';
 import { Home } from './screens/Home';
@@ -21,10 +27,20 @@ import {
   loadProblem,
   saveProblem,
   sampleProblem,
+  loadSettings,
+  saveSettings,
   type Problem as ProblemData,
+  type Settings as SettingsData,
 } from './state';
 
-type Screen = 'home' | 'capture' | 'problem' | 'lowvision' | 'scratchpad';
+type Screen =
+  | 'home'
+  | 'capture'
+  | 'problem'
+  | 'lowvision'
+  | 'scratchpad'
+  | 'settings'
+  | 'export';
 type BackEnd = 'checking' | 'up' | 'down';
 
 export function App() {
@@ -34,6 +50,46 @@ export function App() {
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
   const [backEndNote, setBackEndNote] = useState('');
+  const [settings, setSettings] = useState<SettingsData>(() => loadSettings());
+  // Where to go back to from Settings, and which problem line the student was
+  // on when they started working (their first step is checked against it).
+  const [settingsFrom, setSettingsFrom] = useState<Screen>('home');
+  const [workingFrom, setWorkingFrom] = useState(0);
+
+  useEffect(() => {
+    setSelfVoicing(settings.selfVoicing);
+  }, [settings.selfVoicing]);
+
+  function updateSettings(next: SettingsData) {
+    setSettings(next);
+    saveSettings(next);
+  }
+
+  const [exportFrom, setExportFrom] = useState<Screen>('scratchpad');
+  function openExport(from: Screen) {
+    setExportFrom(from);
+    setScreen('export');
+  }
+
+  function openSettings() {
+    setSettingsFrom(screen === 'settings' ? 'home' : screen);
+    setScreen('settings');
+  }
+  // Keyboard help (#25): `null` when closed, otherwise whether it took focus.
+  const [help, setHelp] = useState<null | { takeFocus: boolean }>(null);
+
+  /** "?" anywhere: say this screen's shortcuts and show them. */
+  function showHelp(takeFocus: boolean) {
+    const text = helpText(screen);
+    announce(text);
+    speak(text); // only when the student has turned self-voicing on
+    setHelp({ takeFocus });
+  }
+
+  useShortcuts({ '?': () => showHelp(false) });
+
+  // The list belongs to the screen it was opened on.
+  useEffect(() => setHelp(null), [screen]);
 
   // MathJax is loaded once, up front. Waiting until a problem arrives would
   // put a multi-second script download inside the capture wait.
@@ -124,9 +180,37 @@ export function App() {
       </a>
 
       <header className="border-b border-[--line] px-6 py-5">
-        <h1 className="text-2xl font-semibold tracking-tight">Glance</h1>
-        <p className="mt-1 text-[--muted]">Math you can hear and speak.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Glance</h1>
+            <p className="mt-1 text-[--muted]">Math you can hear and speak.</p>
+            <div className="mt-2">
+              <ModeBadge mode={settings.mode} />
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            aria-expanded={help !== null}
+            aria-controls="keyboard-help"
+            aria-keyshortcuts="?"
+            onClick={() => (help ? setHelp(null) : showHelp(true))}
+          >
+            Keyboard shortcuts
+          </button>
+        </div>
       </header>
+
+      {help && (
+        <KeyboardHelp
+          screen={screen}
+          takeFocus={help.takeFocus}
+          onClose={() => {
+            setHelp(null);
+            announce('Shortcuts closed.');
+          }}
+        />
+      )}
 
       {screen === 'home' && (
         <Home
@@ -134,6 +218,7 @@ export function App() {
           onCapture={() => setScreen('capture')}
           onSample={() => openProblem(sampleProblem())}
           onResume={problem ? () => setScreen('problem') : undefined}
+          onSettings={openSettings}
         />
       )}
 
@@ -145,17 +230,40 @@ export function App() {
         <Problem
           problem={problem}
           onLowVision={enterLowVision}
+          mode={settings.mode}
           onNewCapture={() => setScreen('capture')}
-          onStartWorking={() => setScreen('scratchpad')}
+          onStartWorking={(index) => {
+            setWorkingFrom(index);
+            setScreen('scratchpad');
+          }}
+          onExport={() => openExport('problem')}
         />
       )}
 
       {screen === 'scratchpad' && problem && (
-        <Scratchpad problem={problem} onBack={() => setScreen('problem')} />
+        <Scratchpad
+          problem={problem}
+          mode={settings.mode}
+          startLine={workingFrom}
+          onBack={() => setScreen('problem')}
+          onExport={() => openExport('scratchpad')}
+        />
+      )}
+
+      {screen === 'export' && problem && (
+        <Export problem={problem} onBack={() => setScreen(exportFrom)} />
+      )}
+
+      {screen === 'settings' && (
+        <Settings
+          settings={settings}
+          onChange={updateSettings}
+          onBack={() => setScreen(settingsFrom)}
+        />
       )}
 
       {/* Only reachable if storage returned something unusable. */}
-      {(screen === 'problem' || screen === 'scratchpad') && !problem && (
+      {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
         <main id="main" className="mx-auto max-w-3xl px-6 py-8">
           <h2 className="text-2xl font-semibold">No problem loaded</h2>
           <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>

@@ -8,8 +8,9 @@ import argparse
 import json
 import re
 import time
+from datetime import UTC, datetime
 from pathlib import Path
-from statistics import median
+from statistics import median, quantiles
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -71,16 +72,22 @@ def evaluate(base_url, fixtures):
                     case["error"] = "response did not match the expected contract"
             except HTTPError as error:
                 case["error"] = f"HTTP {error.code}"
+                case["request_error"] = True
             except (URLError, TimeoutError, ValueError):
                 case["error"] = "could not read a response from the API"
+                case["request_error"] = True
             case["ms"] = round((time.perf_counter() - start) * 1000)
             cases.append(case)
         passed = sum(case["passed"] for case in cases)
+        completed = [case["ms"] for case in cases if "request_error" not in case]
         results[group] = {
             "passed": passed,
             "total": len(cases),
+            "request_failures": len(cases) - len(completed),
             "rate": passed / len(cases),
-            "p50_ms": median(case["ms"] for case in cases),
+            "p50_ms": median(completed) if completed else None,
+            "p90_ms": quantiles(completed, n=10, method="inclusive")[-1]
+            if len(completed) > 1 else next(iter(completed), None),
             "cases": cases,
         }
     return results
@@ -93,7 +100,11 @@ def main():
     args = parser.parse_args()
     fixtures = json.loads(Path(__file__).with_name("spoken.json").read_text(encoding="utf-8"))
     results = evaluate(args.base_url, fixtures)
-    print(json.dumps({"model": args.model, "results": results}, indent=2))
+    print(json.dumps({
+        "model": args.model,
+        "run_at": datetime.now(UTC).isoformat(),
+        "results": results,
+    }, indent=2))
     return int(any(result["passed"] != result["total"] for result in results.values()))
 
 

@@ -18,14 +18,21 @@ import { MathLine } from '../components/MathLine';
 import { RecordButton } from '../components/RecordButton';
 import { ReadbackBar } from '../components/ReadbackBar';
 import { ClarifyDialog } from '../components/ClarifyDialog';
+import { MathExports } from '../components/MathExports';
 import { transcribe, spokenToLatex, ApiFailure, type SpokenAlternative } from '../api';
 import { useShortcuts } from '../shortcuts';
 import type { Recording } from '../audio/recorder';
-import { loadWork, saveWork, type Problem, type WorkLine } from '../state';
+import { checkStep, stepChecksAllowed } from '../stepCheck';
+import { loadWork, saveWork, type Mode, type Problem, type WorkLine } from '../state';
 
 export interface ScratchpadProps {
   problem: Problem;
   onBack: () => void;
+  /** Decides whether and how a saved step is checked (DESIGN.md 14). */
+  mode: Mode;
+  /** The problem line the student was on; their first step follows from it. */
+  startLine: number;
+  onExport: () => void;
 }
 
 interface Pending {
@@ -45,7 +52,7 @@ function newId(): string {
   return `W${nextId}`;
 }
 
-export function Scratchpad({ problem, onBack }: ScratchpadProps) {
+export function Scratchpad({ problem, onBack, mode, startLine, onExport }: ScratchpadProps) {
   const [lines, setLines] = useState<WorkLine[]>(() => loadWork());
   const [pending, setPending] = useState<Pending | null>(null);
   const [clarify, setClarify] = useState<Clarify | null>(null);
@@ -53,10 +60,16 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showProblem, setShowProblem] = useState(false);
+  // What the step check said about each saved line, shown under it so a
+  // low-vision student reading the screen gets it too. Not stored.
+  const [checks, setChecks] = useState<Record<string, string>>({});
 
   // One step of undo is enough in practice and is far easier to explain than a
   // history: "undo" always means "put back the line I just removed".
   const undone = useRef<{ line: WorkLine; at: number } | null>(null);
+  // The most recent thing the student did, so a slow step-check result can
+  // tell whether it is still the news.
+  const lastAction = useRef<string>('');
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -79,6 +92,7 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
 
   /** Turn a transcript into a pending line, or into a clarifying question. */
   async function interpret(text: string) {
+    lastAction.current = 'interpret';
     setBusy(true);
     setError('');
     try {
@@ -118,6 +132,7 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
   }
 
   async function onRecording(recording: Recording) {
+    lastAction.current = 'record';
     setBusy(true);
     setError('');
     announce('Working out what you said…');
@@ -135,27 +150,42 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
     }
   }
 
-  function savePending(line: Pending) {
+  async function savePending(line: Pending) {
     const entry: WorkLine = { id: newId(), ...line };
+    // The step is checked against the line it follows: the student's previous
+    // line, or for their first line, the problem line they were working from.
+    const from = lines[lines.length - 1] ?? problem.lines[startLine] ?? problem.lines[0];
     setLines((prev) => [...prev, entry]);
     setPending(null);
     setTyped('');
     const position = lines.length + 1;
+    window.setTimeout(() => focusFirst(`#${entry.id}`), 80);
+
     announce(
       line.valid
         ? `Saved as line ${position}.`
         : `Saved as line ${position}. I could not check it.`,
     );
-    window.setTimeout(() => focusFirst(`#${entry.id}`), 80);
+    lastAction.current = entry.id;
+
+    if (!line.valid || !from?.valid || !stepChecksAllowed(mode)) return;
+    const verdict = await checkStep(from.latex, entry.latex, mode);
+    if (!verdict) return;
+    setChecks((prev) => ({ ...prev, [entry.id]: verdict }));
+    // Only speak up if the student hasn't moved on. A late verdict must never
+    // talk over "Deleted line 1" or a new readback.
+    if (lastAction.current === entry.id) announce(verdict);
   }
 
   function remove(line: WorkLine, index: number) {
+    lastAction.current = `remove:${line.id}`;
     undone.current = { line, at: index };
     setLines((prev) => prev.filter((l) => l.id !== line.id));
     announce(`Deleted line ${index + 1}. Press U to undo.`);
   }
 
   function undo() {
+    lastAction.current = 'undo';
     const last = undone.current;
     if (!last) {
       announce('There is nothing to undo.');
@@ -184,6 +214,7 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
     {
       u: undo,
       'shift+r': readAll,
+      x: onExport,
       p: () => {
         setShowProblem((v) => !v);
         announce(showProblem ? 'Problem hidden.' : 'Problem shown.');
@@ -249,6 +280,9 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
                     label={`Your line ${i + 1}`}
                     unsure={!l.valid}
                   />
+                  {checks[l.id] && (
+                    <p className="mt-1 text-sm text-[--muted]">{checks[l.id]}</p>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -268,7 +302,7 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
         <ReadbackBar
           readback={pending.readback}
           unsure={!pending.valid}
-          onSave={() => savePending(pending)}
+          onSave={() => void savePending(pending)}
           onEdit={() => {
             // Editing drops into the typed box with the LaTeX already there,
             // so a near-miss is a correction rather than a re-recording.
@@ -337,10 +371,15 @@ export function Scratchpad({ problem, onBack }: ScratchpadProps) {
         <button type="button" className="btn" onClick={undo}>
           Undo delete
         </button>
+        <button type="button" className="btn" onClick={onExport}>
+          Hand in my work
+        </button>
         <button type="button" className="btn" onClick={onBack}>
           Back to the problem
         </button>
       </div>
+
+      <MathExports lines={lines} />
 
       {clarify && (
         <ClarifyDialog

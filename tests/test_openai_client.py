@@ -107,3 +107,43 @@ def test_the_budget_can_be_widened_without_a_deploy(monkeypatch):
     client = ModelClient(ModelSettings(_env_file=None))
     assert client.client.timeout == 25.0
     assert client.client.max_retries == 0
+
+
+@pytest.mark.asyncio
+async def test_a_spoken_line_gets_a_shorter_budget_than_a_capture(model_client, monkeypatch):
+    """The two steps have different budgets in DESIGN.md 16.
+
+    A spoken line has 3 s at p50 and 6 s at worst, and the model call is only
+    part of it, so it must not be given the capture's timeout.
+    """
+    seen = []
+
+    async def record(seconds, call):
+        seen.append(seconds)
+        call.close()  # never awaited, so close the coroutine
+        raise TimeoutError
+
+    monkeypatch.setattr(type(model_client), "_bounded", staticmethod(record))
+
+    for task in ("capture", "spoken"):
+        with pytest.raises(ModelError):
+            await model_client.interpret(task, [{"role": "user", "content": "x"}])
+
+    with pytest.raises(ModelError):
+        await model_client.transcribe("r.webm", b"x", "audio/webm")
+
+    # capture long, spoken short, transcription short
+    assert seen == [10.0, 4.0, 4.0]
+
+
+@pytest.mark.asyncio
+async def test_a_stalled_call_becomes_a_model_error(model_client, monkeypatch):
+    """A hang must surface as the normal error shape, not propagate."""
+
+    async def never(seconds, call):
+        call.close()
+        raise TimeoutError
+
+    monkeypatch.setattr(type(model_client), "_bounded", staticmethod(never))
+    with pytest.raises(ModelError):
+        await model_client.interpret("capture", [{"role": "user", "content": "x"}])
