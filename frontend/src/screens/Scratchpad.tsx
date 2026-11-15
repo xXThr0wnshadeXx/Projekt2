@@ -73,7 +73,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   const [checks, setChecks] = useState<Record<string, string>>({});
   // The work line the student is on (for commands like "delete that"), and
   // the line an edit will replace once the student confirms it (#24).
-  const [current, setCurrent] = useState<number | null>(null);
+  const [current, setCurrent] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<string | null>(null);
 
   // One step of undo is enough in practice and is far easier to explain than a
@@ -196,7 +196,12 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     lastAction.current = `remove:${line.id}`;
     undone.current = { line, at: index };
     setLines((prev) => prev.filter((l) => l.id !== line.id));
-    announce(`Deleted line ${index + 1}. Press U to undo.`);
+    const next = current === line.id ? lines[index + 1] ?? lines[index - 1] : undefined;
+    if (current === line.id) setCurrent(next?.id ?? null);
+    const nextPosition = index + (lines[index + 1] ? 1 : 0);
+    const selection = next ? ` Now on line ${nextPosition}.` : '';
+    if (next) window.requestAnimationFrame(() => focusFirst(`#${next.id}`));
+    announce(`Deleted line ${index + 1}.${selection} Press U to undo.`);
   }
 
   function undo() {
@@ -229,7 +234,8 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     setError('');
     let result;
     try {
-      const currentId = current !== null ? `W${current + 1}` : null;
+      const currentIndex = lines.findIndex((line) => line.id === current);
+      const currentId = currentIndex >= 0 ? `W${currentIndex + 1}` : null;
       result = await command(text, currentId, lines.length);
     } catch (e: unknown) {
       fail(e instanceof ApiFailure ? e.message : "I didn't catch that.");
@@ -255,7 +261,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
 
     switch (result.intent) {
       case 'navigate':
-        setCurrent(n! - 1);
+        setCurrent(target!.id);
         focusFirst(`#${target!.id}`);
         announce(`Line ${n}. ${target!.readback}`);
         return;
@@ -382,7 +388,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         ) : (
           <ol className="space-y-4">
             {lines.map((l, i) => (
-              <li key={l.id} className="flex items-start gap-3" onFocus={() => setCurrent(i)}>
+              <li key={l.id} className="flex items-start gap-3" onFocus={() => setCurrent(l.id)}>
                 <span className="mt-4 w-6 shrink-0 text-right text-[--muted]" aria-hidden="true">
                   {i + 1}
                 </span>

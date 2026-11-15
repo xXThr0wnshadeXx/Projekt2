@@ -85,6 +85,29 @@ test.describe('@smoke commands', () => {
     await expect(workLines(page)).toHaveCount(3);
   });
 
+  test('the rule-supported help phrase reaches the command route', async ({ page }) => {
+    const calls = await open(page, { intent: 'help', target_line: null, instruction: null });
+    await say(page, 'What are the commands?');
+    await expect.poll(() => calls.command.length).toBe(1);
+    expect(calls.spoken).toBe(0);
+  });
+
+  test('relative commands stay on the selected line after an earlier deletion', async ({ page }) => {
+    const calls = await open(page, { intent: 'delete', target_line: 'W1', instruction: null });
+    await page.locator('#W102').focus();
+    await say(page, 'delete line one');
+    await expect(workLines(page)).toHaveCount(2);
+    await page.route('**/api/command', async (route) => {
+      calls.command.push(route.request().postDataJSON());
+      await route.fulfill({
+        json: { intent: 'read', target_line: 'W1', instruction: null },
+      });
+    });
+    await say(page, 'read that');
+    await expect(polite(page)).toHaveText('Line 1. x equals 3');
+    expect(calls.command.at(-1)).toMatchObject({ current_line: 'W1', line_count: 2 });
+  });
+
   test('math is still math: it never goes to the command route', async ({ page }) => {
     const calls = await open(page, { intent: 'unknown', target_line: null, instruction: null });
     await say(page, 'two x equals eight');

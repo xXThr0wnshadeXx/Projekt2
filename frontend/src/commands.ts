@@ -6,15 +6,16 @@
 // math, exactly as before. The server decides which command it is.
 
 const COMMAND_START = new RegExp(
-  '^(?:please |okay |ok |glance )?(?:' +
+  '^(?:(?:please|okay|ok|um|uh|glance)\\s+)?(?:' +
     [
       'next', 'previous', 'back', 'go (?:to|back|up|down)', 'jump to', 'move to', 'line \\w+$',
-      'first line', 'last line', 'top$',
+      'first line', 'last line', 'top$', 'down$', 'up$',
+      '(?:the )?(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\\d{1,3}(?:st|nd|rd|th)) line$',
       'read', 'delete', 'remove', 'erase', 'scratch', 'cross out',
       'undo', 'new line', 'add (?:a )?(?:new )?line', 'start a new line',
       'check', 'what changed',
       'export', 'hand (?:it )?in', 'download', 'print', 'save as pdf',
-      'help', 'what can i say', 'commands$',
+      'help', 'what can i say', 'what are the commands$', 'commands$',
       'change', 'replace', 'swap', 'edit', 'fix', 'correct',
     ].join('|') +
     ')\\b',
@@ -22,7 +23,7 @@ const COMMAND_START = new RegExp(
 );
 
 export function looksLikeCommand(text: string): boolean {
-  return COMMAND_START.test(text.trim().replace(/[.!?]+$/, ''));
+  return COMMAND_START.test(text.trim().replace(/[.,!?;:]+/g, ' ').replace(/\s+/g, ' ').trim());
 }
 
 /** "W3" → 3. */
