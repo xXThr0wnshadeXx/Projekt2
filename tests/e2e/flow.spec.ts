@@ -47,6 +47,63 @@ test.describe('@smoke critical path', () => {
     await expect(page.locator('#L1')).toBeFocused();
   });
 
+  test('low-vision mode opens with high-contrast type', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+
+    await page.getByRole('button', { name: 'Low-vision mode' }).click();
+    const stage = page.getByRole('region', { name: 'Low-vision mode' });
+    await expect(stage).toBeVisible();
+
+    // White on black is the default pairing; AAA ratios are asserted in the
+    // unit test for the theme table.
+    await expect(stage).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+    await expect(stage).toHaveCSS('color', 'rgb(255, 255, 255)');
+
+    await expect(page.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Next' }).click();
+    await expect(page.getByRole('button', { name: 'Previous' })).toBeEnabled();
+  });
+
+  test('low-vision mode is driven entirely from the keyboard', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+
+    // L enters the mode. A low-vision user is often not using a pointer at all.
+    await page.keyboard.press('l');
+    const stage = page.getByRole('region', { name: 'Low-vision mode' });
+    await expect(stage).toBeVisible();
+    await expect(stage.getByText('Line 1 of 2')).toBeVisible();
+
+    const math = page.locator('[id^="lv-"]').first();
+    const sizeOf = async () =>
+      parseFloat(
+        await math.evaluate((el) => getComputedStyle(el.parentElement as HTMLElement).fontSize),
+      );
+
+    const start = await sizeOf();
+    await page.keyboard.press('+');
+    expect(await sizeOf()).toBeGreaterThan(start);
+    await page.keyboard.press('-');
+    expect(await sizeOf()).toBeCloseTo(start, 1);
+
+    // Arrows step between lines.
+    await page.keyboard.press('ArrowRight');
+    await expect(stage.getByText('Line 2 of 2')).toBeVisible();
+    await page.keyboard.press('ArrowLeft');
+    await expect(stage.getByText('Line 1 of 2')).toBeVisible();
+
+    // T cycles the three pairings; the second is black on white.
+    await page.keyboard.press('t');
+    await expect(stage).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(stage).toHaveCSS('color', 'rgb(0, 0, 0)');
+
+    // Escape leaves and puts focus back where the student was.
+    await page.keyboard.press('Escape');
+    await expect(stage).toBeHidden();
+    await expect(page.locator('#L1')).toBeFocused();
+  });
+
   test('no horizontal scrolling at phone width', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/');

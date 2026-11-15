@@ -57,6 +57,8 @@ def test_normalise_drops_display_only_markup():
 # --- validate_latex: unparseable is valid:false, never a crash ----------------
 
 def test_validate_latex_marks_valid_and_unsure():
+    timeouts.warm_up()
+
     async def go():
         return await asyncio.gather(
             mathcheck.validate_latex("2x + 3 = 11"),
@@ -108,6 +110,7 @@ def test_timeout_path_returns_timeout_error_shape():
 
 
 def test_require_parse_raises_unparseable_error_shape():
+    timeouts.warm_up()
     app = FastAPI()
     install_error_handlers(app)
 

@@ -10,6 +10,7 @@ import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { MathLine } from './components/MathLine';
 import { loadMathJax, isReady } from './math/mathjax';
 import { health, apiBase, ApiFailure } from './api';
+import { LowVision } from './screens/LowVision';
 
 // String.raw keeps every backslash — a plain quoted string turns \f and \s into
 // escape sequences and silently mangles the LaTeX.
@@ -20,7 +21,16 @@ const SAMPLE = [
 
 type BackEnd = 'checking' | 'up' | 'down';
 
+// Spoken readings are produced by the summary endpoint (#11); until then the
+// self-voicing in low-vision mode falls back to the line label.
+const SPOKEN: Record<string, string> = {
+  L1: '2 x plus 3 equals 11',
+  L2: 'the fraction with numerator the square root of x plus 1, and denominator 2, equals 5',
+};
+
 export function App() {
+  const [lowVision, setLowVision] = useState(false);
+  const [lineIndex, setLineIndex] = useState(0);
   const [mathReady, setMathReady] = useState(false);
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
   const [backEndNote, setBackEndNote] = useState('');
@@ -36,6 +46,22 @@ export function App() {
       });
   }, []);
 
+  // `L` enters low-vision mode (DESIGN.md 12). Shortcuts stay out of the way of
+  // text fields and of the equation explorer.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (lowVision) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest('input, textarea, [contenteditable], mjx-container')) return;
+      if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        setLowVision(true);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lowVision]);
+
   useEffect(() => {
     health()
       .then(() => {
@@ -47,6 +73,24 @@ export function App() {
         setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
       });
   }, []);
+
+  if (lowVision) {
+    return (
+      <>
+        <LiveRegion />
+        <LowVision
+          lines={SAMPLE.map((l) => ({ ...l, spoken: SPOKEN[l.id] }))}
+          startIndex={lineIndex}
+          onExit={(i) => {
+            setLineIndex(i);
+            setLowVision(false);
+            announce('Left low-vision mode.');
+            window.setTimeout(() => focusFirst(`#${SAMPLE[i]?.id ?? 'L1'}`), 60);
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-[--bg] text-[--fg]">
@@ -67,6 +111,7 @@ export function App() {
         <p className="mt-2 text-[--muted]">
           Tab to a line and press <kbd className="kbd">Enter</kbd>, then use the arrow
           keys to move inside the equation. <kbd className="kbd">Esc</kbd> leaves it.
+          Press <kbd className="kbd">L</kbd> for low-vision mode.
         </p>
 
         <ul className="mt-6 space-y-4" aria-label="Example problem lines">
@@ -87,6 +132,9 @@ export function App() {
             }}
           >
             Focus line 1
+          </button>
+          <button type="button" className="btn" onClick={() => setLowVision(true)}>
+            Low-vision mode
           </button>
           <button
             type="button"

@@ -1,4 +1,4 @@
 {
-  "_comment": "Expected transcription per image for the capture eval (issue #29). 30 images: 10 slides/typed, 10 whiteboard, 5 textbook, 5 handwritten. Images live in eval/photos/ and are NOT committed (see .gitignore) because they may show other people's work.",
+  "_comment": "Each image needs file (relative to eval/photos), category, and lines (ordered LaTeX strings). Full set: 10 slides/typed, 10 whiteboard, 5 textbook, 5 handwritten. Keep real photos and any sensitive annotations out of version control.",
   "images": []
 }
