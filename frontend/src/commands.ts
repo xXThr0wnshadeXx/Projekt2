@@ -29,7 +29,7 @@ export function looksLikeCommand(text: string): boolean {
 // person asking for help would use; none of them is something a line of math
 // or a command contains.
 const ASKS_TO_SOLVE =
-  /\b(solve|hint|clue|next step|what (?:do|should) i do|how do i|do it for me|work it out|figure it out|finish (?:it|this)|(?:what(?:'s| is)|give me|tell me|show me) the answer|help me (?:with|do|solve|finish))\b/i;
+  /\b(solve|hint|clue|next step|what to do|i(?:'m| am) (?:stuck|lost)|i don'?t (?:know|understand|get it)|what(?:'s| is) (?:the value of )?[a-z]$|what (?:do|should) i do|how do i|do it for me|work it out|figure it out|finish (?:it|this)|(?:what(?:'s| is)|give me|tell me|show me) the answer|help me (?:with|do|solve|finish))\b/i;
 
 export function asksToSolve(text: string): boolean {
   return ASKS_TO_SOLVE.test(text);

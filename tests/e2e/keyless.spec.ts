@@ -127,7 +127,7 @@ test.describe('@smoke without a model', () => {
     for (const ask of asks) {
       await typeLine(page, ask);
       await expect(polite(page)).toHaveText(
-        'Glance does not solve, give answers or give hints. Write your next line and I will read it back.',
+        'I cannot solve it, give the answer, or say what to do next. The work is yours. I can read the problem again, explain a math word, or check a line once you have written it.',
       );
       await expect(page.getByLabel('Or type your line')).toHaveValue('');
     }

@@ -14,9 +14,17 @@ type Urgency = 'polite' | 'assertive';
 
 let announceImpl: (message: string, urgency?: Urgency) => void = () => {};
 
+let last = '';
+
 /** Announce a message to screen readers. Safe to call before mount. */
 export function announce(message: string, urgency: Urgency = 'polite'): void {
+  last = message;
   announceImpl(message, urgency);
+}
+
+/** The most recent thing said, for "say that again". */
+export function lastAnnouncement(): string {
+  return last;
 }
 
 /** Move focus to the first match, so the student lands on the new result. */

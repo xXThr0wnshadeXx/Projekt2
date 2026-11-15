@@ -13,7 +13,7 @@
 // speak reliably, some are in a quiet library, and some browsers cannot record.
 
 import { useEffect, useRef, useState } from 'react';
-import { announce, focusFirst } from '../components/LiveRegion';
+import { announce, focusFirst, lastAnnouncement } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
 import { MathExports } from '../components/MathExports';
 import { RecordButton } from '../components/RecordButton';
@@ -29,7 +29,8 @@ import {
 } from '../api';
 import { readTyped } from '../math/typed';
 import { speechFor } from '../math/sre';
-import { applyEdit, asksToSolve, lineNumber, looksLikeCommand } from '../commands';
+import { applyEdit, lineNumber, looksLikeCommand } from '../commands';
+import { SAYS, stripFiller, understandTalk, type Talk } from '../talk';
 import { helpText, useShortcuts } from '../shortcuts';
 import type { Recording } from '../audio/recorder';
 import { checkStep, stepChecksAllowed, withBasis } from '../stepCheck';
@@ -70,6 +71,10 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showProblem, setShowProblem] = useState(false);
+  // The answer to something the student asked, kept on screen. The live
+  // region is heard, not seen, and a low-vision student with no screen reader
+  // would otherwise ask a question and watch nothing happen.
+  const [reply, setReply] = useState('');
   // What the step check said about each saved line, shown under it so a
   // low-vision student reading the screen gets it too. Not stored.
   const [checks, setChecks] = useState<Record<string, string>>({});
@@ -122,6 +127,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     lastAction.current = 'interpret';
     setBusy(true);
     setError('');
+    setReply('');
     try {
       // Prior lines give the model variable names only — never the problem's
       // answer, and never anything it could complete from.
@@ -164,7 +170,9 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     } catch (e: unknown) {
       fail(
         e instanceof ApiFailure
-          ? e.message
+          ? e.code === 'UNPARSEABLE'
+            ? `${e.message} ${SAYS.notMath}`
+            : e.message
           : 'Something went wrong reading that line.',
       );
     } finally {
@@ -287,19 +295,77 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   }
 
   /** Math goes to spoken-to-LaTeX; a command goes to the command route. */
-  async function handleText(text: string) {
-    // Asked outright, the answer is a plain no — said before anything is sent
-    // anywhere, so it does not depend on a model choosing to decline.
-    if (asksToSolve(text)) {
-      lastAction.current = 'refused';
+  async function handleText(heard: string) {
+    // Plain talk gets a plain answer, decided by rules before anything is
+    // sent anywhere (talk.ts). None of these answers is worked out from the
+    // problem, so none of them can contain a step.
+    const talk = understandTalk(heard);
+    if (talk) {
+      lastAction.current = 'talk';
+      setError('');
       setTyped('');
-      announce(
-        'Glance does not solve, give answers or give hints. Write your next line and I will read it back.',
-      );
+      await answerTalk(talk);
       return;
     }
+    // "Uh, okay, two x equals eight" is the line "two x equals eight".
+    const text = stripFiller(heard);
     if (looksLikeCommand(text)) await runCommand(text);
     else await interpret(text);
+  }
+
+  async function answerTalk(talk: Talk) {
+    // What was said before this question, for "say that again".
+    const before = lastAnnouncement();
+    const tell = (message: string) => {
+      setReply(message);
+      announce(message);
+    };
+    switch (talk.kind) {
+      case 'greeting':
+        tell(SAYS.greeting);
+        return;
+      case 'thanks':
+        tell(SAYS.thanks);
+        return;
+      case 'repeat':
+        tell(before || SAYS.nothingToRepeat);
+        return;
+      case 'filler':
+        tell(SAYS.filler);
+        return;
+      case 'refuse':
+        tell(SAYS.refuse);
+        return;
+      case 'capabilities':
+        tell(SAYS.capabilities);
+        return;
+      case 'define':
+        // A human reader in an exam may not explain a word either.
+        tell(mode === 'exam' ? SAYS.examNoMeanings : talk.meaning);
+        return;
+      case 'unknownTerm':
+        tell(mode === 'exam' ? SAYS.examNoMeanings : SAYS.unknownTerm(talk.term));
+        return;
+      case 'status': {
+        const following =
+          problem.lines.length > 1 ? ` You are following line ${startLine + 1} of the problem.` : '';
+        const last = lines[lines.length - 1];
+        tell(
+          last
+            ? `You have written ${lines.length} ${lines.length === 1 ? 'line' : 'lines'}. Line ${lines.length} is: ${last.readback}.${following}`
+            : `You have not written any lines yet.${following}`,
+        );
+        return;
+      }
+      case 'readProblem': {
+        const spoken = await Promise.all(problem.lines.map((l) => speechFor(l.latex)));
+        const body = problem.lines
+          .map((_, n) => `Line ${n + 1}. ${spoken[n] || 'This line could not be read aloud'}.`)
+          .join(' ');
+        tell(`The problem. ${problem.instructions} ${body}`.replace(/\s+/g, ' ').trim());
+        return;
+      }
+    }
   }
 
   /** Carry out a voice or typed command (#24). Never changes math by itself:
@@ -308,6 +374,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     lastAction.current = 'command';
     setBusy(true);
     setError('');
+    setReply('');
     let result;
     try {
       const currentId = current !== null ? `W${current + 1}` : null;
@@ -548,6 +615,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
             </label>
             <p id="typed-line-help" className="mt-1 text-sm text-[--muted]">
               Symbols, plain words or LaTeX all work, for example 2x = 8 or "two x equals eight".
+              You can also ask a question, such as "what can you do".
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               <input
@@ -569,6 +637,15 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
       <p role="status" className="mt-4 min-h-[1.5rem] text-[--muted]">
         {busy && 'Working…'}
       </p>
+
+      {reply && !error && (
+        <p
+          data-testid="glance-reply"
+          className="mt-2 rounded-lg border border-[--line] bg-[--surface] px-4 py-3"
+        >
+          {reply}
+        </p>
+      )}
 
       {error && (
         <p className="mt-2 rounded-lg border border-[--warn] px-4 py-3 text-[--warn]">
