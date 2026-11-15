@@ -19,6 +19,7 @@ from .explain import Explainer, model_explainer
 from .mathcheck import validate_latex
 from .openai_client import ModelClient, ModelSettings
 from .routes.capture import capture_router
+from .routes.command import command_router
 from .routes.diff import diff_router
 from .routes.spoken import spoken_router
 from .routes.transcribe import transcribe_router
@@ -85,6 +86,8 @@ def create_app(
     app.add_middleware(observability.RequestLogMiddleware)
 
     app.include_router(diff_router(explainer))
+    # Commands work without a model: rules handle the fixed set (issue #24).
+    app.include_router(command_router(models))
     if models is not None:
         app.include_router(capture_router(models, validate_latex, settings.max_image_bytes))
         app.include_router(spoken_router(models, validate_latex))

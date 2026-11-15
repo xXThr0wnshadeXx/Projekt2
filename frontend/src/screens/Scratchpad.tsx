@@ -18,8 +18,16 @@ import { MathLine } from '../components/MathLine';
 import { RecordButton } from '../components/RecordButton';
 import { ReadbackBar } from '../components/ReadbackBar';
 import { ClarifyDialog } from '../components/ClarifyDialog';
-import { transcribe, spokenToLatex, ApiFailure, type SpokenAlternative } from '../api';
-import { useShortcuts } from '../shortcuts';
+import {
+  transcribe,
+  spokenToLatex,
+  command,
+  ApiFailure,
+  type SpokenAlternative,
+} from '../api';
+import { applyEdit, lineNumber, looksLikeCommand } from '../commands';
+import { helpText, useShortcuts } from '../shortcuts';
+import { speak } from '../audio/tts';
 import type { Recording } from '../audio/recorder';
 import { checkStep, stepChecksAllowed } from '../stepCheck';
 import { loadWork, saveWork, type Mode, type Problem, type WorkLine } from '../state';
@@ -62,6 +70,10 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
   // What the step check said about each saved line, shown under it so a
   // low-vision student reading the screen gets it too. Not stored.
   const [checks, setChecks] = useState<Record<string, string>>({});
+  // The work line the student is on (for commands like "delete that"), and
+  // the line an edit will replace once the student confirms it (#24).
+  const [current, setCurrent] = useState<number | null>(null);
+  const [editTarget, setEditTarget] = useState<string | null>(null);
 
   // One step of undo is enough in practice and is far easier to explain than a
   // history: "undo" always means "put back the line I just removed".
@@ -141,7 +153,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         fail('I did not hear anything. Try again.');
         return;
       }
-      await interpret(text);
+      await handleText(text);
     } catch (e: unknown) {
       fail(e instanceof ApiFailure ? e.message : 'I could not transcribe that recording.');
     } finally {
@@ -151,20 +163,23 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
 
   async function savePending(line: Pending) {
     const entry: WorkLine = { id: newId(), ...line };
+    // An edit (#24) replaces its line in place; anything else is appended.
+    const editIndex = editTarget ? lines.findIndex((l) => l.id === editTarget) : -1;
+    const index = editIndex >= 0 ? editIndex : lines.length;
     // The step is checked against the line it follows: the student's previous
     // line, or for their first line, the problem line they were working from.
-    const from = lines[lines.length - 1] ?? problem.lines[startLine] ?? problem.lines[0];
-    setLines((prev) => [...prev, entry]);
+    const from = lines[index - 1] ?? problem.lines[startLine] ?? problem.lines[0];
+    setLines((prev) =>
+      editIndex >= 0 ? prev.map((l, i) => (i === editIndex ? entry : l)) : [...prev, entry],
+    );
     setPending(null);
     setTyped('');
-    const position = lines.length + 1;
+    setEditTarget(null);
+    const position = index + 1;
     window.setTimeout(() => focusFirst(`#${entry.id}`), 80);
 
-    announce(
-      line.valid
-        ? `Saved as line ${position}.`
-        : `Saved as line ${position}. I could not check it.`,
-    );
+    const saved = editIndex >= 0 ? `Updated line ${position}.` : `Saved as line ${position}.`;
+    announce(line.valid ? saved : `${saved} I could not check it.`);
     lastAction.current = entry.id;
 
     if (!line.valid || !from?.valid || !stepChecksAllowed(mode)) return;
@@ -197,6 +212,104 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
     });
     undone.current = null;
     announce('Put the line back.');
+  }
+
+  /** Math goes to spoken-to-LaTeX; a command goes to the command route. */
+  async function handleText(text: string) {
+    if (looksLikeCommand(text)) await runCommand(text);
+    else await interpret(text);
+  }
+
+  /** Carry out a voice or typed command (#24). Never changes math by itself:
+   *  an edit lands in the edit box to be read back and confirmed. */
+  async function runCommand(text: string) {
+    lastAction.current = 'command';
+    setBusy(true);
+    setError('');
+    let result;
+    try {
+      const currentId = current !== null ? `W${current + 1}` : null;
+      result = await command(text, currentId, lines.length);
+    } catch (e: unknown) {
+      fail(e instanceof ApiFailure ? e.message : "I didn't catch that.");
+      return;
+    } finally {
+      setBusy(false);
+    }
+
+    const n = lineNumber(result.target_line);
+    const target = n !== null ? lines[n - 1] : undefined;
+    const needsLine = ['navigate', 'delete', 'edit', 'check', 'what_changed'].includes(result.intent)
+      || (result.intent === 'read' && result.instruction !== 'all');
+    if (needsLine && !target) {
+      announce(
+        lines.length === 0
+          ? 'You have not written any lines yet.'
+          : n !== null
+            ? `There is no line ${n}. You have ${lines.length} ${lines.length === 1 ? 'line' : 'lines'}.`
+            : 'Which line? Say a line number, like line two.',
+      );
+      return;
+    }
+
+    switch (result.intent) {
+      case 'navigate':
+        setCurrent(n! - 1);
+        focusFirst(`#${target!.id}`);
+        announce(`Line ${n}. ${target!.readback}`);
+        return;
+      case 'read':
+        if (result.instruction === 'all') readAll();
+        else announce(`Line ${n}. ${target!.readback}`);
+        return;
+      case 'delete':
+        remove(target!, n! - 1);
+        return;
+      case 'undo':
+        undo();
+        return;
+      case 'new_line':
+        announce('Ready for a new line. Hold Space and speak, or type it.');
+        return;
+      case 'check':
+      case 'what_changed': {
+        if (!stepChecksAllowed(mode)) {
+          announce('Step checking is off in exam mode.');
+          return;
+        }
+        const before = lines[n! - 2] ?? problem.lines[startLine] ?? problem.lines[0];
+        if (!target!.valid || !before?.valid) {
+          announce(`I couldn't confirm line ${n}. It could not be read as math.`);
+          return;
+        }
+        const verdict = await checkStep(before.latex, target!.latex, mode);
+        announce(verdict ? `Line ${n}. ${verdict}` : "I couldn't check that right now. Try again in a moment.");
+        return;
+      }
+      case 'export':
+        onExport();
+        return;
+      case 'help': {
+        const help = helpText('scratchpad');
+        announce(help);
+        speak(help);
+        return;
+      }
+      case 'edit': {
+        const changed = applyEdit(target!.latex, result.instruction);
+        setTyped(changed ?? target!.latex);
+        setEditTarget(target!.id);
+        announce(
+          changed
+            ? `Line ${n} is in the edit box with that change. Press Add line to hear it back.`
+            : `Line ${n} is in the edit box. Change it, then press Add line.`,
+        );
+        window.setTimeout(() => focusFirst('#typed-line'), 60);
+        return;
+      }
+      default:
+        announce("I didn't catch that.");
+    }
   }
 
   function readAll() {
@@ -268,7 +381,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
         ) : (
           <ol className="space-y-4">
             {lines.map((l, i) => (
-              <li key={l.id} className="flex items-start gap-3">
+              <li key={l.id} className="flex items-start gap-3" onFocus={() => setCurrent(i)}>
                 <span className="mt-4 w-6 shrink-0 text-right text-[--muted]" aria-hidden="true">
                   {i + 1}
                 </span>
@@ -312,6 +425,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
           }}
           onDiscard={() => {
             setPending(null);
+            setEditTarget(null);
             announce('Discarded.');
           }}
         />
@@ -327,7 +441,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
               e.preventDefault();
               const text = typed.trim();
               if (!text) return;
-              void interpret(text);
+              void handleText(text);
             }}
           >
             <label htmlFor="typed-line" className="block text-sm font-medium">
