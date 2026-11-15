@@ -12,12 +12,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
 import { LiveBoard } from './LiveBoard';
-import { capture, pdfPageCount, pdfPage, ApiFailure, CAPTURE_TYPES } from '../api';
+import { capture, checkFrame, pdfPageCount, pdfPage, ApiFailure, CAPTURE_TYPES } from '../api';
 import { downscale, sharpestFrame } from '../image';
 import { useShortcuts } from '../shortcuts';
 import type { Problem } from '../state';
-import { analyseFrame } from '../camera/framing';
+import { asGuidance } from '../camera/framing';
 import { FramingGuide, tick } from '../camera/guide';
+
+// Shortest gap between camera framing checks, in milliseconds.
+const GUIDE_EVERY_MS = 1500;
 
 type Busy = 'idle' | 'preparing' | 'reading';
 
@@ -51,6 +54,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [cameraOn, setCameraOn] = useState(false);
   const guideTimer = useRef<number | null>(null);
+  const guideRun = useRef<AbortController | null>(null);
   const [cameraStarting, setCameraStarting] = useState(false);
   const [liveBoard, setLiveBoard] = useState(false);
   const [pdf, setPdf] = useState<PendingPdf | null>(null);
@@ -67,40 +71,81 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
     announce('Capture. Upload a file, paste a screenshot, or take a photo.');
   }, []);
 
-  function stopCamera() {
-    if (guideTimer.current) window.clearInterval(guideTimer.current);
+  function stopGuiding() {
+    if (guideTimer.current) window.clearTimeout(guideTimer.current);
     guideTimer.current = null;
+    guideRun.current?.abort();
+    guideRun.current = null;
+  }
+
+  function stopCamera() {
+    stopGuiding();
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = null;
     setCameraOn(false);
   }
 
-  /** Watch the preview and steer the phone onto the page (#198). Nothing is
-   *  uploaded while guiding; only the photo it finally takes is sent. */
+  /** Watch the preview and steer the phone onto the page (#198, #242).
+   *  About every 1.5 s one small frame goes to OpenAI through the back end,
+   *  which says where the page is. It is not stored. Never two at once, and if
+   *  the check fails the student is told to take the photo themselves. */
   function startGuiding() {
+    stopGuiding();
+    const run = new AbortController();
+    guideRun.current = run;
     const frame = document.createElement('canvas');
     const guide = new FramingGuide({
       say: (text) => announce(text),
       tone: tick,
       onReady: () => {
-        if (guideTimer.current) window.clearInterval(guideTimer.current);
-        guideTimer.current = null;
+        stopGuiding();
         announce('Got it. Taking the photo.');
         void takePhoto();
       },
     });
-    guideTimer.current = window.setInterval(() => {
+    let failures = 0;
+
+    const later = (ms: number) => {
+      if (!run.signal.aborted) guideTimer.current = window.setTimeout(step, ms);
+    };
+
+    async function step() {
       const v = video.current;
-      if (!v || v.readyState < 2 || !v.videoWidth) return;
-      const w = 160;
-      const h = Math.max(1, Math.round((v.videoHeight / v.videoWidth) * w));
-      frame.width = w;
-      frame.height = h;
-      const ctx = frame.getContext('2d', { willReadFrequently: true });
-      if (!ctx) return;
-      ctx.drawImage(v, 0, 0, w, h);
-      guide.frame(analyseFrame(ctx.getImageData(0, 0, w, h).data, w, h));
-    }, 300);
+      if (run.signal.aborted) return;
+      if (!v || v.readyState < 2 || !v.videoWidth) return later(300);
+      // Around 512 px on the long side is plenty to see where a page sits.
+      const scale = 512 / Math.max(v.videoWidth, v.videoHeight);
+      frame.width = Math.max(1, Math.round(v.videoWidth * scale));
+      frame.height = Math.max(1, Math.round(v.videoHeight * scale));
+      const ctx = frame.getContext('2d');
+      if (!ctx) return later(GUIDE_EVERY_MS);
+      ctx.drawImage(v, 0, 0, frame.width, frame.height);
+      const jpeg = await new Promise<Blob | null>((done) => frame.toBlob(done, 'image/jpeg', 0.6));
+      if (run.signal.aborted) return;
+      if (!jpeg) return later(GUIDE_EVERY_MS);
+      try {
+        const answer = await checkFrame(jpeg, run.signal);
+        const guidance = asGuidance(answer.guidance);
+        if (!guidance) throw new Error('unknown guidance');
+        failures = 0;
+        if (run.signal.aborted) return;
+        guide.frame({ guidance, reason: answer.reason });
+      } catch {
+        if (run.signal.aborted) return;
+        failures += 1;
+        if (failures >= 2) {
+          // Never a dead end: the Take a photo button works without guidance.
+          announce(
+            'I cannot check the framing right now. Point the camera at the page and choose Take a photo when you are ready.',
+          );
+          stopGuiding();
+          return;
+        }
+      }
+      if (!run.signal.aborted) later(GUIDE_EVERY_MS);
+    }
+
+    later(0);
   }
 
   useEffect(() => stopCamera, []);
@@ -280,8 +325,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
 
   async function takePhoto() {
     if (!video.current) return;
-    if (guideTimer.current) window.clearInterval(guideTimer.current);
-    guideTimer.current = null;
+    stopGuiding();
     try {
       announce('Taking the photo. Hold still.');
       // Three frames, sharpest kept (DESIGN.md 5, Flow D) — a handheld shot of

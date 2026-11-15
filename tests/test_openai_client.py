@@ -24,7 +24,7 @@ def model_client(monkeypatch):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("task,model", [("capture", "test-vision"), ("spoken", "test-text")])
+@pytest.mark.parametrize("task,model", [("capture", "test-vision"), ("spoken", "test-text"), ("frame", "test-vision")])
 async def test_interpret_sends_strict_schema(model_client, task, model):
     def respond(request):
         payload = json.loads(request.content)
@@ -34,6 +34,7 @@ async def test_interpret_sends_strict_schema(model_client, task, model):
         assert schema["schema"]["additionalProperties"] is False
         output = {
             "capture": {"instructions": "", "lines": [], "diagrams": [], "warnings": []},
+            "frame": {"guidance": "good", "reason": None},
             "spoken": {
                 "latex": "x",
                 "ambiguous": False,

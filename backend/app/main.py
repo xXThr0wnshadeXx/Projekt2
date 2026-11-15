@@ -22,6 +22,7 @@ from .openai_client import ModelClient, ModelSettings
 from .routes.capture import capture_router
 from .routes.command import command_router
 from .routes.diff import diff_router
+from .routes.frame import frame_router
 from .routes.pdf import pdf_router
 from .routes.spoken import spoken_router
 from .routes.transcribe import transcribe_router
@@ -83,6 +84,7 @@ def create_app(
         guards.RateLimitMiddleware,
         model_budget=guards.Budget(settings.rate_limit_model_per_minute, 60),
         general_budget=guards.Budget(settings.rate_limit_per_minute, 60),
+        frame_budget=guards.Budget(settings.rate_limit_frame_per_minute, 60),
         trusted_proxy_hops=settings.trusted_proxy_hops,
     )
     app.add_middleware(
@@ -107,6 +109,7 @@ def create_app(
     app.include_router(validate_router(validate_latex))
     if models is not None:
         app.include_router(capture_router(models, validate_latex, settings.max_image_bytes))
+        app.include_router(frame_router(models))
         app.include_router(spoken_router(models, validate_latex))
         app.include_router(transcribe_router(models, min(settings.max_audio_seconds, 30)))
 

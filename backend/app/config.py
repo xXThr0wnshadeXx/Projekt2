@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     # Per-IP request budgets. Model-backed endpoints share the tighter one.
     rate_limit_model_per_minute: int = 20
     rate_limit_per_minute: int = 120
+    # Camera framing checks (about one a second while aiming), counted apart.
+    rate_limit_frame_per_minute: int = 60
     model_call_limit: int = Field(default=0, ge=0)
     model_call_window_seconds: int = Field(default=3600, gt=0)
     # Proxies in front of the app that append to X-Forwarded-For (1 on Render).

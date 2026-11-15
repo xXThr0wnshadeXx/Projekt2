@@ -17,6 +17,10 @@ services:
         value: "3.11.11"
       - key: OPENAI_API_KEY
         sync: false
+      # Enter these in the dashboard. Recommended OpenAI models (reasons in
+      # backend/.env.example): MODEL_VISION=gpt-4.1 (worksheet reading and camera
+      # framing), MODEL_TEXT=gpt-4.1-mini (fast spoken-line and command work),
+      # MODEL_STT=gpt-4o-transcribe (accurate speech to text).
       - key: MODEL_VISION
         sync: false
       - key: MODEL_TEXT

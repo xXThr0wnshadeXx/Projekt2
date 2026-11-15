@@ -36,6 +36,11 @@ MODEL_PATHS = frozenset({
     "/api/pdf/pages",
     "/api/pdf/page",
 })
+# Camera framing checks arrive every second or so while a student aims the phone
+# (issue #242), so they get a budget of their own rather than spending the
+# tight one that a capture or a spoken line needs.
+FRAME_PATH = "/api/frame"
+FRAME_MAX_BYTES = 256 * KB
 UNLIMITED_PATHS = frozenset({"/api/health"})
 
 
@@ -67,6 +72,7 @@ class BodyLimitMiddleware:
             "/api/capture": max_image_bytes + FORM_OVERHEAD,
             "/api/pdf/pages": max_image_bytes + FORM_OVERHEAD,
             "/api/pdf/page": max_image_bytes + FORM_OVERHEAD,
+            FRAME_PATH: FRAME_MAX_BYTES,
             "/api/transcribe": max_audio_seconds * AUDIO_BYTES_PER_SECOND + FORM_OVERHEAD,
         }
 
@@ -123,12 +129,14 @@ class RateLimitMiddleware:
         app: ASGIApp,
         model_budget: Budget = Budget(20, 60),
         general_budget: Budget = Budget(120, 60),
+        frame_budget: Budget = Budget(60, 60),
         trusted_proxy_hops: int = 0,
         clock=time.monotonic,
     ) -> None:
         self.app = app
         self.model_budget = model_budget
         self.general_budget = general_budget
+        self.frame_budget = frame_budget
         self.hops = trusted_proxy_hops
         self.clock = clock
         self.hits: dict[tuple[str, str], deque[float]] = {}
@@ -149,15 +157,22 @@ class RateLimitMiddleware:
         if now - self._last_sweep < 60:
             return
         self._last_sweep = now
-        horizon = max(self.model_budget.per_seconds, self.general_budget.per_seconds)
+        horizon = max(
+            self.model_budget.per_seconds,
+            self.general_budget.per_seconds,
+            self.frame_budget.per_seconds,
+        )
         for key in [k for k, q in self.hits.items() if not q or now - q[-1] > horizon]:
             del self.hits[key]
 
     def check(self, ip: str, path: str) -> float:
         """Record a hit; return 0 if allowed, else seconds until the next slot."""
-        bucket, budget = (
-            ("model", self.model_budget) if path in MODEL_PATHS else ("all", self.general_budget)
-        )
+        if path == FRAME_PATH:
+            bucket, budget = "frame", self.frame_budget
+        elif path in MODEL_PATHS:
+            bucket, budget = "model", self.model_budget
+        else:
+            bucket, budget = "all", self.general_budget
         now = self.clock()
         self._sweep(now)
         q = self.hits.setdefault((ip, bucket), deque())
