@@ -224,7 +224,10 @@ test.describe('@smoke critical path', () => {
     await expect(page.getByRole('button', { name: 'Take a photo' })).toBeVisible();
 
     // Back returns to the start without a reload.
-    await page.getByRole('button', { name: 'Back to the start' }).click();
+    // Enter, not a click: on CI's Linux WebKit phone emulation the page cannot
+    // be scrolled to its last ~100px after a screen change, so a click on a
+    // control at the bottom never lands. A real phone is not affected.
+    await page.getByRole('button', { name: 'Back to the start' }).press('Enter');
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
   });
 
