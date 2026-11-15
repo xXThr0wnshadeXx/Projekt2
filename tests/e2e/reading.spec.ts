@@ -112,19 +112,19 @@ test.describe('@smoke reading controls', () => {
     );
 
     await page.getByRole('button', { name: 'Try a sample problem' }).click();
-    await expect(page.locator('#L2 mjx-container')).toHaveAttribute(
+    await expect(page.locator('#L1 mjx-container')).toHaveAttribute(
       'data-semantic-speech-none',
       /.+/,
     );
-    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.getByRole('group', { name: 'Line 1' }).focus();
     await page.keyboard.press('g');
     await expect(polite(page)).toContainText('fraction');
     await page.keyboard.press('r');
-    await expect(polite(page)).toContainText('Line 2. the fraction');
+    await expect(polite(page)).toContainText('Line 1. the fraction');
 
     const said = (await spoken(page)).join(' | ');
     expect(said).toContain('Reading aloud is on.');
-    expect(said).toContain('Sample problem. Solve for x. 2 lines.');
+    expect(said).toContain('Sample problem. Read this worked step. 2 lines.');
     expect(said).toContain('This is an equation, with a left side and a right side.');
     expect(said).toContain('the fraction with numerator the square root of x plus 1');
     // The voice says math, never markup.

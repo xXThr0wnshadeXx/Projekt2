@@ -176,29 +176,29 @@ test.describe('@smoke without a model', () => {
 test.describe('@smoke reading the problem', () => {
   test('the glance calls an equation an equation', async ({ page }) => {
     await openSample(page);
-    await page.getByRole('group', { name: 'Line 1' }).focus();
+    await page.getByRole('group', { name: 'Line 2' }).focus();
     await page.keyboard.press('g');
     await expect(polite(page)).toHaveText(
-      'This is an equation, with a left side and a right side. It has no fractions, roots or exponents.',
+      'This is an equation, with a left side and a right side. It contains 1 square root.',
     );
   });
 
   test('R and Shift+R speak the math, never the LaTeX', async ({ page }) => {
     await openSample(page);
-    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.getByRole('group', { name: 'Line 1' }).focus();
     // Speech is attached a moment after the line is typeset.
-    await expect(page.locator('#L2 mjx-container')).toHaveAttribute(
+    await expect(page.locator('#L1 mjx-container')).toHaveAttribute(
       'data-semantic-speech-none',
       /.+/,
     );
 
     await page.keyboard.press('r');
     await expect(polite(page)).toHaveText(
-      'Line 2. the fraction with numerator the square root of x plus 1 and denominator 2 equals 5',
+      'Line 1. the fraction with numerator the square root of x plus 1 and denominator 2 equals 5',
     );
 
     await page.keyboard.press('Shift+R');
-    await expect(polite(page)).toContainText('Line 1. 2 x plus 3 equals 11.');
+    await expect(polite(page)).toContainText('Line 2. the square root of x plus 1 equals 10.');
     await expect(polite(page)).not.toContainText('{');
   });
 
