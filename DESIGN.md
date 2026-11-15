@@ -188,6 +188,7 @@ Priorities: **P0** must ship · **P1** should ship · **P2** stretch.
 │ POST /api/spoken-to-latex text → OpenAI (strict JSON) → SymPy validate             │
 │ POST /api/command        text → OpenAI intent (enum)                               │
 │ POST /api/diff           SymPy equivalence → OpenAI explanation (only if verified) │
+│ POST /api/validate       SymPy parse check for a typed line (one boolean, no model)│
 │ POST /api/summary        optional structure-only rewrite                           │
 │ GET  /api/health                                                                   │
 │ No database. No file storage. Timeouts on every external/CAS call.                 │
@@ -270,6 +271,15 @@ Request `{ "from_latex": "2x + 3 = 11", "to_latex": "2x = 8", "mode": "study" }`
 → `{ "verified": true, "method": "ratio_constant", "message": "3 was subtracted from both sides." }`
 - `homework`: message is "This step checks out." / "I couldn't confirm this step."
 - `exam`: `403`.
+
+### `POST /api/validate`
+Request `{ "latex": "2x = 8" }` → `{ "valid": true }`
+
+A line typed with ordinary symbols (`2x = 8`, `(x+1)/2 = 5`, "two x equals eight") is read in the
+browser by `frontend/src/math/typed.ts` whenever the model route is unavailable, so the student can
+always write their work. This route gives that line the same `valid` flag a spoken line carries.
+It needs no model key, returns one boolean and nothing else, and words whose grouping is unclear
+("x plus one over two") are refused in the browser rather than guessed.
 
 ### `POST /api/summary`
 `{ "latex": "...", "sre_summary": "..." }` → `{ "summary": "..." }`
