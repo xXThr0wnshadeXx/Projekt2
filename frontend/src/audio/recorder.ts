@@ -54,22 +54,21 @@ function bareType(mime: string): string {
 export class Recorder {
   private media: MediaRecorder | null = null;
   private stream: MediaStream | null = null;
-  private chunks: Blob[] = [];
-  private startedAt = 0;
+  private startRequest: symbol | null = null;
   private capTimer = 0;
-  private done: ((r: Recording) => void) | null = null;
-  private fail: ((e: Error) => void) | null = null;
 
   /** Fired when the cap stops a recording, so the UI can say why. */
   onCapped: (() => void) | null = null;
+  onResult: ((recording: Recording) => void) | null = null;
+  onError: ((message: string) => void) | null = null;
 
   get recording(): boolean {
     return this.media?.state === 'recording';
   }
 
-  /** Ask for the microphone and start. Rejects if permission is refused. */
-  async start(): Promise<void> {
-    if (this.recording) return;
+  /** Ask for the microphone and start, unless the gesture was cancelled. */
+  async start(): Promise<boolean> {
+    if (this.media || this.startRequest) return false;
     if (!isSupported()) {
       throw new Error('This browser cannot record audio. Type your line instead.');
     }
@@ -78,83 +77,86 @@ export class Recorder {
       throw new Error('This browser cannot record a supported audio format. Type your line instead.');
     }
 
+    const request = Symbol();
+    this.startRequest = request;
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
+      if (this.startRequest !== request) return false;
+      this.startRequest = null;
       throw new Error(
         'I could not use the microphone. To allow it, open this site\'s settings in your browser, turn the microphone on, and try again. Or type your line instead.',
       );
     }
+    if (this.startRequest !== request) {
+      // Permission can resolve after release or navigation. The browser still
+      // hands us live tracks, even though the original gesture is over.
+      stream.getTracks().forEach((track) => track.stop());
+      return false;
+    }
+    this.startRequest = null;
 
     this.stream = stream;
-    this.chunks = [];
-    this.media = new MediaRecorder(stream, { mimeType: mime });
-    this.media.ondataavailable = (e) => {
-      if (e.data.size > 0) this.chunks.push(e.data);
-    };
-    this.media.onstop = () => {
-      const type = bareType(this.media?.mimeType || mime);
-      const blob = new Blob(this.chunks, { type });
-      const seconds = (Date.now() - this.startedAt) / 1000;
+    try {
+      const media = new MediaRecorder(stream, { mimeType: mime });
+      const chunks: Blob[] = [];
+      const startedAt = Date.now();
+      this.media = media;
+      media.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      media.onstop = () => {
+        if (this.media !== media) return;
+        const type = bareType(media.mimeType || mime);
+        const blob = new Blob(chunks, { type });
+        const seconds = (Date.now() - startedAt) / 1000;
+        this.release();
+        if (blob.size > 0 && seconds >= 0.25) {
+          this.onResult?.({ blob, contentType: type, seconds });
+        } else {
+          this.onError?.('That was too short to hear. Try recording again.');
+        }
+      };
+      media.onerror = () => {
+        if (this.media !== media) return;
+        this.release();
+        this.onError?.('The recording failed. Try again, or type your line.');
+      };
+      media.start();
+    } catch {
       this.release();
-      this.done?.({ blob, contentType: type, seconds });
-      this.done = null;
-      this.fail = null;
-    };
-    this.media.onerror = () => {
-      this.release();
-      this.fail?.(new Error('The recording failed. Try again, or type your line.'));
-      this.done = null;
-      this.fail = null;
-    };
-
-    this.startedAt = Date.now();
-    this.media.start();
+      throw new Error('I could not start recording. Try again, or type your line.');
+    }
 
     this.capTimer = window.setTimeout(() => {
       if (this.recording) {
         this.onCapped?.();
-        this.media?.stop();
+        this.stop();
       }
     }, MAX_SECONDS * 1000);
+    return true;
   }
 
-  /** Stop and resolve with the audio. Rejects if nothing was captured. */
-  stop(): Promise<Recording> {
-    return new Promise<Recording>((resolve, reject) => {
-      if (!this.media || this.media.state === 'inactive') {
-        reject(new Error('Nothing was recorded.'));
-        return;
-      }
-      this.done = (r) =>
-        // A tap so short it produced no audio is a mis-press, not a line.
-        r.blob.size > 0 && r.seconds >= 0.25
-          ? resolve(r)
-          : reject(new Error('That was too short to hear. Hold while you speak.'));
-      this.fail = reject;
-      this.media.stop();
-    });
+  /** Finish through the same result callback for manual and capped stops. */
+  stop(): void {
+    if (this.recording) this.media?.stop();
   }
 
   /** Drop the recording and let go of the microphone. */
   cancel(): void {
-    this.done = null;
-    this.fail = null;
-    if (this.media && this.media.state !== 'inactive') {
-      this.media.onstop = null;
-      this.media.stop();
-    }
+    this.startRequest = null;
+    this.stop();
     this.release();
   }
 
   private release(): void {
     window.clearTimeout(this.capTimer);
     this.capTimer = 0;
+    this.media = null;
     // Releasing every track is what turns the browser's recording indicator
     // off. Leaving it on makes the app look like it is always listening.
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
-    this.media = null;
   }
 }
