@@ -14,10 +14,37 @@ async function recordSpeech(page: Page) {
   await page.addInitScript(() => {
     const spoken: string[] = [];
     (window as unknown as { __spoken: string[] }).__spoken = spoken;
-    window.speechSynthesis.speak = (u: SpeechSynthesisUtterance) => {
-      spoken.push(u.text);
+    // The test browsers differ: Playwright's WebKit has no speech synthesis
+    // on some platforms and one that cannot be patched on others, though
+    // Safari on a real iPhone speaks. So the whole engine is replaced with a
+    // recorder, and the app's own voice is tested the same way everywhere.
+    const recorder = {
+      speaking: false,
+      pending: false,
+      paused: false,
+      speak: (u: { text: string }) => {
+        spoken.push(u.text);
+      },
+      cancel: () => {},
+      pause: () => {},
+      resume: () => {},
+      getVoices: () => [],
+      addEventListener: () => {},
+      removeEventListener: () => {},
     };
-    window.speechSynthesis.cancel = () => {};
+    Object.defineProperty(window, 'speechSynthesis', {
+      value: recorder,
+      configurable: true,
+      writable: true,
+    });
+    (window as unknown as { SpeechSynthesisUtterance: unknown }).SpeechSynthesisUtterance = class {
+      text: string;
+      rate = 1;
+      lang = '';
+      constructor(text: string) {
+        this.text = text;
+      }
+    };
   });
 }
 
@@ -39,15 +66,16 @@ test.describe('@smoke reading controls', () => {
 
   test('the app opens in large print, and the size can be changed and is kept', async ({ page }) => {
     await page.goto('/');
-    expect(await rootSize(page)).toBe('125%');
+    // Set by an effect after the first render, so it is waited for.
+    await expect.poll(() => rootSize(page)).toBe('125%');
 
     await page.getByRole('button', { name: 'Larger text' }).click();
     await expect(polite(page)).toHaveText('Text size 150 percent.');
-    expect(await rootSize(page)).toBe('150%');
+    await expect.poll(() => rootSize(page)).toBe('150%');
 
     await page.reload();
     await expect(page.getByTestId('text-scale')).toHaveText('150%');
-    expect(await rootSize(page)).toBe('150%');
+    await expect.poll(() => rootSize(page)).toBe('150%');
   });
 
   test('at the largest size the button says so instead of going dead', async ({ page }) => {
