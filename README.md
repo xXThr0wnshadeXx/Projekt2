@@ -2,6 +2,8 @@
 
 **Math you can hear and speak.** Bring in any math problem — a file, a screenshot, a photo of a whiteboard — hear its structure, navigate it piece by piece, work it out loud, confirm every line, and hand in clean typed work.
 
+**Try it:** https://glance-shreev2703.vercel.app (the sample problem works with no setup) · **Code:** https://github.com/xXThr0wnshadeXx/Projekt2
+
 ---
 
 ## The problem
@@ -110,6 +112,14 @@ Workflow, branch naming and review rules are in [`DESIGN.md`](DESIGN.md) §18.
 ## Privacy
 
 No accounts and no database. Images and audio are sent to the OpenAI API for processing and are not stored by Glance. Session state lives in the browser. In user research we record roles, not names, and no disability details without explicit consent.
+
+## Team
+
+| Who | Built |
+|---|---|
+| Nicolas Lam | Back end, step checking (SymPy), deploy, pitch |
+| Shaswath | AI pipeline (capture, spoken math), evals, user research |
+| Shreevatson Babu Sreegeetha | Front end, accessibility, export |
 
 ## Credits and licences
 
