@@ -48,11 +48,11 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
   }
 
   return (
-    <main id="main" className="mx-auto max-w-3xl px-6 py-8">
+    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Settings
       </h2>
