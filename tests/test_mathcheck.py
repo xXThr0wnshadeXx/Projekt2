@@ -181,8 +181,8 @@ def test_valid_steps_are_verified(a, b, method):
         # equation vs expression
         ("2x = 8", "x", "mixed"),
         ("2x + 1", "2x + 1 = 0", "mixed"),
-        # inequalities are a documented limitation
-        ("2x < 8", "x < 4", "inequality"),
+        # two-variable inequalities are still a documented limitation
+        ("x + y < 3", "x < 3 - y", "inequality"),
         # multi-variable equations are a documented limitation
         ("x + y = 3", "2x + 2y + 1 = 7", "ratio_constant"),
         ("x + y = 3", "2x + 2y = 7", "not_verified"),
@@ -208,3 +208,48 @@ def test_check_step_timeout_raises_timeout(monkeypatch):
     monkeypatch.setattr(timeouts, "_budget", lambda _t: 0.0001)
     with pytest.raises(timeouts.CasTimeout):
         asyncio.run(mathcheck.check_step("2x = 8", "x = 4"))
+
+
+# --- inequalities, ±, "or" and chains, compared as solution sets -------------
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        ("x + 1 < 3", "x < 2"),
+        (r"2x \ge 8", r"x \ge 4"),
+        ("-2x > 6", "x < -3"),                       # dividing by a negative flips the sign
+        (r"x^{2} - 4 \le 0", r"-2 \le x \le 2"),     # compound inequality
+        (r"3x - 1 \neq 5", r"x \neq 2"),
+        (r"x^{2} = 9", r"x = \pm 3"),
+        (r"x^{2} = 9", r"x = 3 \text{ or } x = -3"),
+        ("|x| = 3", r"x = \pm 3"),
+        ("|x - 1| = 3", r"x = 4 \text{ or } x = -2"),
+        ("x² − 4 = 0", "x = ±2"),                    # Unicode from the model
+    ],
+)
+def test_statements_with_the_same_solutions_are_verified(a, b):
+    assert steps_equivalent(a, b) == (True, "same_solutions")
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        ("-2x > 6", "x > -3"),                       # forgot to flip the sign
+        ("x + 1 < 3", r"x \le 2"),                    # strict became non-strict
+        (r"x^{2} - 4 \le 0", "-2 < x < 2"),          # lost the end points
+        (r"x^{2} = 9", "x = 3"),                      # lost a root
+        (r"x^{2} = 9", r"x = \pm 4"),
+    ],
+)
+def test_statements_with_different_solutions_are_not_verified(a, b):
+    assert steps_equivalent(a, b) == (False, "not_verified")
+
+
+def test_several_plus_minus_signs_are_not_guessed():
+    # Which pairing of the two ± signs is meant is ambiguous: don't pick one.
+    assert steps_equivalent(r"x^{2} = 9", r"x = \pm 3 \pm 0")[0] is False
+
+
+@pytest.mark.parametrize("latex", ["x²+1", "50\\%", "3 × 4", "x ≤ 2"])
+def test_unicode_and_percent_from_the_model_are_readable(latex):
+    assert is_parseable(latex)
