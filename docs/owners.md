@@ -11,7 +11,7 @@ issue carries exactly one `owner:*` label and one assignee that matches it.
 | Back end and math | `nicolashlam` | FastAPI app and deploy, `mathcheck.py`, `/api/diff`, `/api/summary`, timeouts, mode enforcement in the API, latency, cost logging, CI, request guards | 10 |
 | Capture and interpretation | `xXThr0wnshadeXx` | `/api/capture`, `/api/transcribe`, `/api/spoken-to-latex`, `/api/command`, prompts, strict JSON schemas, both eval sets | 7 |
 | Front end, accessibility and product | `shreev2703` | Every screen, MathJax and the explorer, recorder, `LiveRegion`, keyboard map, low-vision mode, export, accessibility testing, user research, pitch, submission | 37 |
-| Hardest open technical work, testing and rehearsal | `tuffling` | Safari and WebKit test failures on `main` (#153), installable app / service worker (#160), one-voice readback (#146), bringing #138, #139 and #120 up to date with `main` (#163), glossary words (#147), clean-machine dry run (#55), screen-reader passes (#32, #133), real-voice pass (#150), sign-up page (#39) | 10 |
+| Hardest open technical work, testing and rehearsal | `tuffling` | Safari and WebKit test failures on `main` (#153), one-voice readback (#146), bringing #138, #139 and #120 up to date with `main` (#163), clean-machine dry run (#55), screen-reader passes (#32, #133), real-voice pass (#150), sign-up page (#39) | 8 |
 
 `tuffling` has the most time free, so they take the hardest technical work
 left. Each ticket has a handoff comment with what was already found, so it can
