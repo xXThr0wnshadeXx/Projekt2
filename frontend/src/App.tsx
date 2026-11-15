@@ -10,7 +10,7 @@
 // Low-vision mode is the one exception. It is a full-screen magnifier over the
 // same page, not a different place, and leaving it returns to the same line.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { ScreenBoundary } from './components/ScreenBoundary';
 import { KeyboardHelp } from './components/KeyboardHelp';
@@ -47,6 +47,10 @@ type BackEnd = 'checking' | 'up' | 'down';
 const WELCOME =
   'Glance. It reads your maths worksheet aloud and writes down your own work as you say it. It never solves it for you. Use the Down arrow to move through the page and Space to press or hear what you are on.';
 
+/** How soon an unanswered health check is asked again, doubling up to the cap. */
+const HEALTH_RETRY_FIRST_MS = 2_000;
+const HEALTH_RETRY_MAX_MS = 30_000;
+
 export function App() {
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
   // A new worksheet is being brought in while one is already loaded.
@@ -73,6 +77,8 @@ export function App() {
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
   const [backEndNote, setBackEndNote] = useState('');
+  // Whether the server said it can read images and speech (#127).
+  const [models, setModels] = useState(true);
   const [settings, setSettings] = useState<SettingsData>(() => loadSettings());
   // The problem line the student's first step follows from.
   const [workingFrom, setWorkingFrom] = useState(0);
@@ -129,33 +135,66 @@ export function App() {
     });
   }, []);
 
-  useEffect(() => {
+  // Health is asked again, not trusted from one request at load (#127). A
+  // cold start can make the first request fail, and a student told "capture
+  // is unavailable" should not have to reload to find out it came back.
+  const healthRun = useRef(0);
+  const healthRetry = useRef<number | undefined>(undefined);
+  const retryDelay = useRef(HEALTH_RETRY_FIRST_MS);
+  const checkHealth = useCallback(async () => {
     // A deployed build with no server address has nothing to ask (#135).
     if (!apiConnected) {
       setBackEnd('down');
       setBackEndNote(UNCONNECTED_MESSAGE);
       return;
     }
-    health()
-      .then(() => {
-        setBackEnd('up');
-        setBackEndNote('');
-      })
-      .catch(async (e: unknown) => {
-        setBackEnd('down');
-        // A server that is up but refusing this origin looks identical to one
-        // that is down, so find out which before telling anyone anything.
-        if (e instanceof ApiFailure && e.code === 'NETWORK') {
-          setBackEndNote(
-            (await diagnoseUnreachable()) === 'blocked'
-              ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
-              : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
-          );
-          return;
-        }
-        setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
-      });
+    const run = ++healthRun.current;
+    window.clearTimeout(healthRetry.current);
+    try {
+      const h = await health();
+      if (run !== healthRun.current) return;
+      retryDelay.current = HEALTH_RETRY_FIRST_MS;
+      setBackEnd('up');
+      setBackEndNote('');
+      setModels(h.models !== false);
+    } catch (e: unknown) {
+      if (run !== healthRun.current) return;
+      setBackEnd('down');
+      // Try again on its own, further apart each time, until it answers.
+      healthRetry.current = window.setTimeout(() => void checkHealth(), retryDelay.current);
+      retryDelay.current = Math.min(retryDelay.current * 2, HEALTH_RETRY_MAX_MS);
+      // A server that is up but refusing this origin looks identical to one
+      // that is down, so find out which before telling anyone anything.
+      if (e instanceof ApiFailure && e.code === 'NETWORK') {
+        const why = await diagnoseUnreachable();
+        if (run !== healthRun.current) return;
+        setBackEndNote(
+          why === 'blocked'
+            ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
+            : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
+        );
+        return;
+      }
+      setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
+    }
   }, []);
+
+  useEffect(() => () => window.clearTimeout(healthRetry.current), []);
+
+  // Asked on load, again each time the capture page is opened, and again when
+  // a capture button is pressed while capture is unavailable.
+  useEffect(() => {
+    void checkHealth();
+  }, [capturing, checkHealth]);
+
+  // Recording and capture need the server's model. They are hidden only when
+  // a server that answered says it has none, or when this build has no
+  // server at all. An unanswered request proves nothing: it may be a cold
+  // start, and a failed upload explains itself.
+  const modelsUsable = apiConnected && models;
+  const modelsUnavailableWhy = apiConnected
+    ? 'The server cannot read images or speech right now.'
+    : UNCONNECTED_MESSAGE;
 
   const openProblem = useCallback((next: ProblemData) => {
     setProblem(next);
@@ -163,6 +202,9 @@ export function App() {
     setLineIndex(0);
     setWorkingFrom(0);
     setCapturing(false);
+    // Your work is on the page from here on, and its controls depend on whether
+    // the server can read speech, so ask again now.
+    void checkHealth();
 
     // A capture announces its own result, in more detail than is possible here
     // — it knows what was unsure and what the photo warnings were. The sample
@@ -171,7 +213,7 @@ export function App() {
       const count = `${next.lines.length} ${next.lines.length === 1 ? 'line' : 'lines'}`;
       announce(`Sample problem. ${next.instructions} ${count}.`.trim());
     }
-  }, []);
+  }, [checkHealth]);
 
   /** A capture is a suggestion, not a fact. Keep the student's correction in
    * their local copy too, so an inaccurate line cannot return after reload. */
@@ -203,8 +245,21 @@ export function App() {
     setLowVisionOn(true);
   }
 
-  function newWorksheet() {
+  /** Open the capture page, or say why it cannot work right now (#127). The
+   *  buttons that lead here stay in the tab order, so a student moving by Tab
+   *  is told why instead of landing on a page where every upload fails. */
+  function openCapturePage() {
+    if (!modelsUsable) {
+      announce(`Capture is unavailable right now. ${modelsUnavailableWhy} Try the sample problem instead.`);
+      // Pressing it is also a reason to ask again: the model may be back.
+      void checkHealth();
+      return;
+    }
     setCapturing(true);
+  }
+
+  function newWorksheet() {
+    openCapturePage();
   }
 
   function leaveCapture() {
@@ -219,9 +274,10 @@ export function App() {
   }
 
   function startWorking(index: number) {
+    void checkHealth();
     setWorkingFrom(index);
     setLineIndex(index);
-    announce(`Your work, following line ${index + 1} of the worksheet. Hold Space to say a line, or type it.`);
+    announce(`Your work, following line ${index + 1} of the worksheet. ${modelsUsable ? 'Hold Space to say a line, or type it.' : 'Type a line.'}`);
     window.setTimeout(() => focusFirst('#work-heading'), 60);
   }
 
@@ -240,6 +296,9 @@ export function App() {
   useTraversal(!lowVision);
 
   const showStart = !problem && !capturing;
+
+  // U and C on the landing open the capture page, as they did on Home.
+  useShortcuts({ u: openCapturePage, c: openCapturePage }, showStart);
 
   // `LiveRegion` stays outside every conditional: if it remounted during a
   // change, the announcement made at that moment would be lost.
@@ -327,8 +386,13 @@ export function App() {
                   <li><strong>Write it.</strong> Say or type your own steps and hand them in as typed work.</li>
                 </ul>
                 <div className="hero-action">
-                  <button type="button" className="btn-hero" onClick={() => setCapturing(true)}>
-                    Get started
+                  <button
+                    type="button"
+                    className="btn-hero"
+                    onClick={openCapturePage}
+                    aria-disabled={modelsUsable ? undefined : 'true'}
+                  >
+                    {modelsUsable ? 'Get started' : 'Get started - capture is unavailable right now'}
                   </button>
                 </div>
                 <div className="text-center">
@@ -368,6 +432,7 @@ export function App() {
                   problem={problem}
                   mode={settings.mode}
                   startLine={workingFrom}
+                  speechAvailable={modelsUsable}
                   onExport={goToHandIn}
                 />
               </ScreenBoundary>

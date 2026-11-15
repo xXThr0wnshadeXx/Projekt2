@@ -5,6 +5,8 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import { KEYMAP, helpText } from '../../frontend/src/shortcuts';
+import { stubServerWithModels } from './server';
+
 
 async function openSample(page: Page) {
   await page.goto('/');
@@ -30,6 +32,7 @@ test.describe('@smoke keyboard help', () => {
   });
 
   test('the help follows the part of the page that is in use', async ({ page }) => {
+    await stubServerWithModels(page); // capture needs the model (#127)
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     // Let the welcome announcement land first, as it would for a person.
@@ -76,6 +79,7 @@ test.describe('@smoke keyboard help', () => {
   });
 
   test('U in the capture section opens the file picker', async ({ page }) => {
+    await stubServerWithModels(page); // capture needs the model (#127)
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     await page.getByRole('button', { name: 'Get started' }).click();

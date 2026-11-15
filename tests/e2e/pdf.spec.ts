@@ -10,6 +10,10 @@
 // question is operable by keyboard.
 
 import { test, expect, type Page } from '@playwright/test';
+import { stubServerWithModels } from './server';
+
+// Capture is offered only when the server says it has its model (#127).
+test.beforeEach(async ({ page }) => stubServerWithModels(page));
 
 const CAPTURED = {
   instructions: 'Solve for x.',
