@@ -15,7 +15,6 @@ import { announce, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
 import { spokenMath, structureSummary } from '../math/sre';
 import { useShortcuts } from '../shortcuts';
-import { readAloud, useLineKeys } from '../lineKeys';
 import { checksOffMessage, stepChecksAllowed } from '../stepCheck';
 import type { Mode, Problem as ProblemData } from '../state';
 
