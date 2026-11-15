@@ -42,8 +42,10 @@ def test_model_endpoints_have_a_tighter_budget():
     rl = limiter(clock)
     assert [rl.check("1.1.1.1", "/api/capture") for _ in range(3)] == [0, 0, 0]
     assert rl.check("1.1.1.1", "/api/capture") > 0
-    # the cheap bucket is separate
-    assert rl.check("1.1.1.1", "/api/diff") == 0
+    # Step explanations and PDF processing share the stricter bucket.
+    assert rl.check("1.1.1.1", "/api/diff") > 0
+    assert rl.check("2.2.2.2", "/api/pdf/pages") == 0
+    assert rl.check("2.2.2.2", "/api/pdf/page") == 0
     # another IP is unaffected
     assert rl.check("2.2.2.2", "/api/capture") == 0
 
@@ -75,7 +77,9 @@ def test_sweep_forgets_idle_clients():
 
 
 def test_rate_limit_response_is_friendly_and_readable_cross_origin():
-    settings = Settings(_env_file=None, allowed_origin=ORIGIN, rate_limit_per_minute=2)
+    settings = Settings(
+        _env_file=None, allowed_origin=ORIGIN, rate_limit_per_minute=2, rate_limit_model_per_minute=2
+    )
     app = create_app(settings, warm_cas=False)
     body = {"from_latex": "x", "to_latex": "x", "mode": "exam"}
     with TestClient(app) as c:

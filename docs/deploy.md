@@ -36,7 +36,17 @@ does not mention Python at all. `backend/.python-version` and the
 | `MODEL_VISION` | capture | |
 | `MODEL_TEXT` | spoken maths, explanations | |
 | `MODEL_STT` | recording | |
+| `MODEL_CALL_LIMIT` | model-call budget | Set to `1500` for the public demo; adjust this number for the event. |
+| `MODEL_CALL_WINDOW_SECONDS` | model-call budget window | Set to `86400` for the public demo (one day). |
+| `ENVIRONMENT` | production safeguards | Set to `production` on the deployed API. |
+| `TRUSTED_PROXY_HOPS` | per-address limits | Required in production; set to `1` for Render. Railway needs this set by hand too. |
 | `STATS_TOKEN` | `/api/stats` | Optional |
+
+For Railway, add `MODEL_CALL_LIMIT=1500`, `MODEL_CALL_WINDOW_SECONDS=86400`,
+`ENVIRONMENT=production`, and `TRUSTED_PROXY_HOPS=1` in its Variables panel.
+The cap is deliberately adjustable: change the limit to match the planned demo
+traffic. Do not set a production environment without `TRUSTED_PROXY_HOPS`;
+the API refuses to start so one visitor cannot consume every student's budget.
 
 ### What a keyless deploy looks like
 

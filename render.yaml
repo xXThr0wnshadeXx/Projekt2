@@ -28,3 +28,10 @@ services:
         value: https://glance-shreev2703.vercel.app
       - key: TRUSTED_PROXY_HOPS
         value: "1"
+      - key: ENVIRONMENT
+        value: production
+      # Shared daily ceiling for routes that call a model. Adjust for the demo.
+      - key: MODEL_CALL_LIMIT
+        value: "1500"
+      - key: MODEL_CALL_WINDOW_SECONDS
+        value: "86400"

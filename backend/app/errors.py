@@ -76,7 +76,9 @@ async def _http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
 
 
 async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
-    log.error("unhandled %s on %s", type(exc).__name__, request.url.path, exc_info=exc)
+    # Exception messages and tracebacks can include student work. Keep logs to
+    # the exception type and route, which are enough to diagnose a failure.
+    log.error("unhandled %s on %s", type(exc).__name__, request.url.path)
     return error_response("INTERNAL", "Something went wrong on our side. Try again.", 500)
 
 

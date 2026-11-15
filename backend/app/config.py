@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 120
     model_call_limit: int = Field(default=0, ge=0)
     model_call_window_seconds: int = Field(default=3600, gt=0)
+    environment: str = "development"
     # Proxies in front of the app that append to X-Forwarded-For (1 on Render).
     trusted_proxy_hops: int = 0
 

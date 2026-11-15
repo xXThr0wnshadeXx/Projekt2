@@ -24,7 +24,7 @@ class ModelQuota:
                 retry_after = ceil(self.window_seconds - (now - self._calls[0]))
                 raise ApiError(
                     "RATE_LIMITED",
-                    "Glance has reached its shared model limit. Try again shortly.",
+                    "Reading new photos and speech is paused for today to keep the demo running. You can still type your lines, check them, and hand in.",
                     429,
                     headers={"Retry-After": str(max(1, retry_after))},
                 )

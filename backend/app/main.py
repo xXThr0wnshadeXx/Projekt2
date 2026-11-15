@@ -36,6 +36,11 @@ def create_app(
     explainer: Explainer | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
+    if settings.environment.lower() == "production" and settings.trusted_proxy_hops < 1:
+        logging.getLogger("glance.startup").critical(
+            "TRUSTED_PROXY_HOPS must be set in production before the API can start."
+        )
+        raise RuntimeError("TRUSTED_PROXY_HOPS is required in production")
     quota = (
         ModelQuota(settings.model_call_limit, settings.model_call_window_seconds)
         if settings.model_call_limit else None

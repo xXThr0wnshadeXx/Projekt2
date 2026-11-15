@@ -80,3 +80,17 @@ def test_models_configured_needs_every_value():
         model_stt="s",
     )
     assert full.models_configured
+
+
+def test_production_requires_trusted_proxy_hops(caplog):
+    caplog.set_level("CRITICAL", logger="glance.startup")
+    with pytest.raises(RuntimeError, match="TRUSTED_PROXY_HOPS"):
+        create_app(Settings(_env_file=None, environment="production"), warm_cas=False)
+    assert "TRUSTED_PROXY_HOPS must be set in production" in caplog.text
+
+
+def test_production_accepts_a_trusted_proxy_setting():
+    app = create_app(
+        Settings(_env_file=None, environment="production", trusted_proxy_hops=1), warm_cas=False
+    )
+    assert app is not None

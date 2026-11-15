@@ -79,6 +79,19 @@ def test_unhandled_exception_logged_as_internal_without_trace(client, caplog):
     assert rec["error"] == "INTERNAL" and rec["status"] == 500
 
 
+def test_unhandled_error_logs_no_student_latex(client, caplog):
+    caplog.set_level(logging.ERROR, logger="glance.errors")
+    app = create_app(Settings(_env_file=None), warm_cas=False)
+
+    @app.get("/api/_latex_boom")
+    async def latex_boom():
+        raise RuntimeError(r"\\frac{x}{2}")
+
+    with TestClient(app, raise_server_exceptions=False) as c:
+        assert c.get("/api/_latex_boom").status_code == 500
+    assert "frac" not in caplog.text
+
+
 def test_unknown_paths_are_not_echoed_into_logs(client, caplog):
     caplog.set_level(logging.INFO, logger="glance.requests")
     client.get("/api/<script>")

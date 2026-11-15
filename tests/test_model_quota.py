@@ -20,6 +20,10 @@ def test_shared_quota_is_atomic_and_expires(monkeypatch):
             quota.acquire()
         except ApiError as error:
             assert error.headers == {"Retry-After": "10"}
+            assert error.message == (
+                "Reading new photos and speech is paused for today to keep the demo running. "
+                "You can still type your lines, check them, and hand in."
+            )
             return False
         return True
 
