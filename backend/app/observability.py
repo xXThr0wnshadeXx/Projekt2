@@ -121,8 +121,128 @@ def summary(last: int = 50) -> dict[str, Any]:
             "cost_usd_total": round(sum(costs), 6) if costs else None,
             "cost_usd_per_request": round(sum(costs) / len(costs), 6) if costs else None,
         }
-    return {"window": len(_RECENT), "paths": paths, "recent": list(_RECENT)[-last:]}
+    return {
+        "window": len(_RECENT),
+        "paths": paths,
+        "unit_economics": unit_economics(paths),
+        "recent": list(_RECENT)[-last:],
+    }
 
 
 def reset() -> None:
     _RECENT.clear()
+
+
+# --- model usage and cost (issue #44) -------------------------------------------
+
+def _prices() -> dict[str, dict[str, float]]:
+    """MODEL_PRICES from the environment, e.g.
+    {"model-a": {"input_per_1m": 1.0, "output_per_1m": 4.0},
+     "model-stt": {"per_minute": 0.006}}
+    Prices are configuration, not code: they change and must match the account.
+    """
+    from .config import get_settings
+
+    raw = get_settings().model_prices
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        log.warning('{"evt":"config","error":"MODEL_PRICES is not valid JSON"}')
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def cost_usd(model: str, tokens_in: int, tokens_out: int, audio_seconds: float = 0.0) -> float | None:
+    price = _prices().get(model)
+    if not isinstance(price, dict):
+        return None
+    total = (
+        tokens_in * float(price.get("input_per_1m", 0)) / 1_000_000
+        + tokens_out * float(price.get("output_per_1m", 0)) / 1_000_000
+        + audio_seconds * float(price.get("per_minute", 0)) / 60
+    )
+    return round(total, 8)
+
+
+def record_model_call(
+    model: str, tokens_in: int = 0, tokens_out: int = 0, audio_seconds: float = 0.0
+) -> None:
+    """Add one model call's usage to the current request's log record."""
+    rec = current()
+    if rec is None:
+        return
+    rec["model"] = model if rec["model"] in (None, model) else f'{rec["model"]}+{model}'
+    rec["tokens_in"] += int(tokens_in or 0)
+    rec["tokens_out"] += int(tokens_out or 0)
+    cost = cost_usd(model, tokens_in or 0, tokens_out or 0, audio_seconds or 0.0)
+    if cost is not None:
+        rec["cost_usd"] = round((rec["cost_usd"] or 0.0) + cost, 8)
+
+
+def _field(obj: Any, name: str) -> Any:
+    if obj is None:
+        return None
+    return obj.get(name) if isinstance(obj, dict) else getattr(obj, name, None)
+
+
+def _record_completion(model: str, result: Any) -> None:
+    usage = _field(result, "usage")
+    record_model_call(
+        _field(result, "model") or model,
+        _field(usage, "prompt_tokens") or 0,
+        _field(usage, "completion_tokens") or 0,
+    )
+
+
+def _record_transcription(model: str, result: Any) -> None:
+    usage = _field(result, "usage") or (getattr(result, "model_extra", None) or {}).get("usage")
+    record_model_call(
+        model,
+        _field(usage, "input_tokens") or 0,
+        _field(usage, "output_tokens") or 0,
+        _field(usage, "seconds") or 0.0,
+    )
+
+
+def instrument_openai(client: Any) -> Any:
+    """Record usage for every chat and transcription call made through `client`.
+
+    Works on an AsyncOpenAI instance without changing the code that calls it:
+        instrument_openai(models.client)
+    """
+    if getattr(client, "_glance_instrumented", False):
+        return client
+
+    chat_create = client.chat.completions.create
+
+    async def chat(*args: Any, **kwargs: Any) -> Any:
+        result = await chat_create(*args, **kwargs)
+        _record_completion(kwargs.get("model", ""), result)
+        return result
+
+    stt_create = client.audio.transcriptions.create
+
+    async def transcribe(*args: Any, **kwargs: Any) -> Any:
+        result = await stt_create(*args, **kwargs)
+        _record_transcription(kwargs.get("model", ""), result)
+        return result
+
+    client.chat.completions.create = chat
+    client.audio.transcriptions.create = transcribe
+    client._glance_instrumented = True
+    return client
+
+
+def unit_economics(paths: dict[str, dict[str, Any]]) -> dict[str, float | None]:
+    """Cost per page converted and per spoken line, from the live window."""
+    def per(path: str) -> float | None:
+        return (paths.get(path) or {}).get("cost_usd_per_request")
+
+    spoken = [c for c in (per("/api/transcribe"), per("/api/spoken-to-latex")) if c is not None]
+    return {
+        "cost_per_page_usd": per("/api/capture"),
+        "cost_per_spoken_line_usd": round(sum(spoken), 8) if spoken else None,
+        "cost_per_step_explanation_usd": per("/api/diff"),
+    }
