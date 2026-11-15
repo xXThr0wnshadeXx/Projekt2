@@ -4,11 +4,14 @@
 
 ```bash
 curl -s "$API/api/health"          # {"ok":true}
+bash scripts/preflight.sh          # every check the demo depends on
 ```
+
+Before and during a demo, follow `docs/demo-day.md`.
 
 ## Live logs: one place
 
-Render dashboard → `glance-api` → **Logs** (live tail). Each request is one JSON line:
+Railway → the back-end service → **Deployments → View logs** (live tail). Each request is one JSON line:
 
 ```
 {"evt":"request","path":"/api/diff","method":"POST","status":200,"ms":23.1,"error":null,"model":null,"tokens_in":0,"tokens_out":0,"cost_usd":null}
@@ -22,7 +25,7 @@ The uvicorn access log is off (`--no-access-log`) because it prints full URLs.
 
 ## Live numbers
 
-Set `STATS_TOKEN` in the Render environment, then:
+Set `STATS_TOKEN` in the host's variables, then:
 
 ```bash
 curl -s -H "X-Stats-Token: $STATS_TOKEN" "$API/api/stats" | python -m json.tool
