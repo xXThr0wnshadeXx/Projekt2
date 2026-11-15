@@ -118,7 +118,7 @@ test.describe('@smoke reading controls', () => {
       'data-semantic-speech-none',
       /.+/,
     );
-    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.getByRole('group', { name: 'Line 2', exact: true }).focus();
     await page.keyboard.press('g');
     await expect(polite(page)).toContainText('fraction');
     await page.keyboard.press('r');
@@ -141,9 +141,10 @@ test.describe('@smoke reading controls', () => {
     await expect(page.getByText(/not reachable/i)).toHaveCount(0);
   });
 
-  test('the same controls are in Settings', async ({ page }) => {
+  test('the reading controls are on the page, with no settings screen', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'How Glance reads to you' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Settings' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Read aloud/ })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Text size' })).toBeVisible();
   });

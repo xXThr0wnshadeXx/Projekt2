@@ -35,8 +35,8 @@ async function seed(page: Page, work: unknown[] = WORK) {
 
 async function openExport(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Back to your problem' }).click();
   await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+  await page.locator('#L1').focus();
   await page.keyboard.press('x');
   await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeFocused();
 }
@@ -154,8 +154,10 @@ test.describe('@smoke export', () => {
   test('the scratchpad has a Hand in button', async ({ page }) => {
     await seed(page);
     await page.goto('/');
-    await page.getByRole('button', { name: 'Back to your problem' }).click();
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+    await page.locator('#L1').focus();
     await page.keyboard.press('s');
+    await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Hand in my work' }).click();
     await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeFocused();
   });

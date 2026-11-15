@@ -40,7 +40,6 @@ async function stubPdf(page: Page, pages: number) {
 
 async function uploadPdf(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Capture a problem' }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'worksheet.pdf',
     mimeType: 'application/pdf',
@@ -69,7 +68,7 @@ test.describe('@smoke pdf worksheets', () => {
     await page.getByLabel('Which page is your problem on?').fill('4');
     await page.keyboard.press('Enter');
 
-    await expect(page.getByRole('heading', { name: 'Your problem' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your worksheet' })).toBeVisible();
     await expect(page.locator('#L1')).toBeFocused();
   });
 
@@ -78,7 +77,7 @@ test.describe('@smoke pdf worksheets', () => {
     await uploadPdf(page);
 
     await expect(page.getByRole('region', { name: 'Choose a page' })).toBeHidden();
-    await expect(page.getByRole('heading', { name: 'Your problem' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your worksheet' })).toBeVisible();
   });
 
   test('a page number out of range is refused, not sent', async ({ page }) => {

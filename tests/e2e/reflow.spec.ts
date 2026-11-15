@@ -58,7 +58,6 @@ async function expectNoSidewaysScroll(page: Page, screen: string) {
 
 async function openProblem(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Back to your problem' }).click();
   await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
 }
 
@@ -66,47 +65,53 @@ test.describe('@smoke reflow at 400% zoom (320px)', () => {
   test.use({ viewport: { width: 320, height: 640 } });
   test.beforeEach(async ({ page }) => seed(page));
 
-  test('home and keyboard help', async ({ page }) => {
+  test('the page and keyboard help', async ({ page }) => {
     await page.goto('/');
-    await expectNoSidewaysScroll(page, 'home');
-    await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+    await expectNoSidewaysScroll(page, 'page');
+    await page.getByRole('button', { name: 'Keys' }).click();
     await expectNoSidewaysScroll(page, 'keyboard help');
   });
 
   test('capture', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Capture a problem' }).click();
+    await page.getByRole('button', { name: 'Bring in a different worksheet' }).click();
+    await expect(page.getByRole('heading', { name: 'Bring in your worksheet' })).toBeVisible();
     await expectNoSidewaysScroll(page, 'capture');
   });
 
   test('problem with a long equation, a diagram and a warning', async ({ page }) => {
     await openProblem(page);
+    await page.locator('#L1').focus();
     await page.keyboard.press('g');
     await expectNoSidewaysScroll(page, 'problem');
   });
 
-  test('scratchpad with the problem shown', async ({ page }) => {
+  test('scratchpad beside the worksheet', async ({ page }) => {
     await openProblem(page);
+    await page.locator('#L1').focus();
     await page.keyboard.press('s');
-    await page.getByRole('button', { name: 'Show the problem' }).click();
+    await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
     await expectNoSidewaysScroll(page, 'scratchpad');
   });
 
   test('settings', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByText('More settings').click();
+    await expect(page.getByRole('heading', { name: 'Mode' })).toBeVisible();
     await expectNoSidewaysScroll(page, 'settings');
   });
 
   test('hand-in', async ({ page }) => {
     await openProblem(page);
+    await page.locator('#L1').focus();
     await page.keyboard.press('x');
-    await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeFocused();
     await expectNoSidewaysScroll(page, 'hand-in');
   });
 
   test('low-vision mode at its largest size', async ({ page }) => {
     await openProblem(page);
+    await page.locator('#L1').focus();
     await page.keyboard.press('l');
     for (let i = 0; i < 8; i += 1) await page.keyboard.press('+');
     await expectNoSidewaysScroll(page, 'low-vision');

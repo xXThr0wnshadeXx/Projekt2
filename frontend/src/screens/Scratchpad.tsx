@@ -104,20 +104,9 @@ export function Scratchpad({ problem, mode, startLine, onExport }: ScratchpadPro
   const heading = useRef<HTMLHeadingElement>(null);
   const section = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    // Say which problem line the work follows from. The first step saved here
-    // is checked against the line the student pressed S on, so without this
-    // they can get "I couldn't confirm this step" for a correct step and have
-    // no way to tell why — they were working from a line they had forgotten
-    // they were on. Nobody can see which line is pinned; it has to be said.
-    const following =
-      problem.lines.length > 1 ? ` Following line ${startLine + 1} of the problem.` : '';
-    announce(
-      lines.length
-        ? `Your work.${following} ${lines.length} ${lines.length === 1 ? 'line' : 'lines'} so far.`
-        : `Your work.${following} Record a line, or type one.`,
-    );
-  }, []);
+  // Nothing is announced on mount. Your work is always on the page now, so
+  // saying so when it appeared would talk over the capture result or the
+  // welcome. Pressing S says which line the work follows from (App.startWorking).
 
   useEffect(() => {
     saveWork(lines);
@@ -341,6 +330,11 @@ export function Scratchpad({ problem, mode, startLine, onExport }: ScratchpadPro
     setCanUndo(true);
     setLines((prev) => prev.filter((l) => l.id !== line.id));
     announce(`Deleted line ${index + 1}. Press U to undo.`);
+    // The button that was pressed is gone. Without somewhere to land, focus
+    // drops to the page and U, which the announcement just promised, would
+    // not work because its keys only fire inside this section.
+    const next = lines[index + 1] ?? lines[index - 1];
+    window.setTimeout(() => focusFirst(next ? `#${next.id}` : '#work-heading'), 80);
   }
 
   function undo() {

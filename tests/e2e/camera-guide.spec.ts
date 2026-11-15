@@ -103,12 +103,11 @@ test.describe('@smoke the guided camera', () => {
     });
     await fakeCamera(page, { left: 0.15, top: 0.1, right: 0.85, bottom: 0.9 });
     await page.goto('/');
-    await page.getByRole('button', { name: 'Capture a problem', exact: true }).click();
     await page.getByRole('button', { name: 'Take a photo' }).click();
 
     await expect(page.getByTestId('live-polite')).toContainText('I will tell you how to move the phone');
     expect(uploads).toBe(0);
-    await expect(page.getByRole('heading', { name: 'Your problem', exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: 'Your worksheet', exact: true })).toBeVisible({ timeout: 15000 });
     expect(uploads).toBe(1);
   });
 
@@ -118,7 +117,6 @@ test.describe('@smoke the guided camera', () => {
     await page.route('**/api/capture', (r) => { uploads += 1; return r.abort(); });
     await fakeCamera(page, { left: 0, top: 0.1, right: 0.55, bottom: 0.9 });
     await page.goto('/');
-    await page.getByRole('button', { name: 'Capture a problem', exact: true }).click();
     await page.getByRole('button', { name: 'Take a photo' }).click();
 
     await expect(page.getByTestId('live-polite')).toHaveText('Move the phone left.', { timeout: 10000 });

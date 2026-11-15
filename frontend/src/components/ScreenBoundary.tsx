@@ -1,5 +1,5 @@
 import { Component, useEffect, useRef, type ReactNode } from 'react';
-import { announce } from './LiveRegion';
+import { announce, focusFirst } from './LiveRegion';
 
 const RECOVERY = 'Something went wrong on this screen. Your work is saved.';
 
@@ -13,6 +13,8 @@ interface Props {
   children: ReactNode;
   onBackToStart: () => void;
   onFailure?: (failed: boolean) => void;
+  /** Where focus goes when the part is started again, so it is not dropped on the page. */
+  restartFocus?: string;
 }
 
 function Recovery({ onRestart, onBack }: { onRestart: () => void; onBack: () => void }) {
@@ -24,14 +26,16 @@ function Recovery({ onRestart, onBack }: { onRestart: () => void; onBack: () => 
   }, []);
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
-      <h2 ref={heading} tabIndex={-1} className="text-2xl font-semibold">Screen unavailable</h2>
+    // A section, not a <main>: the page already has one, and it now holds the
+    // other parts of the page that are still working.
+    <section aria-labelledby="recovery-title" className="mx-auto max-w-3xl px-6 py-8">
+      <h2 id="recovery-title" ref={heading} tabIndex={-1} className="text-2xl font-semibold">Screen unavailable</h2>
       <p className="mt-3">{RECOVERY}</p>
       <div className="mt-6 flex flex-wrap gap-3">
         <button type="button" className="btn-primary" onClick={onRestart}>Start this screen again</button>
         <button type="button" className="btn" onClick={onBack}>Back to the start</button>
       </div>
-    </main>
+    </section>
   );
 }
 
@@ -55,6 +59,9 @@ export class ScreenBoundary extends Component<Props, { failed: boolean; restarte
   private restart = () => {
     this.props.onFailure?.(false);
     this.setState({ failed: false, restarted: true });
+    announce('Started again.');
+    const target = this.props.restartFocus;
+    if (target) window.setTimeout(() => focusFirst(target), 60);
   };
 
   render() {

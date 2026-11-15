@@ -25,7 +25,8 @@ test.describe('@smoke critical path', () => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: 'Glance', level: 1 })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Capture a problem' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bring in your worksheet' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Upload a file' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
   });
 
@@ -45,7 +46,7 @@ test.describe('@smoke critical path', () => {
   test('each line is a single focusable group with an accessible name', async ({ page }) => {
     await openSample(page);
 
-    const l1 = page.getByRole('group', { name: 'Line 1' });
+    const l1 = page.getByRole('group', { name: 'Line 1', exact: true });
     await expect(l1).toBeVisible();
     await l1.focus();
     await expect(l1).toBeFocused();
@@ -106,7 +107,7 @@ test.describe('@smoke critical path', () => {
     const polite = page.getByTestId('live-polite');
     // Line 2 is the fraction with a root on top — the case the product is
     // named after.
-    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.getByRole('group', { name: 'Line 2', exact: true }).focus();
     await page.keyboard.press('g');
 
     const summary = page.getByRole('region', { name: 'Structure summary' });
@@ -146,7 +147,7 @@ test.describe('@smoke critical path', () => {
     await openSample(page);
 
     const polite = page.getByTestId('live-polite');
-    await page.getByRole('group', { name: 'Line 1' }).focus();
+    await page.getByRole('group', { name: 'Line 1', exact: true }).focus();
 
     await page.keyboard.press('n');
     await expect(polite).toHaveText('Line 2 of 2.');
@@ -212,17 +213,15 @@ test.describe('@smoke critical path', () => {
     await expect(page.locator('#L1')).toBeFocused();
   });
 
-  test('the capture screen offers every input by keyboard', async ({ page }) => {
+  test('the capture section offers every input from the start', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Capture a problem' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Capture a problem' })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Bring in your worksheet' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Upload a file' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Take a photo' })).toBeVisible();
-
-    // Back returns to the start without a reload.
-    await page.getByRole('button', { name: 'Back to the start' }).click();
+    await expect(page.getByRole('button', { name: 'Live board' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Capture a problem' })).toHaveCount(0);
   });
 
   test('a problem survives a reload', async ({ page }) => {
@@ -230,7 +229,6 @@ test.describe('@smoke critical path', () => {
     // phone up over it, so the problem is cached in the browser.
     await openSample(page);
     await page.reload();
-    await page.getByRole('button', { name: 'Back to your problem' }).click();
     await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
   });
 

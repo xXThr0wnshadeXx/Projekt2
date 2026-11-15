@@ -39,11 +39,7 @@ test.describe('@smoke progressive web app shell', () => {
 
 test('@smoke skip link moves focus to main content', async ({ page, browserName }) => {
   await page.goto('/');
-  // Home deliberately focuses its heading on arrival. Two Shift+Tabs pass the
-  // header shortcut button and reach the preceding skip link.
-  await expect(
-    page.getByRole('heading', { name: 'Math for students who are blind or have low vision' }),
-  ).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Bring in your worksheet' })).toBeVisible();
   const skip = page.getByRole('link', { name: 'Skip to main content' });
   if (browserName === 'webkit') {
     // Safari leaves links out of the Tab order unless "Press Tab to highlight
@@ -51,8 +47,8 @@ test('@smoke skip link moves focus to main content', async ({ page, browserName 
     // both is what Enter on the link does.
     await skip.focus();
   } else {
-    await page.keyboard.press('Shift+Tab');
-    await page.keyboard.press('Shift+Tab');
+    // The skip link is the first stop on the page.
+    await page.keyboard.press('Tab');
   }
   await expect(skip).toBeFocused();
   await page.keyboard.press('Enter');
@@ -96,9 +92,15 @@ async function expectNoSeriousViolations(page: Page, screen: string) {
   expect(bad).toEqual([]);
 }
 
+/** The capture section is on the page already; with a worksheet loaded it
+ * comes back through "Bring in a different worksheet". */
+async function openCapture(page: Page) {
+  await page.getByRole('button', { name: 'Bring in a different worksheet' }).click();
+  await expect(page.getByRole('heading', { name: 'Bring in your worksheet' })).toBeVisible();
+}
+
 async function openProblem(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Back to your problem' }).click();
   await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
 }
 
@@ -107,21 +109,29 @@ for (const scheme of ['dark', 'light'] as const) {
     test.use({ colorScheme: scheme });
     test.beforeEach(async ({ page }) => seed(page));
 
-    test('home', async ({ page }) => {
-      await page.goto('/');
-      await expect(page.getByRole('button', { name: 'Capture a problem' })).toBeVisible();
-      await expectNoSeriousViolations(page, 'home');
+    test('the whole page with a worksheet loaded', async ({ page }) => {
+      await openProblem(page);
+      await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeVisible();
+      await expectNoSeriousViolations(page, 'whole page');
     });
 
-    test('home with keyboard help open', async ({ page }) => {
+    test('the first visit, with nothing loaded yet', async ({ page }) => {
+      await page.addInitScript(() => localStorage.clear());
       await page.goto('/');
-      await page.getByRole('button', { name: 'Keyboard shortcuts' }).click();
+      await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
+      await expectNoSeriousViolations(page, 'first visit');
+    });
+
+    test('page with keyboard help open', async ({ page }) => {
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Keys' }).click();
       await expectNoSeriousViolations(page, 'keyboard help');
     });
 
     test('capture, including a refused camera', async ({ page }) => {
       await page.goto('/');
-      await page.getByRole('button', { name: 'Capture a problem' }).click();
+      await openCapture(page);
       await expectNoSeriousViolations(page, 'capture');
       await page.getByRole('button', { name: 'Take a photo' }).click();
       await page.waitForTimeout(300);
@@ -133,7 +143,7 @@ for (const scheme of ['dark', 'light'] as const) {
         r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ pages: 3 }) }),
       );
       await page.goto('/');
-      await page.getByRole('button', { name: 'Capture a problem' }).click();
+      await openCapture(page);
       await page.locator('input[type=file]').setInputFiles({
         name: 'worksheet.pdf',
         mimeType: 'application/pdf',
@@ -145,6 +155,7 @@ for (const scheme of ['dark', 'light'] as const) {
 
     test('problem, with an unsure line, a diagram and a photo warning', async ({ page }) => {
       await openProblem(page);
+      await page.locator('#L1').focus();
       await page.keyboard.press('g');
       await expect(page.getByRole('region', { name: 'Structure summary' })).toBeVisible();
       await expectNoSeriousViolations(page, 'problem');
@@ -160,10 +171,10 @@ for (const scheme of ['dark', 'light'] as const) {
       await expectNoSeriousViolations(page, 'low-vision');
     });
 
-    test('scratchpad, with the problem shown', async ({ page }) => {
+    test('scratchpad, beside the worksheet', async ({ page }) => {
       await openProblem(page);
       await page.keyboard.press('s');
-      await page.getByRole('button', { name: 'Show the problem' }).click();
+      await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
       await expectNoSeriousViolations(page, 'scratchpad');
     });
 
@@ -173,6 +184,7 @@ for (const scheme of ['dark', 'light'] as const) {
       );
       await openProblem(page);
       await page.keyboard.press('s');
+      await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
       await page.getByLabel('Or type your line').fill('x equals four');
       await page.getByRole('button', { name: 'Add line' }).click();
       await expect(page.getByRole('region', { name: 'Confirm your line' })).toBeVisible();
@@ -185,6 +197,7 @@ for (const scheme of ['dark', 'light'] as const) {
       );
       await openProblem(page);
       await page.keyboard.press('s');
+      await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
       await page.getByLabel('Or type your line').fill('x plus one over two');
       await page.getByRole('button', { name: 'Add line' }).click();
       await expect(page.getByRole('dialog')).toBeVisible();
@@ -193,14 +206,16 @@ for (const scheme of ['dark', 'light'] as const) {
 
     test('settings', async ({ page }) => {
       await page.goto('/');
-      await page.getByRole('button', { name: 'Settings' }).click();
+      await page.getByText('More settings').click();
+      await expect(page.getByRole('heading', { name: 'Mode' })).toBeVisible();
       await expectNoSeriousViolations(page, 'settings');
     });
 
     test('hand-in', async ({ page }) => {
       await openProblem(page);
+      await page.locator('#L1').focus();
       await page.keyboard.press('x');
-      await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeFocused();
       await expectNoSeriousViolations(page, 'hand-in');
     });
   });

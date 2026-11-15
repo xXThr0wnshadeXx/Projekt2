@@ -12,7 +12,6 @@ const captured = {
 
 async function openCapture(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Capture a problem', exact: true }).click();
   await page.clock.install();
 }
 
@@ -37,11 +36,11 @@ test.describe('@smoke stalled browser requests', () => {
     await page.clock.fastForward(12_100);
     await expect(page.getByTestId('live-assertive')).toContainText('took too long');
     await expect(page.getByRole('button', { name: 'Upload a file' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Back to the start' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeEnabled();
     expect(attempts).toBe(1); // Never spend credit on an automatic retry.
 
     await page.locator('input[type=file]').setInputFiles(file);
-    await expect(page.getByRole('heading', { name: 'Your problem', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your worksheet', exact: true })).toBeVisible();
     expect(attempts).toBe(2);
   });
 

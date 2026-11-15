@@ -137,6 +137,8 @@ test.describe('@smoke arrows and space on the scratchpad', () => {
   test('Up and Down leave the text box, Left and Right stay in it', async ({ page }) => {
     await openSample(page);
     await page.keyboard.press('s');
+    // Focus lands on the heading a moment after S; click the box only after.
+    await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
     const box = page.getByLabel('Or type your line');
     await box.click();
     await page.keyboard.type('x = 4');

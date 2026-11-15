@@ -10,7 +10,7 @@
 // Low-vision mode is the one exception. It is a full-screen magnifier over the
 // same page, not a different place, and leaving it returns to the same line.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { ScreenBoundary } from './components/ScreenBoundary';
 import { KeyboardHelp } from './components/KeyboardHelp';
@@ -78,21 +78,23 @@ export function App() {
   }
 
   // One greeting on arrival, or what was restored from last time.
-  const greeted = useRef(false);
+  // Once, on arrival. The timer is cleared and set again by StrictMode's
+  // second pass in development, so the guard cannot be a "greeted" flag set on
+  // the first pass: that would cancel the only timer.
   useEffect(() => {
-    if (greeted.current) return;
-    greeted.current = true;
     const count = loadWork().length || problem?.lines.length;
     const text = count
       ? `Glance. I restored your work from earlier: ${count} ${count === 1 ? 'line' : 'lines'}. Use the Down arrow to move through the page and Space to press or hear what you are on.`
       : WELCOME;
     const timer = window.setTimeout(() => announce(text), 0);
     return () => window.clearTimeout(timer);
-  }, [problem]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keyboard help (#25): `null` when closed, otherwise whether it took focus.
   const [help, setHelp] = useState<null | { takeFocus: boolean }>(null);
-  const helpScreen: ScreenName = problem && !replacing ? 'problem' : 'capture';
+  const helpScreen: ScreenName =
+    lowVisionOn && problem ? 'lowvision' : problem && !replacing ? 'problem' : 'capture';
 
   /** "?" anywhere: say the shortcuts and show them. */
   function showHelp(takeFocus: boolean) {
@@ -278,7 +280,11 @@ export function App() {
               <li>Hand in</li>
             </ol>
 
-            <ScreenBoundary screen="worksheet" onBackToStart={() => setReplacing(false)}>
+            <ScreenBoundary
+              screen="worksheet"
+              onBackToStart={() => setReplacing(false)}
+              restartFocus="#problem-heading, #capture-heading"
+            >
               {showCapture && (
                 <Capture
                   onCaptured={openProblem}
@@ -306,7 +312,7 @@ export function App() {
             </ScreenBoundary>
 
             {problem && (
-              <ScreenBoundary screen="work" onBackToStart={() => focusFirst('#problem-heading')}>
+              <ScreenBoundary screen="work" onBackToStart={() => focusFirst('#problem-heading')} restartFocus="#work-heading">
                 <Scratchpad
                   problem={problem}
                   mode={settings.mode}
@@ -317,7 +323,7 @@ export function App() {
             )}
 
             {problem && (
-              <ScreenBoundary screen="handin" onBackToStart={() => focusFirst('#problem-heading')}>
+              <ScreenBoundary screen="handin" onBackToStart={() => focusFirst('#problem-heading')} restartFocus="#handin-heading">
                 <Export problem={problem} />
               </ScreenBoundary>
             )}
