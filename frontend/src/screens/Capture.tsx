@@ -11,11 +11,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { announce } from '../components/LiveRegion';
-import { capture, ApiFailure, CAPTURE_TYPES } from '../api';
+import { capture, pdfPageCount, pdfPage, ApiFailure, CAPTURE_TYPES } from '../api';
 import { downscale, sharpestFrame } from '../image';
 import type { Problem } from '../state';
 
 type Busy = 'idle' | 'preparing' | 'reading';
+
+/** A PDF waiting for the student to say which page they want. */
+interface PendingPdf {
+  file: File;
+  pages: number;
+}
 
 export interface CaptureProps {
   onCaptured: (problem: Problem) => void;
@@ -40,6 +46,8 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [cameraOn, setCameraOn] = useState(false);
+  const [pdf, setPdf] = useState<PendingPdf | null>(null);
+  const [pageWanted, setPageWanted] = useState('1');
 
   const fileInput = useRef<HTMLInputElement>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -123,13 +131,58 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
     }
   }
 
+  /** Ask the back end how many pages, then ask the student which one.
+   *
+   *  A scanned worksheet is usually several pages and only one of them is the
+   *  problem, so DESIGN.md F1 asks for the page number rather than guessing.
+   *  A one-page PDF is not worth a question, so it goes straight through.
+   */
+  async function openPdf(file: File) {
+    setError('');
+    setPdf(null);
+    setBusy('preparing');
+    announce('Reading the PDF…');
+    try {
+      const { pages } = await pdfPageCount(file);
+      if (pages <= 1) {
+        await sendPdfPage(file, 1);
+        return;
+      }
+      setPdf({ file, pages });
+      setPageWanted('1');
+      announce(`This PDF has ${pages} pages. Which page is your problem on?`);
+      window.setTimeout(() => {
+        document.getElementById('pdf-page')?.focus();
+      }, 60);
+    } catch (e: unknown) {
+      const message = e instanceof ApiFailure ? e.message : 'I could not read that PDF.';
+      setError(message);
+      announce(message, 'assertive');
+    } finally {
+      setBusy('idle');
+    }
+  }
+
+  /** Render one page to an image and capture it like any other photo. */
+  async function sendPdfPage(file: File, page: number) {
+    setBusy('preparing');
+    announce(`Opening page ${page}…`);
+    try {
+      const png = await pdfPage(file, page);
+      setPdf(null);
+      await send(png, 'upload');
+    } catch (e: unknown) {
+      const message = e instanceof ApiFailure ? e.message : 'I could not open that page.';
+      setError(message);
+      announce(message, 'assertive');
+      setBusy('idle');
+    }
+  }
+
   function acceptFile(file: File | null | undefined, source: Problem['source']) {
     if (!file) return;
     if (file.type === 'application/pdf') {
-      const message =
-        'PDF pages are not supported yet. Upload a screenshot or photo of the page instead.';
-      setError(message);
-      announce(message, 'assertive');
+      void openPdf(file);
       return;
     }
     if (!CAPTURE_TYPES.includes(file.type)) {
@@ -219,7 +272,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
         <input
           ref={fileInput}
           type="file"
-          accept={CAPTURE_TYPES.join(',')}
+          accept={[...CAPTURE_TYPES, 'application/pdf'].join(',')}
           className="sr-only"
           onChange={(e) => {
             acceptFile(e.target.files?.[0], 'upload');
@@ -249,6 +302,61 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
         {busy === 'preparing' && 'Preparing the image…'}
         {busy === 'reading' && 'Reading your problem…'}
       </p>
+
+      {pdf && (
+        <section aria-label="Choose a page" className="mt-4">
+          <form
+            // The browser's own number validation silently refuses to submit
+            // and shows a bubble that screen readers do not reliably announce,
+            // which would leave a blind student pressing Enter with no idea
+            // why nothing happened. We validate and announce it ourselves.
+            noValidate
+            onSubmit={(e) => {
+              e.preventDefault();
+              const page = Number(pageWanted);
+              if (!Number.isInteger(page) || page < 1 || page > pdf.pages) {
+                const message = `Enter a page number between 1 and ${pdf.pages}.`;
+                setError(message);
+                announce(message, 'assertive');
+                return;
+              }
+              void sendPdfPage(pdf.file, page);
+            }}
+          >
+            <label htmlFor="pdf-page" className="block font-medium">
+              Which page is your problem on?
+            </label>
+            <p id="pdf-page-help" className="mt-1 text-sm text-[--muted]">
+              This PDF has {pdf.pages} pages.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <input
+                id="pdf-page"
+                type="number"
+                min={1}
+                max={pdf.pages}
+                value={pageWanted}
+                aria-describedby="pdf-page-help"
+                onChange={(e) => setPageWanted(e.target.value)}
+                className="min-h-[48px] w-32 rounded-lg border border-[--line] bg-[--surface] px-4 text-[--fg]"
+              />
+              <button type="submit" className="btn" disabled={working}>
+                Open this page
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setPdf(null);
+                  announce('Cancelled.');
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
 
       {cameraOn && (
         <section aria-label="Camera" className="mt-4">
