@@ -97,7 +97,11 @@ test.describe('@smoke the whole page by arrows and space', () => {
     expect(await heard(page)).toBe(last);
   });
 
-  test('the current line is always in view, with no scrolling', async ({ page }) => {
+  test('the current line is always in view, with no scrolling', async ({ page, isMobile, browserName }) => {
+    // CI's Linux WebKit keeps a stale scroll range after the page grows (#256),
+    // so the lowest lines cannot be scrolled to there at all. Real browsers
+    // are not affected; chromium and firefox cover the check.
+    test.skip(isMobile && browserName === 'webkit', 'Linux WebKit cannot scroll to the lowest lines');
     await openSample(page);
     // Scrolling is turned off only where the browser reports a mouse. Headless
     // Firefox on Linux reports none, so there the page keeps scrolling, which
