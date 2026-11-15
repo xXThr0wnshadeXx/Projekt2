@@ -10,7 +10,7 @@ import type { CSSProperties } from 'react';
 import { MathLine } from '../components/MathLine';
 import { announce } from '../components/LiveRegion';
 import { LOW_VISION_THEMES } from '../lowVisionThemes';
-import { cancel, isSelfVoicingEnabled, isSupported, setSelfVoicing, speak } from '../audio/tts';
+import { cancel, isSelfVoicingEnabled, isSupported, setSelfVoicing } from '../audio/tts';
 
 export interface LowVisionLine {
   id: string;
@@ -33,8 +33,9 @@ const DEFAULT_SIZE = 2;
 function announceLine(line: LowVisionLine, count: number, voicing: boolean) {
   const position = `${line.label} of ${count}.`;
   const text = voicing ? `${position} ${line.spoken ?? line.latex}` : position;
+  // announce() also speaks it when reading aloud is on, so one call is one
+  // utterance.
   announce(text);
-  if (voicing) speak(text);
 }
 
 export function LowVision({ lines, startIndex = 0, onExit }: LowVisionProps) {
