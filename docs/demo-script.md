@@ -70,15 +70,25 @@ Then, in order:
 | `G` | *"This is an equation, with a left side and a right side. It contains 1 fraction and 1 square root, nested."* — "That is the sentence a sighted reader gets for free." |
 | `Enter` | Explore. Arrow keys walk inside the expression. Subtitles are on, so judges see speech and braille. |
 | `Esc` | Back out to the line. |
+| `P` | **Back to line 1.** Do not skip this — see below. |
 | `S` | Start working. |
+
+> **Why `P` matters.** Since #92 the first line you save is checked against the
+> problem line you pressed `S` on. Press `S` on line 2 and "two x equals eight"
+> is checked against the fraction, which correctly comes back *"I couldn't
+> confirm this step."* — contradicting the narration a sentence later. Press
+> `S` on line 1 and it checks out. nicolashlam ran both through the real
+> checker to confirm.
 
 Now the student's own work. Hold `Space`, say **"two x equals eight"**, release.
 
 > *"I heard: 2 x equals 8. Enter to save, E to edit."* → press `Enter` →
-> *"Saved as line 1."*
+> *"Saved as line 1."* → *"This step checks out."*
 
 > "Nothing is saved until I confirm it. The model does not get the last word —
-> I do."
+> I do. And a computer algebra system just checked that step. It did not solve
+> anything — it checked that what I wrote follows from the line above. When it
+> cannot tell, it says it could not confirm. It never tells me I am wrong."
 
 **Then the moment.** Hold `Space`, say **"x plus one over two"**.
 
@@ -90,23 +100,25 @@ Stop talking. Let it sit for a beat.
 > that guesses is worse than useless for homework, because I cannot see what it
 > chose. So it asks."
 
-Press `2`. It goes to the readback, you confirm.
+Press `2`, then **`Escape` to discard the readback.**
 
-It then confirms the step:
+> "The point was the question, not the line."
 
-> *"This step checks out."*
+**Do not save this one.** Both options are expressions rather than equations,
+so after `2x = 8` the checker returns `mixed` and the app says *"I couldn't
+confirm this step."* — which is correct behaviour but lands as an anticlimax
+straight after the wow moment. Discarding keeps the beat clean.
 
-> "A computer algebra system checked that. It did not solve anything — it
-> checked that what I wrote follows from the line above. And if it cannot tell,
-> it says it could not confirm. It never tells me I am wrong."
+If you would rather keep it, own it instead of ignoring it: *"it couldn't
+confirm that one, because it is an expression, not a step — and it says so
+rather than guessing."* That is a fair answer, but it costs you ten seconds.
 
 `L` for low-vision mode. `+` a few times, `T` once to flip the pairing.
 
 > "Same problem, no screen reader, for the much larger group who have some
 > sight."
 
-`Escape` back. Then, **only if export is on the deployed build** (see
-[Known gaps](#known-gaps)), open it from the scratchpad:
+`Escape` back. Then `X`, or **Hand in my work** in the scratchpad:
 
 > "And this is the part that closes the loop — my own work, typed, as
 > accessible HTML with real MathML in it. My instructor opens it like any other
@@ -122,7 +134,8 @@ failed and what changed — `BUSINESS.md` §3 is explicit that judges reward tha
 ### 3:10–3:45 · Who pays
 
 Disability services and alternate-format offices. Free for students. Cal Poly →
-CSU's 22 campuses → other public universities. Pilot plan in `docs/pilot.md`.
+CSU's 22 campuses → other public universities. The pilot one-pager is #43
+and is not written yet — do not point at a document that does not exist.
 
 ### 3:45–4:00 · Close
 
@@ -134,15 +147,13 @@ CSU's 22 campuses → other public universities. Pilot plan in `docs/pilot.md`.
 
 Read these before rehearsing, because two of them change the script.
 
-1. **Export is written but check it is on `main` before you rehearse it.**
-   #96 built it — accessible HTML with real MathML, print-to-PDF, `.tex` and
-   Nemeth — but that pull request merged into a branch that had already been
-   merged, so the work was stranded. #107 brings it onto `main` and is waiting
-   on a review. **Open the deployed link and look for the export control.** If
-   it is there, close the demo on the hand-in as `DESIGN.md` §25 step 6
-   intends, and show the HTML rather than only the PDF — the point is that an
-   instructor opens it and a blind student can still read and navigate the
-   math. If it is not there, close on the ambiguity moment instead.
+1. **Export is on `main`** (#107). Close the demo on the hand-in, as
+   `DESIGN.md` §25 step 6 intends: `X`, or **Hand in my work** in the
+   scratchpad. Show the accessible HTML rather than only the PDF — the point is
+   that an instructor opens it and a blind student can still read and navigate
+   the math. `.tex` and Nemeth are a separate panel in the scratchpad (#94).
+   Check the deployed build has caught up before you rely on it.
+
 2. **Capture and voice need the API key** (#4). Without it those routes are not
    registered. The sample problem, glance, explore and low-vision mode all work
    regardless, so a key failure is survivable: switch to "Try a sample problem"

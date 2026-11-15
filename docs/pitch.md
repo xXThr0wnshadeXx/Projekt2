@@ -126,9 +126,9 @@ and ambiguity handling until the shared worksheet test is recorded.
 | "Isn't this cheating?" | No solve, no hints, no next step, in any mode. Exam mode is transcription only. The student does every line and confirms it. |
 | "What if the AI is wrong?" | Low-confidence lines are flagged, every line is read back and confirmed by the student, and a computer algebra system checks what it can. When it cannot, it says so — it never says "wrong", it says it could not confirm. Accuracy numbers from the evals. |
 | "How big is this?" | Bottom-up only: named campuses × a price under validation. Never a percentage of a large market. |
-| "What does it cost to run?" | Measured per page and per spoken line in the evals. |
-| "Braille?" | Nemeth via MathJax and the Speech Rule Engine, through the student's own display. Verified against NVDA's Braille Viewer. Speech and large print are the primary story. |
-| "Privacy?" | No accounts, no database, nothing stored server-side. Images and audio are processed and discarded. |
+| "What does it cost to run?" | **Not measured yet** — there is no API credit (#88). We log tokens and cost per request (#44, #76), so `/api/stats` gives cost per page and per spoken line the moment a key is live. Say "we log it per request; numbers once the pilot key is live." |
+| "Braille?" | Nemeth output comes from MathJax's Speech Rule Engine. **We have not had it checked by a braille reader yet** — the screen-reader pass is #32. Say that. Speech and large print are the primary story. |
+| "Privacy?" | No accounts, no database, nothing stored on our server. Images and audio are **sent to OpenAI to be read**, never stored by us — the Home screen says so. Do not imply they go nowhere. |
 | "What changed your plan this weekend?" | Have a real answer from the ledger. |
 
 ## Rules for the room
