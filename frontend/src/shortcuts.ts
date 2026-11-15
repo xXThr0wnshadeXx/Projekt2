@@ -101,6 +101,7 @@ export const KEYMAP: Record<ScreenName, Shortcut[]> = {
   ],
   scratchpad: [
     { keys: 'Space, held down', does: 'record a line while you speak' },
+    { keys: 'H', does: 'hands-free: just talk, and say stop listening to stop' },
     { keys: 'Enter', does: 'save the line you just heard' },
     { keys: 'E', does: 'edit it before saving' },
     { keys: 'Escape', does: 'discard it' },
