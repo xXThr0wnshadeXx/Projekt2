@@ -25,7 +25,7 @@ const RELATIONS: Record<string, string> = {
 };
 
 /** Convert LaTeX to a MathML document, or null if MathJax cannot. */
-async function toMathML(latex: string): Promise<Element | null> {
+export async function toMathML(latex: string): Promise<Element | null> {
   await loadMathJax();
   const mj = window.MathJax;
   try {
