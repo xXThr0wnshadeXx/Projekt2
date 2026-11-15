@@ -36,6 +36,30 @@ export interface RecordButtonProps {
 /** Held this long, Space records; released sooner, it was a tap (#236). */
 export const HOLD_MS = 350;
 
+const MIC_KEY = 'glance.microphoneAllowed';
+// Safari cannot be asked about the microphone, so a start that worked is
+// remembered instead, and the explanation is not repeated after it (#200).
+let micWorked = false;
+
+function micRemembered(): boolean {
+  if (micWorked) return true;
+  try {
+    micWorked = localStorage.getItem(MIC_KEY) === '1';
+  } catch {
+    // Storage may be blocked. Then it is remembered for this visit only.
+  }
+  return micWorked;
+}
+
+function rememberMic(): void {
+  micWorked = true;
+  try {
+    localStorage.setItem(MIC_KEY, '1');
+  } catch {
+    // Ignore: the in-memory flag still holds.
+  }
+}
+
 /** True when this is a touch device, where hold-to-talk must not be used. */
 export function prefersTapToggle(): boolean {
   if (typeof window === 'undefined') return false;
@@ -86,11 +110,12 @@ export function RecordButton({ onResult, onError, disabled = false, onTap }: Rec
   async function start() {
     if (busy.current || disabled || recording) return;
     busy.current = true;
-    if (micState.current !== 'granted') {
+    if (micState.current !== 'granted' && !micRemembered()) {
       announce(MIC_EXPLAINED, 'assertive');
     }
     try {
       await recorder.current?.start();
+      rememberMic();
       setRecording(true);
       announce('Recording. Speak your line.', 'assertive');
     } catch (e: unknown) {
