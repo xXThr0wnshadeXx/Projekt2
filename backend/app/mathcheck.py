@@ -33,6 +33,7 @@ _UNICODE = {
     "²": "^{2}", "³": "^{3}", "−": "-", "–": "-", "×": r"\times ", "÷": r"\div ",
     "≤": r"\le ", "≥": r"\ge ", "≠": r"\ne ", "±": r"\pm ", "·": r"\cdot ",
 }
+_MIXED = re.compile(r"(?<![\w.^_}])(\d+)\s*\\frac\{\s*(\d+)\s*\}\{\s*(\d+)\s*\}")
 _PERCENT = re.compile(r"(\d+(?:\.\d+)?)\s*\\%")
 
 
@@ -43,6 +44,10 @@ def normalise(latex: str) -> str:
     out = _PERCENT.sub(r"\\frac{\1}{100}", out)
     for pattern, repl in _NORMALISE:
         out = pattern.sub(repl, out)
+    # A whole number written straight before a fraction of whole numbers is a
+    # mixed number: 3\frac{1}{2} is three and a half, not 3 x 1/2. Read the
+    # other way, "2x = 3 -> x = 3 1/2" would wrongly check out.
+    out = _MIXED.sub(r"(\1+\\frac{\2}{\3})", out)
     return out.strip()
 
 
@@ -64,7 +69,23 @@ def parse(latex: str):
         raise Unparseable(str(exc)) from None
     if isinstance(expr, Relational) and any(isinstance(a, Relational) for a in expr.args):
         raise Unparseable("chained relation")  # e.g. x = y = z
-    return expr
+    return _letters_times_brackets(expr)
+
+
+# Letters students use as function names. Any other single letter written
+# before brackets is multiplication: x(x + 1) means x times (x + 1).
+_FUNCTION_LETTERS = {"f", "g", "h"}
+
+
+def _letters_times_brackets(expr):
+    from sympy import Mul, Symbol
+    from sympy.core.function import AppliedUndef
+
+    def is_misread(e) -> bool:
+        name = e.func.__name__
+        return isinstance(e, AppliedUndef) and len(name) == 1 and name not in _FUNCTION_LETTERS
+
+    return expr.replace(is_misread, lambda e: Symbol(e.func.__name__) * Mul(*e.args))
 
 
 def is_parseable(latex: str) -> bool:

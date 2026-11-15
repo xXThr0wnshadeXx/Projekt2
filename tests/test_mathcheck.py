@@ -253,3 +253,40 @@ def test_several_plus_minus_signs_are_not_guessed():
 @pytest.mark.parametrize("latex", ["x²+1", "50\\%", "3 × 4", "x ≤ 2"])
 def test_unicode_and_percent_from_the_model_are_readable(latex):
     assert is_parseable(latex)
+
+
+# --- reading notation the way students mean it --------------------------------
+
+@pytest.mark.parametrize(
+    "a, b, valid",
+    [
+        # 3\frac{1}{2} is three and a half, not 3 x 1/2.
+        ("2x = 7", r"x = 3\frac{1}{2}", True),
+        ("2x = 3", r"x = 3\frac{1}{2}", False),      # was a false "checks out"
+        (r"x = 1\frac{1}{2}", "x = 1.5", True),
+        (r"x = 1\frac{1}{2}", "x = 0.5", False),     # was a false "checks out"
+        # A letter before brackets is multiplication, except f, g and h.
+        ("x(x + 1) = 6", "x^{2} + x = 6", True),
+        ("x(x+1)", "x^{2} + x", True),
+        ("x(x+1)", "x^{2} + 1", False),
+        ("f(x) = 2x + 1", "f(x) - 1 = 2x", True),
+    ],
+)
+def test_notation_is_read_as_students_mean_it(a, b, valid):
+    assert steps_equivalent(a, b)[0] is valid
+
+
+@pytest.mark.parametrize(
+    "latex, expected",
+    [
+        (r"3\frac{1}{2}", "7/2"),
+        (r"12\frac{3}{4}", "51/4"),
+        (r"2\frac{x}{3}", "2*x/3"),       # a variable on top: multiplication
+        (r"x^{2}\frac{1}{2}", "x**2/2"),  # after an exponent: multiplication
+        (r"0.5\frac{1}{2}", "0.25"),      # a decimal is never a mixed number
+    ],
+)
+def test_mixed_numbers_only_when_whole_numbers(latex, expected):
+    from sympy import simplify, sympify
+
+    assert simplify(parse(latex) - sympify(expected)) == 0
