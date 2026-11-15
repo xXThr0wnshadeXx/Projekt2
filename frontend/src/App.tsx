@@ -17,7 +17,8 @@ import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
-import { health, apiBase, ApiFailure } from './api';
+import { health, apiBase, apiConnected, ApiFailure } from './api';
+import { UNCONNECTED_MESSAGE } from './apiBase';
 import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
@@ -100,6 +101,12 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    // A deployed build with no server address has nothing to ask (#135).
+    if (!apiConnected) {
+      setBackEnd('down');
+      setBackEndNote(UNCONNECTED_MESSAGE);
+      return;
+    }
     health()
       .then(() => {
         setBackEnd('up');
@@ -215,6 +222,7 @@ export function App() {
       {screen === 'home' && (
         <Home
           backEndReachable={backEnd !== 'down'}
+          connected={apiConnected}
           onCapture={() => setScreen('capture')}
           onSample={() => openProblem(sampleProblem())}
           onResume={problem ? () => setScreen('problem') : undefined}
@@ -282,7 +290,7 @@ export function App() {
           </dd>
           <dt>API base</dt>
           <dd>
-            <code>{apiBase}</code>
+            <code>{apiBase ?? 'not set'}</code>
           </dd>
         </dl>
       </footer>

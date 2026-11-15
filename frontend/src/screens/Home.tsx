@@ -14,10 +14,19 @@ export interface HomeProps {
   /** Present only when a problem from earlier in the session is still loaded. */
   onResume?: () => void;
   backEndReachable: boolean;
+  /** False on a deployed build that was never given a server address (#135). */
+  connected?: boolean;
   onSettings: () => void;
 }
 
-export function Home({ onCapture, onSample, onResume, backEndReachable, onSettings }: HomeProps) {
+export function Home({
+  onCapture,
+  onSample,
+  onResume,
+  backEndReachable,
+  connected = true,
+  onSettings,
+}: HomeProps) {
   const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -63,8 +72,14 @@ export function Home({ onCapture, onSample, onResume, backEndReachable, onSettin
       </div>
 
       {!backEndReachable && (
-        <p className="mt-6 rounded-lg border border-[--warn] px-4 py-3 text-sm text-[--warn]">
-          The server is not reachable, so capture is unavailable. The sample
+        <p
+          data-testid="backend-notice"
+          className="mt-6 rounded-lg border border-[--warn] px-4 py-3 text-sm text-[--warn]"
+        >
+          {connected
+            ? 'The server is not reachable, so capture is unavailable.'
+            : 'This site has not been connected to a server yet, so capture is unavailable.'}{' '}
+          The sample
           problem still works — you can explore it, glance at it, and read it in
           low-vision mode.
         </p>

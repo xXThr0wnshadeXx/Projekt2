@@ -2,10 +2,10 @@
 // The base URL comes from the environment so the deployed front end can point
 // at the deployed back end without a code change.
 
-const BASE = (import.meta.env.VITE_API_BASE ?? 'http://localhost:8000').replace(
-  /\/$/,
-  '',
-);
+import { resolveApiBase, UNCONNECTED_MESSAGE } from './apiBase';
+
+/** Null on a production build made without VITE_API_BASE (issue #135). */
+const BASE = resolveApiBase(import.meta.env);
 
 /** The single error shape the back end returns (DESIGN.md section 9).
  *
@@ -38,6 +38,9 @@ export class ApiFailure extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // No address to try: say so rather than send the request somewhere wrong.
+  if (BASE === null) throw new ApiFailure('NETWORK', UNCONNECTED_MESSAGE);
+
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, init);
@@ -119,6 +122,7 @@ export async function pdfPage(pdf: Blob, page: number): Promise<Blob> {
   const form = new FormData();
   form.append('pdf', pdf, 'worksheet.pdf');
   form.append('page', String(page));
+  if (BASE === null) throw new ApiFailure('NETWORK', UNCONNECTED_MESSAGE);
 
   let res: Response;
   try {
@@ -238,3 +242,5 @@ export function command(
 // The remaining endpoint is implemented with its own issue:
 //   /api/summary          issue #11
 export { BASE as apiBase };
+/** False on a deployed build that was never given a back-end address. */
+export const apiConnected = BASE !== null;
