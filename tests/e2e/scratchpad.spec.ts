@@ -39,6 +39,14 @@ const AMBIGUOUS_ONE_UNCHECKED = {
   ],
 };
 
+// The step check (#21) runs after every save. These tests are about the
+// scratchpad, not the checker, so it is made unreachable here: that is the
+// same as running with no back end, and keeps the announcements exact on a
+// machine that happens to have one running. tests/e2e/modes.spec.ts covers it.
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/diff', (route) => route.abort());
+});
+
 async function stubSpoken(page: Page, body: unknown) {
   await page.route('**/api/spoken-to-latex', async (route) => {
     await route.fulfill({

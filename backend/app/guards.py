@@ -58,6 +58,8 @@ class BodyLimitMiddleware:
         self.app = app
         self.limits = {
             "/api/capture": max_image_bytes + FORM_OVERHEAD,
+            "/api/pdf/pages": max_image_bytes + FORM_OVERHEAD,
+            "/api/pdf/page": max_image_bytes + FORM_OVERHEAD,
             "/api/transcribe": max_audio_seconds * AUDIO_BYTES_PER_SECOND + FORM_OVERHEAD,
         }
 

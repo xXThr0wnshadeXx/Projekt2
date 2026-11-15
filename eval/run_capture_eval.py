@@ -7,7 +7,8 @@ Run from the repository root with python -m eval.run_capture_eval.
 import argparse
 import json
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
+from datetime import UTC, datetime
 from itertools import zip_longest
 from pathlib import Path
 from statistics import median, quantiles
@@ -21,7 +22,11 @@ from backend.app.timeouts import CasTimeout, run_cas_sync, shutdown, warm_up
 
 EVAL_DIR = Path(__file__).resolve().parent
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-               ".webp": "image/webp", ".gif": "image/gif"}
+               ".webp": "image/webp"}
+SUITES = {
+    "pilot": {"slides": 3, "whiteboard": 3, "textbook": 2, "handwritten": 2},
+    "full": {"slides": 10, "whiteboard": 10, "textbook": 5, "handwritten": 5},
+}
 
 
 def equivalent(expected, actual):
@@ -79,6 +84,15 @@ def load_images(manifest, photos_dir):
     return cases
 
 
+def check_suite(cases, suite):
+    if suite == "custom":
+        return
+    counts = Counter(category for _, category, _ in cases)
+    expected = SUITES[suite]
+    if counts != expected:
+        raise ValueError(f"{suite} suite needs {expected}; manifest contains {dict(counts)}.")
+
+
 def evaluate(client, cases):
     groups = defaultdict(list)
     for index, (path, category, expected) in enumerate(cases, start=1):
@@ -126,9 +140,11 @@ def main():
     parser.add_argument("--model", required=True, help="Deployed vision model ID for the report")
     parser.add_argument("--manifest", type=Path, default=EVAL_DIR / "photos_expected.json")
     parser.add_argument("--photos", type=Path, default=EVAL_DIR / "photos")
+    parser.add_argument("--suite", choices=("pilot", "full", "custom"), default="custom")
     args = parser.parse_args()
     try:
         cases = load_images(args.manifest, args.photos)
+        check_suite(cases, args.suite)
     except (OSError, ValueError, TypeError, KeyError) as error:
         parser.error(str(error))
 
@@ -138,7 +154,12 @@ def main():
             results = evaluate(client, cases)
     finally:
         shutdown()
-    print(json.dumps({"model": args.model, "results": results}, indent=2))
+    print(json.dumps({
+        "model": args.model,
+        "suite": args.suite,
+        "run_at": datetime.now(UTC).isoformat(),
+        "results": results,
+    }, indent=2))
     return int(any(result["failures"] for result in results.values()))
 
 
