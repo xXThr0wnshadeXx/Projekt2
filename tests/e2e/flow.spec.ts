@@ -229,8 +229,8 @@ test.describe('@smoke critical path', () => {
     // Re-photographing a worksheet is expensive for someone who had to line a
     // phone up over it, so the problem is cached in the browser.
     await openSample(page);
+    // A reload returns to the same screen (#208), so no "Back to your problem".
     await page.reload();
-    await page.getByRole('button', { name: 'Back to your problem' }).click();
     await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
   });
 
