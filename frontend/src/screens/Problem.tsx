@@ -181,7 +181,7 @@ export function Problem({
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
-      <h2 className="text-2xl font-semibold tracking-tight">Your problem</h2>
+      <h2 className="text-4xl font-medium tracking-tight">Your problem</h2>
 
       {problem.instructions && (
         <p className="mt-2 text-lg">
@@ -198,13 +198,14 @@ export function Problem({
           is not recited — "?" announces it properly. */}
       <p className="mt-2 text-sm text-[--muted]">
         {lines.length} {lines.length === 1 ? 'line' : 'lines'}
-        {unsure > 0 && `, ${unsure} unsure`}. Press{' '}
+        {unsure > 0 && `, ${unsure} unsure`}. Use the{' '}
+        <kbd className="kbd">arrow keys</kbd> to move between lines and{' '}
+        <kbd className="kbd">Space</kbd> to hear one. Press{' '}
         <kbd className="kbd">Enter</kbd> on a line to explore it,{' '}
         <kbd className="kbd">S</kbd> to start working.
         <span aria-hidden="true">
           {' '}
-          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">N</kbd>{' '}
-          and <kbd className="kbd">P</kbd> to move, <kbd className="kbd">L</kbd>{' '}
+          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">L</kbd>{' '}
           large print, <kbd className="kbd">?</kbd> for all shortcuts.
         </span>
       </p>

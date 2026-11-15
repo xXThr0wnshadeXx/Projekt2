@@ -1,0 +1,16 @@
+# Demo Q&A
+
+Give the one-sentence answer first, then show the evidence if asked. See the [questions in #193](https://github.com/xXThr0wnshadeXx/Projekt2/issues/193).
+
+| Question | One-sentence answer | Evidence to show |
+|---|---|---|
+| Isn't this just a chatbot? | Glance gives a student navigable maths from a worksheet, reads back the student's own work for confirmation, and exports that work as accessible HTML. | Open the sample, explore an equation and show a confirmed line in the [hand-in](demo-script.md). |
+| Can students use it to cheat? | Glance refuses requests to solve and exam mode turns off step checks, while the instructor-set lock is still under review. | Ask “What's x?” in the scratchpad and show the refusal, then show the current exam-mode step-check refusal and point to [#224](https://github.com/xXThr0wnshadeXx/Projekt2/pull/224) for the lock and [#225](https://github.com/xXThr0wnshadeXx/Projekt2/pull/225) for the proposed stricter dictation guard. |
+| What if the photo is bad? | Glance announces available retake guidance and flags lines it could not read with confidence, so the student can try again. | Show [capture announcements](../frontend/src/screens/Capture.tsx) and the synthetic results in [eval notes](../eval/notes.md), which leave real-photo accuracy unverified. |
+| How is it different from Equatio or a screen reader? | Equatio documents screenshot reading and spoken maths input, and Glance combines whole-page capture, structured exploration and confirmed hand-in in one workspace that can be used with a screen reader. | Show the [documented overlap and pending hands-on comparison](pitch.md#equatio-comparison), then demonstrate upload, focus and confirmation. |
+| Have blind students used it? | Not yet: the evidence ledger has no recorded session with a blind student. | Show the [evidence ledger](proof-log.md) and [user-testing ticket #186](https://github.com/xXThr0wnshadeXx/Projekt2/issues/186). |
+| What does it cost to run? | We log model usage per request, and measured cost per page and spoken line is still pending. | Show the [scoreboard's measurement gaps](https://github.com/xXThr0wnshadeXx/Projekt2/pull/180/files) and [latency benchmark](https://github.com/xXThr0wnshadeXx/Projekt2/pull/195/files) if asked about speed. |
+| Where does student data go? | Glance keeps session state in the browser and sends capture images and speech to its processing provider without storing them on the Glance server. | Show the [privacy statement](../README.md#privacy). |
+| Braille? | The equation explorer offers Nemeth output, with verification by a qualified braille reader still pending. | Show the explorer output and the [manual verification checklist](screen-reader-pass.md). |
+| Who pays? | The plan is for students to use Glance free and for disability-services offices to fund access, with institutional pricing still to be validated. | Show the [buyer and pilot hypotheses](BUSINESS.md#7-market-size--bottom-up-only). |
+| What's next? | We need to rehearse the complete voice flow on the venue network and log sessions with blind and low-vision students. | Show the acceptance criteria in [#193](https://github.com/xXThr0wnshadeXx/Projekt2/issues/193) and the user-testing plan in [#186](https://github.com/xXThr0wnshadeXx/Projekt2/issues/186). |

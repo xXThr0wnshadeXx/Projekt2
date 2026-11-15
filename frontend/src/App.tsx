@@ -8,9 +8,11 @@
 // routing problem, and every dependency is one more thing that can break a
 // screen reader in a way we would have to discover ourselves.
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
+import { ScreenBoundary } from './components/ScreenBoundary';
 import { KeyboardHelp } from './components/KeyboardHelp';
+import { useTraversal } from './traverse';
 import { setSelfVoicing } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
 import { InstallApp } from './components/InstallApp';
@@ -19,7 +21,8 @@ import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
 import { spokenMath } from './math/sre';
-import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
+import { health, apiBase, apiConnected, ApiFailure, diagnoseUnreachable } from './api';
+import { UNCONNECTED_MESSAGE } from './apiBase';
 import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
@@ -27,6 +30,7 @@ import { LowVision } from './screens/LowVision';
 import { Scratchpad } from './screens/Scratchpad';
 import {
   loadProblem,
+  loadWork,
   saveProblem,
   sampleProblem,
   loadSettings,
@@ -56,6 +60,13 @@ interface Discarded {
 export function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [problem, setProblem] = useState<ProblemData | null>(() => loadProblem());
+  const [initialRestore] = useState(() => {
+    const count = loadWork().length || problem?.lines.length;
+    return count === undefined
+      ? ''
+      : `I restored your work from earlier: ${count} ${count === 1 ? 'line' : 'lines'}.`;
+  });
+  const [lowVisionFailed, setLowVisionFailed] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
   const [spokenLines, setSpokenLines] = useState<Record<string, string>>({});
   const [backEnd, setBackEnd] = useState<BackEnd>('checking');
@@ -70,6 +81,14 @@ export function App() {
   useEffect(() => {
     setSelfVoicing(settings.selfVoicing);
   }, [settings.selfVoicing]);
+
+  const restored = useRef(initialRestore);
+  const takeRestoredAnnouncement = useCallback(() => {
+    const announcement = restored.current;
+    restored.current = '';
+    return announcement;
+  }, []);
+  const resumeProblem = useCallback(() => setScreen('problem'), []);
 
   // Every size in the app is in rem, so this one number is large print for
   // all of it — buttons, notes and maths alike.
@@ -118,6 +137,12 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    // A deployed build with no server address has nothing to ask (#135).
+    if (!apiConnected) {
+      setBackEnd('down');
+      setBackEndNote(UNCONNECTED_MESSAGE);
+      return;
+    }
     health()
       .then(() => {
         setBackEnd('up');
@@ -210,6 +235,7 @@ export function App() {
       if (label) spoken[line.id] = label;
     }
     setSpokenLines(spoken);
+    setLowVisionFailed(false);
     setLineIndex(index);
     setScreen('lowvision');
   }
@@ -219,15 +245,15 @@ export function App() {
   // unmounted and remounted on the way in or out, the announcement made during
   // that same switch would be delivered to a component that is going away, and
   // the student would hear nothing at the exact moment the screen changed.
+  // The whole page by Up/Down and Space, with no scrolling (#236). Low-vision
+  // mode has its own one-line-at-a-time arrows.
+  useTraversal(screen !== 'lowvision');
+
   const lowVision = screen === 'lowvision' && problem
     ? (
         <LowVision
-          lines={problem.lines.map((l, i) => ({
-            id: l.id,
-            latex: l.latex,
-            label: `Line ${i + 1}`,
-            spoken: spokenLines[l.id],
-          }))}
+          lines={problem.lines}
+          spokenLines={spokenLines}
           startIndex={lineIndex}
           onExit={(i) => {
             setLineIndex(i);
@@ -242,119 +268,131 @@ export function App() {
   return (
     <>
       <LiveRegion />
-      {lowVision}
-      <div className="min-h-dvh bg-[--bg] text-[--fg]" hidden={Boolean(lowVision)}>
-      {/* A skip link is the first thing a keyboard user needs. */}
-      <a href="#main" className="skip-link">
-        Skip to main content
-      </a>
+      <div className="min-h-dvh bg-[--bg] text-[--fg]">
+      <div hidden={Boolean(lowVision) && !lowVisionFailed}>
+        {/* A skip link is the first thing a keyboard user needs. */}
+        <a href="#main" className="skip-link">
+          Skip to main content
+        </a>
 
-      <header className="border-b border-[--line] px-6 py-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Glance</h1>
-            <p className="mt-1 text-[--muted]">Math you can hear, explore and write without seeing the page.</p>
-            <div className="mt-2">
-              <ModeBadge mode={settings.mode} />
+        <header className="border-b border-[--line] px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="mono inline-flex min-h-[40px] items-center bg-[--accent] px-3 text-xl font-medium text-[--accent-fg]">Glance</h1>
+              <p className="mt-1 text-[--muted]">Math you can hear, explore and write without seeing the page.</p>
+              <div className="mt-2">
+                <ModeBadge mode={settings.mode} />
+              </div>
             </div>
+            <button
+              type="button"
+              className="btn"
+              aria-expanded={help !== null}
+              aria-controls="keyboard-help"
+              aria-keyshortcuts="?"
+              onClick={() => (help ? setHelp(null) : showHelp(true))}
+            >
+              Keyboard shortcuts
+            </button>
+            <InstallApp />
           </div>
-          <button
-            type="button"
-            className="btn"
-            aria-expanded={help !== null}
-            aria-controls="keyboard-help"
-            aria-keyshortcuts="?"
-            onClick={() => (help ? setHelp(null) : showHelp(true))}
-          >
-            Keyboard shortcuts
-          </button>
-          <InstallApp />
-        </div>
-      </header>
+        </header>
 
-      {help && (
-        <KeyboardHelp
-          screen={screen}
-          takeFocus={help.takeFocus}
-          onClose={() => {
-            setHelp(null);
-            announce('Shortcuts closed.');
-          }}
-        />
-      )}
+        {help && (
+          <KeyboardHelp
+            screen={screen}
+            takeFocus={help.takeFocus}
+            onClose={() => {
+              setHelp(null);
+              announce('Shortcuts closed.');
+            }}
+          />
+        )}
 
-      {screen === 'home' && (
-        <Home
-          onCapture={() => setScreen('capture')}
-          onSample={() => openProblem(sampleProblem())}
-          onResume={problem ? () => setScreen('problem') : undefined}
-          settings={settings}
-          onSettingsChange={updateSettings}
-          onSettings={openSettings}
-        />
-      )}
+      </div>
 
-      {screen === 'capture' && (
-        <Capture onCaptured={openProblem} onBack={() => setScreen('home')} />
-      )}
+      <ScreenBoundary
+        key={screen}
+        screen={screen}
+        onBackToStart={() => setScreen('home')}
+        onFailure={lowVision ? setLowVisionFailed : undefined}
+      >
+        {lowVision}
+        {screen === 'home' && (
+          <Home
+            onCapture={() => setScreen('capture')}
+            onSample={() => openProblem(sampleProblem())}
+            onResume={problem ? resumeProblem : undefined}
+            takeRestoredAnnouncement={takeRestoredAnnouncement}
+            settings={settings}
+            onSettingsChange={updateSettings}
+            onSettings={openSettings}
+          />
+        )}
 
-      {screen === 'problem' && problem && (
-        <Problem
-          problem={problem}
-          startIndex={lineIndex}
-          onLowVision={enterLowVision}
-          mode={settings.mode}
-          onNewCapture={() => setScreen('capture')}
-          onDiscardLine={discardProblemLine}
-          discardedIndex={discarded?.index ?? null}
-          onRestoreLine={restoreProblemLine}
-          onStartWorking={(index) => {
-            setWorkingFrom(index);
-            setLineIndex(index);
-            setScreen('scratchpad');
-          }}
-          onExport={() => openExport('problem')}
-        />
-      )}
+        {screen === 'capture' && (
+          <Capture onCaptured={openProblem} onBack={() => setScreen('home')} />
+        )}
 
-      {screen === 'scratchpad' && problem && (
-        <Scratchpad
-          problem={problem}
-          mode={settings.mode}
-          startLine={workingFrom}
-          onBack={() => setScreen('problem')}
-          onExport={() => openExport('scratchpad')}
-        />
-      )}
+        {screen === 'problem' && problem && (
+          <Problem
+            problem={problem}
+            startIndex={lineIndex}
+            onLowVision={enterLowVision}
+            mode={settings.mode}
+            onNewCapture={() => setScreen('capture')}
+            onDiscardLine={discardProblemLine}
+            discardedIndex={discarded?.index ?? null}
+            onRestoreLine={restoreProblemLine}
+            onStartWorking={(index) => {
+              setWorkingFrom(index);
+              setLineIndex(index);
+              setScreen('scratchpad');
+            }}
+            onExport={() => openExport('problem')}
+          />
+        )}
 
-      {screen === 'export' && problem && (
-        <Export problem={problem} onBack={() => setScreen(exportFrom)} />
-      )}
+        {screen === 'scratchpad' && problem && (
+          <Scratchpad
+            problem={problem}
+            mode={settings.mode}
+            startLine={workingFrom}
+            onBack={() => setScreen('problem')}
+            onExport={() => openExport('scratchpad')}
+          />
+        )}
 
-      {screen === 'settings' && (
-        <Settings
-          settings={settings}
-          onChange={updateSettings}
-          onBack={() => setScreen(settingsFrom)}
-        />
-      )}
+        {screen === 'export' && problem && (
+          <Export problem={problem} onBack={() => setScreen(exportFrom)} />
+        )}
 
-      {/* Only reachable if storage returned something unusable. */}
-      {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
-        <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
-          <h2 className="text-2xl font-semibold">No problem loaded</h2>
-          <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
-            Back to start
-          </button>
-        </main>
-      )}
+        {screen === 'settings' && (
+          <Settings
+            settings={settings}
+            onChange={updateSettings}
+            onBack={() => setScreen(settingsFrom)}
+          />
+        )}
+
+        {/* Only reachable if storage returned something unusable. */}
+        {(screen === 'problem' || screen === 'scratchpad' || screen === 'export') && !problem && (
+          <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
+            <h2 className="text-2xl font-semibold">No problem loaded</h2>
+            <button type="button" className="btn mt-4" onClick={() => setScreen('home')}>
+              Back to start
+            </button>
+          </main>
+        )}
+
+      </ScreenBoundary>
 
       {/* Nothing is said while everything works. A reachable server and the
           address it lives at are facts for whoever deployed it, not for the
           student — and read aloud on every screen they are just noise before
           the content. When it breaks, this says what still works first, and
           keeps the technical detail for whoever goes looking. */}
-      {backEnd === 'down' && (
+      {!lowVision && backEnd === 'down' && (
         <footer className="mx-auto max-w-3xl px-6 pb-10 pt-4">
           <div
             role="status"
@@ -369,7 +407,7 @@ export function App() {
               <summary className="cursor-pointer">Why</summary>
               <p className="mt-2">{backEndNote}</p>
               <p className="mt-1">
-                Server address: <code>{apiBase}</code>
+                Server address: <code>{apiBase ?? 'not set'}</code>
               </p>
             </details>
           </div>
