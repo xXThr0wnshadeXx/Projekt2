@@ -124,3 +124,87 @@ def test_require_parse_raises_unparseable_error_shape():
         bad = client.get("/check", params={"latex": "x +"})
     assert bad.status_code == 422
     assert bad.json()["error"]["code"] == "UNPARSEABLE"
+
+
+# --- steps_equivalent (DESIGN.md 22) -----------------------------------------
+
+from backend.app.mathcheck import steps_equivalent  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "a, b, method",
+    [
+        # subtract / add on both sides
+        ("2x + 3 = 11", "2x = 8", "ratio_constant"),
+        ("x - 5 = 2", "x = 7", "ratio_constant"),
+        # divide / multiply both sides
+        ("2x = 8", "x = 4", "ratio_constant"),
+        (r"\frac{x}{3} = 2", "x = 6", "ratio_constant"),
+        # two operations in one line is still the student's own valid work
+        ("2x + 3 = 11", "x = 4", "ratio_constant"),
+        # distribute
+        ("3(x + 2) = 12", "3x + 6 = 12", "ratio_constant"),
+        # combine like terms
+        ("2x + 3x - 4 = 6", "5x - 4 = 6", "ratio_constant"),
+        # move a term across
+        ("4x = 2x + 6", "2x = 6", "ratio_constant"),
+        # swap sides
+        ("11 = 2x + 3", "2x + 3 = 11", "ratio_constant"),
+        # factor (equation): same roots, ratio is constant
+        ("x^{2} - 5x + 6 = 0", "(x - 2)(x - 3) = 0", "ratio_constant"),
+        # square root of both sides keeping both roots
+        ("x^{2} = 9", "(x - 3)(x + 3) = 0", "ratio_constant"),
+        # same solution set, not a constant multiple
+        (r"\sqrt{x} = 2", "x = 4", "same_solutions"),
+        # expressions
+        ("(x + 1)^{2}", "x^{2} + 2x + 1", "expr_equal"),
+        ("2(a + b)", "2a + 2b", "expr_equal"),
+        (r"\frac{6x}{3}", "2x", "expr_equal"),
+        (r"\left(x + 1\right)^{2}", "x^{2} + 2x + 1", "expr_equal"),
+    ],
+)
+def test_valid_steps_are_verified(a, b, method):
+    assert steps_equivalent(a, b) == (True, method)
+
+
+@pytest.mark.parametrize(
+    "a, b, method",
+    [
+        # arithmetic slip
+        ("2x + 3 = 11", "2x = 9", "not_verified"),
+        # sign slip when distributing
+        ("-(x - 2) = 5", "-x - 2 = 5", "not_verified"),
+        # lost a root
+        ("x^{2} = 4", "x = 2", "not_verified"),
+        # expressions that differ
+        ("(x + 1)^{2}", "x^{2} + 1", "not_verified"),
+        # equation vs expression
+        ("2x = 8", "x", "mixed"),
+        ("2x + 1", "2x + 1 = 0", "mixed"),
+        # inequalities are a documented limitation
+        ("2x < 8", "x < 4", "inequality"),
+        # multi-variable equations are a documented limitation
+        ("x + y = 3", "2x + 2y + 1 = 7", "ratio_constant"),
+        ("x + y = 3", "2x + 2y = 7", "not_verified"),
+        # degenerate
+        ("2x = 8", "0 = 0", "degenerate"),
+        ("2x = 8", "1 = 2", "degenerate"),
+        # unparseable either side
+        ("2x + 3 = 11", "x +", "unparseable"),
+        (r"\frac{}{}", "x = 1", "unparseable"),
+    ],
+)
+def test_other_steps_are_not_verified(a, b, method):
+    verified, got = steps_equivalent(a, b)
+    assert got == method
+    assert verified is (method == "ratio_constant")
+
+
+def test_check_step_runs_under_the_timeout():
+    assert asyncio.run(mathcheck.check_step("2x = 8", "x = 4")) == (True, "ratio_constant")
+
+
+def test_check_step_timeout_raises_timeout(monkeypatch):
+    monkeypatch.setattr(timeouts, "_budget", lambda _t: 0.0001)
+    with pytest.raises(timeouts.CasTimeout):
+        asyncio.run(mathcheck.check_step("2x = 8", "x = 4"))
