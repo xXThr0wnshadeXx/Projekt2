@@ -52,7 +52,7 @@ export function ReadingControls({ settings, onChange }: ReadingControlsProps) {
       >
         Read aloud: {settings.selfVoicing ? 'on' : 'off'}
       </button>
-      <div role="group" aria-label="Text size" className="flex items-center gap-2">
+      <div role="group" aria-label="Text size" className="flex flex-wrap items-center gap-2">
         {/* Never disabled: a disabled button drops out of the tab order, and
             the student who pressed it would land nowhere. At the limit it
             says so instead. */}

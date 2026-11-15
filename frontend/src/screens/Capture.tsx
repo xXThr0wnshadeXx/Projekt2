@@ -35,6 +35,8 @@ export interface CaptureProps {
   onCancel: () => void;
   /** What leaving is called: back to the start, or keep the current problem. */
   keepLabel: string;
+  /** Start the camera on arrival (the C key on the landing, #211). */
+  autoCamera?: boolean;
 }
 
 /** Turn capture warnings into one spoken, actionable instruction (issue #14).
@@ -50,7 +52,7 @@ export function retakeGuidance(warnings: string[]): string | null {
   return `${first}${ends} Try again when you are ready.`;
 }
 
-export function Capture({ onCaptured, onSample, onCancel, keepLabel }: CaptureProps) {
+export function Capture({ onCaptured, onSample, onCancel, keepLabel, autoCamera }: CaptureProps) {
   const [busy, setBusy] = useState<Busy>('idle');
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -73,6 +75,11 @@ export function Capture({ onCaptured, onSample, onCancel, keepLabel }: CapturePr
     announce(
       'Bring in your problem. Three choices: upload a file you already have, take a photo, or follow a live board. Use the Down arrow to hear each one, and Space to choose.',
     );
+    // C on the landing means "point my camera at a worksheet". The timer is
+    // cleared by StrictMode's first pass, so the camera starts once.
+    if (!autoCamera) return;
+    const timer = window.setTimeout(() => void startCamera(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function stopCamera() {
@@ -259,6 +266,9 @@ export function Capture({ onCaptured, onSample, onCancel, keepLabel }: CapturePr
   async function startCamera() {
     setError('');
     setCameraStarting(true);
+    // Said before the browser's own prompt, so a student who cannot see it
+    // knows what is being asked and why (#200).
+    announce('To see your worksheet I need your camera. Your browser will ask for permission now.');
     try {
       const media = await navigator.mediaDevices.getUserMedia({
         // The back camera is the one pointed at a page or a board.

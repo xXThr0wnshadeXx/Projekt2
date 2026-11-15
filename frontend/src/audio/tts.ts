@@ -107,6 +107,18 @@ export function speak(text: string, rate = 1): void {
   utter(text, rate);
 }
 
+/** Speak once, even with the app's voice switched off — issue #200.
+ *
+ *  Only for the very first gesture on a first visit, so a student with no
+ *  screen reader hears how to turn the voice on. Browsers allow speech only
+ *  after a gesture, which is why it waits for one. */
+export function speakOnce(text: string): void {
+  if (!isSupported() || !text.trim()) return;
+  cancel();
+  lastStarted = Date.now();
+  utter(text, 1);
+}
+
 /** Speak an announcement. An urgent one interrupts; a quick follow-up waits
  *  its turn; anything else replaces what was being said. */
 export function say(text: string, urgent = false): void {

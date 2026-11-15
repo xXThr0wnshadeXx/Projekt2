@@ -15,7 +15,7 @@ import { LiveRegion, announce, focusFirst } from './components/LiveRegion';
 import { ScreenBoundary } from './components/ScreenBoundary';
 import { KeyboardHelp } from './components/KeyboardHelp';
 import { useTraversal } from './traverse';
-import { setSelfVoicing } from './audio/tts';
+import { setSelfVoicing, speakOnce } from './audio/tts';
 import { ModeBadge } from './components/ModeBadge';
 import { InstallApp } from './components/InstallApp';
 import { ReadingControls } from './components/ReadingControls';
@@ -47,6 +47,37 @@ type BackEnd = 'checking' | 'up' | 'down';
 const WELCOME =
   'Glance. It reads your maths worksheet aloud and writes down your own work as you say it. It never solves it for you. Use the Down arrow to move through the page and Space to press or hear what you are on.';
 
+// First visit (#211): one question, so a student arriving alone, with or
+// without a screen reader, can start with no one helping.
+const WELCOMED_KEY = 'glance.welcomed.v1';
+const ASK_VOICE = 'Press Y to hear Glance speak to you, or N if you use a screen reader.';
+const NEXT = 'Then press C to point your camera at a worksheet, or S to try a sample problem.';
+const FIRST_VISIT_WELCOME =
+  'Glance. It reads your maths worksheet aloud and writes down your own work as you say it. It never solves it for you.';
+
+function welcomedBefore(): boolean {
+  try {
+    return window.localStorage.getItem(WELCOMED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function rememberWelcomed(): void {
+  try {
+    window.localStorage.setItem(WELCOMED_KEY, '1');
+  } catch {
+    // Private windows can refuse storage; the question is simply asked again.
+  }
+}
+
+// Keys a screen-reader user moves around with. The first-gesture voice waits
+// for something else, so it does not talk over a screen reader.
+const NAVIGATION_KEYS = new Set([
+  'Tab', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Escape',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown',
+]);
+
 /** How soon an unanswered health check is asked again, doubling up to the cap. */
 const HEALTH_RETRY_FIRST_MS = 2_000;
 const HEALTH_RETRY_MAX_MS = 30_000;
@@ -71,6 +102,10 @@ export function App() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+  // Asked on the landing of a first visit only: Y or N for the voice (#211).
+  const [firstVisit, setFirstVisit] = useState(() => !welcomedBefore());
+  // The camera starts on arrival at the capture page when it was reached by C.
+  const [cameraOnArrival, setCameraOnArrival] = useState(false);
   const [lowVisionOn, setLowVisionOn] = useState(false);
   const [lowVisionFailed, setLowVisionFailed] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
@@ -108,7 +143,9 @@ export function App() {
     const count = loadWork().length || problem?.lines.length;
     const text = count
       ? `Glance. I restored your work from earlier: ${count} ${count === 1 ? 'line' : 'lines'}. Use the Down arrow to move through the page and Space to press or hear what you are on.`
-      : WELCOME;
+      : !problem && !window.location.hash && firstVisit
+        ? `${FIRST_VISIT_WELCOME} ${ASK_VOICE} ${NEXT} Use the Down arrow to move through the page and Space to press or hear what you are on.`
+        : WELCOME;
     const timer = window.setTimeout(() => announce(text), 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -248,14 +285,24 @@ export function App() {
   /** Open the capture page, or say why it cannot work right now (#127). The
    *  buttons that lead here stay in the tab order, so a student moving by Tab
    *  is told why instead of landing on a page where every upload fails. */
-  function openCapturePage() {
+  function openCapturePage(withCamera = false) {
     if (!modelsUsable) {
       announce(`Capture is unavailable right now. ${modelsUnavailableWhy} Try the sample problem instead.`);
       // Pressing it is also a reason to ask again: the model may be back.
       void checkHealth();
       return;
     }
+    setCameraOnArrival(withCamera);
     setCapturing(true);
+  }
+
+  function chooseVoice(on: boolean) {
+    rememberWelcomed();
+    setFirstVisit(false);
+    // Saved as a choice, so reading aloud stays as picked from now on.
+    updateSettings({ ...settings, selfVoicing: on, voiceChosen: true });
+    // Switched on before announcing, so this very sentence is spoken.
+    announce(on ? `Okay, I will speak to you. ${NEXT}` : `Okay, your screen reader will do the talking. ${NEXT}`);
   }
 
   function goHome() {
@@ -308,7 +355,45 @@ export function App() {
   const showStart = !problem && !capturing;
 
   // U and C on the landing open the capture page, as they did on Home.
-  useShortcuts({ u: openCapturePage, c: openCapturePage }, showStart);
+  useShortcuts(
+    {
+      u: () => openCapturePage(),
+      c: () => openCapturePage(true),
+      s: () => openProblem(sampleProblem()),
+      ...(firstVisit ? { y: () => chooseVoice(true), n: () => chooseVoice(false) } : {}),
+    },
+    showStart,
+  );
+
+  // A student with no screen reader hears nothing from a live region, and the
+  // browser will not let the page speak until they do something. So on a first
+  // visit, their first tap, click or key other than navigation says the
+  // question aloud, once (#211).
+  useEffect(() => {
+    if (!showStart || !firstVisit) return;
+    let done = false;
+    const CONTROLS = 'button, a, input, select, textarea, label';
+    function first(e: Event) {
+      if (done) return;
+      // Someone using a control has found their way already, and a screen
+      // reader activating one must never be talked over: stop listening.
+      const target = e instanceof KeyboardEvent ? document.activeElement : e.target;
+      if (target instanceof Element && target.closest(CONTROLS)) {
+        done = true;
+        return;
+      }
+      // Keys: only Space or Enter on the page itself.
+      if (e instanceof KeyboardEvent && (NAVIGATION_KEYS.has(e.key) || ![' ', 'Enter'].includes(e.key))) return;
+      done = true;
+      speakOnce(`Welcome to Glance. ${ASK_VOICE} ${NEXT}`);
+    }
+    window.addEventListener('pointerdown', first, true);
+    window.addEventListener('keydown', first, true);
+    return () => {
+      window.removeEventListener('pointerdown', first, true);
+      window.removeEventListener('keydown', first, true);
+    };
+  }, [showStart, firstVisit]);
 
   // `LiveRegion` stays outside every conditional: if it remounted during a
   // change, the announcement made at that moment would be lost.
@@ -390,6 +475,7 @@ export function App() {
                   onSample={() => openProblem(sampleProblem())}
                   onCancel={leaveCapture}
                   keepLabel={problem ? 'Keep my current problem' : 'Back to the start'}
+                  autoCamera={cameraOnArrival}
                 />
               </ScreenBoundary>
             ) : showStart ? (
@@ -397,6 +483,15 @@ export function App() {
                 <h2 id="start-heading" tabIndex={-1} className="display text-center">
                   Maths you can hear, explore and write
                 </h2>
+                {firstVisit && (
+                  // Text, not buttons: it adds no Tab stops, and Tab still goes
+                  // straight to "Get started". The Read aloud switch below does
+                  // the same thing for anyone who prefers a control.
+                  <p className="welcome-ask text-center" data-testid="welcome">
+                    New here? Press <kbd className="kbd">Y</kbd> to hear Glance speak to you, or{' '}
+                    <kbd className="kbd">N</kbd> if you use a screen reader.
+                  </p>
+                )}
                 <p className="get-started-lead text-center">
                   Glance reads your maths worksheet aloud, lets you explore each line
                   piece by piece, and writes down your own working as you say it.{' '}
@@ -412,7 +507,7 @@ export function App() {
                   <button
                     type="button"
                     className="btn-hero"
-                    onClick={openCapturePage}
+                    onClick={() => openCapturePage()}
                     aria-disabled={modelsUsable ? undefined : 'true'}
                   >
                     {modelsUsable ? 'Get started' : 'Get started - capture is unavailable right now'}
