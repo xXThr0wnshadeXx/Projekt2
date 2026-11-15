@@ -10,10 +10,12 @@ import { announce } from '../components/LiveRegion';
 import { ExportPreview } from '../components/ExportPreview';
 import { buildExportHtml, downloadFile } from '../export';
 import { useShortcuts } from '../shortcuts';
-import { loadWork, type Problem } from '../state';
+import { feedback, ApiFailure, type FeedbackResponse } from '../api';
+import { loadWork, type Mode, type Problem } from '../state';
 
 export interface ExportProps {
   problem: Problem;
+  mode: Mode;
   onBack: () => void;
 }
 
@@ -32,10 +34,12 @@ export function exportFilename(name: string, date: Date): string {
   return slug ? `math-work-${slug}-${day}.html` : `math-work-${day}.html`;
 }
 
-export function Export({ problem, onBack }: ExportProps) {
+export function Export({ problem, mode, onBack }: ExportProps) {
   const work = useMemo(() => loadWork(), []);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<FeedbackResponse | null>(null);
   const date = useMemo(() => new Date(), []);
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -80,6 +84,23 @@ export function Export({ problem, onBack }: ExportProps) {
     window.setTimeout(() => window.print(), 150);
   }
 
+  async function askAi(kind: 'review' | 'hint') {
+    if (!work.length || mode === 'exam') return;
+    setAiBusy(true);
+    setAiFeedback(null);
+    try {
+      const result = await feedback(problem.lines.map((line) => line.latex), work.map((line) => line.latex), mode, kind);
+      setAiFeedback(result);
+      announce(result.message);
+    } catch (error) {
+      const message = error instanceof ApiFailure ? error.message : 'AI feedback is unavailable right now.';
+      setAiFeedback({ outcome: 'needs_review', message });
+      announce(message, 'assertive');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   useShortcuts({ d: () => void downloadHtml() }, !busy);
 
   return (
@@ -122,6 +143,33 @@ export function Export({ problem, onBack }: ExportProps) {
           Back
         </button>
       </div>
+
+      <section aria-labelledby="ai-feedback-heading" className="no-print mt-8 rounded-lg border border-[--line] bg-[--surface] px-4 py-4">
+        <h3 id="ai-feedback-heading" className="text-lg font-semibold">AI feedback</h3>
+        <p className="mt-1 text-sm text-[--muted]">
+          Optional and never submitted to your teacher. It reviews the problem and your confirmed work in real time, but never gives an answer or does the next step for you.
+        </p>
+        {mode === 'exam' ? (
+          <p className="mt-3 text-sm text-[--muted]">AI feedback is off in exam mode.</p>
+        ) : (
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button type="button" className="btn" disabled={aiBusy || !work.length} onClick={() => void askAi('review')}>
+              Check accuracy with AI
+            </button>
+            <button type="button" className="btn" disabled={aiBusy || !work.length} onClick={() => void askAi('hint')}>
+              Get a feedback-only hint
+            </button>
+          </div>
+        )}
+        <p role="status" className="mt-3 min-h-[1.5rem] text-[--muted]">
+          {aiBusy && 'Reviewing your submitted work…'}
+        </p>
+        {aiFeedback && (
+          <p aria-label="AI feedback result" className="mt-2 rounded-lg border border-[--line] px-3 py-2">
+            {aiFeedback.message}
+          </p>
+        )}
+      </section>
 
       <p role="status" className="no-print mt-4 min-h-[1.5rem] text-[--muted]">
         {busy && 'Making the file…'}

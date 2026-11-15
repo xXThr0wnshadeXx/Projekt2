@@ -289,7 +289,7 @@ export function App() {
       )}
 
       {screen === 'export' && problem && (
-        <Export problem={problem} onBack={() => setScreen(exportFrom)} />
+        <Export problem={problem} mode={settings.mode} onBack={() => setScreen(exportFrom)} />
       )}
 
       {screen === 'settings' && (
