@@ -40,6 +40,7 @@ async function stubPdf(page: Page, pages: number) {
 
 async function uploadPdf(page: Page) {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Get started' }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'worksheet.pdf',
     mimeType: 'application/pdf',

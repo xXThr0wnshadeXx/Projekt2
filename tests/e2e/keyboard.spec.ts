@@ -78,7 +78,8 @@ test.describe('@smoke keyboard help', () => {
   test('U in the capture section opens the file picker', async ({ page }) => {
     await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
-    await page.locator('#capture-heading').focus();
+    await page.getByRole('button', { name: 'Get started' }).click();
+    await expect(page.locator('#capture-heading')).toBeFocused();
     // Headless Chromium doesn't raise a file-chooser event for a key-driven
     // click, so assert the thing that opens it: the file input being clicked.
     await page.evaluate(() => {

@@ -39,7 +39,7 @@ test.describe('@smoke progressive web app shell', () => {
 
 test('@smoke skip link moves focus to main content', async ({ page, browserName }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Get started' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
   const skip = page.getByRole('link', { name: 'Skip to main content' });
   if (browserName === 'webkit') {
     // Safari leaves links out of the Tab order unless "Press Tab to highlight
@@ -96,7 +96,7 @@ async function expectNoSeriousViolations(page: Page, screen: string) {
  * comes back through "Bring in a different worksheet". */
 async function openCapture(page: Page) {
   await page.getByRole('button', { name: 'Bring in a different worksheet' }).click();
-  await expect(page.getByRole('heading', { name: 'Get started' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toBeFocused();
 }
 
 async function openProblem(page: Page) {

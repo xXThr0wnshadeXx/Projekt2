@@ -142,7 +142,7 @@ test.describe('@smoke commands', () => {
 
   test('check is off in exam mode', async ({ page }) => {
     await page.addInitScript(() =>
-      localStorage.setItem('glance.settings.v1', JSON.stringify({ mode: 'exam', selfVoicing: false })),
+      localStorage.setItem('glance.settings.v1', JSON.stringify({ mode: 'exam', selfVoicing: false, voiceChosen: true })),
     );
     await open(page, { intent: 'check', target_line: 'W1', instruction: null });
     await say(page, 'check this step');

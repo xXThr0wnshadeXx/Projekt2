@@ -25,13 +25,13 @@ test.describe('@smoke critical path', () => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: 'Glance', level: 1 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Get started' })).toBeVisible();
-    const capture = page.getByRole('button', { name: 'Capture a problem' });
-    await expect(capture).toBeVisible();
-    await expect(capture).toHaveAttribute('aria-controls', 'capture-choices');
+    await expect(page.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Get started' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
-    // The three ways in appear when the one button is pressed.
-    await capture.click();
+    // The capture choices are not on the landing; Get started opens them.
+    await expect(page.getByRole('button', { name: 'Upload a file' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Get started' }).click();
+    await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toBeFocused();
     await expect(page.getByRole('button', { name: 'Upload a file' })).toBeVisible();
   });
 
@@ -218,16 +218,19 @@ test.describe('@smoke critical path', () => {
     await expect(page.locator('#L1')).toBeFocused();
   });
 
-  test('the capture section offers every input from the start', async ({ page }) => {
+  test('the capture page offers every input, and Back to the start leaves it', async ({ page }) => {
     await page.goto('/');
+    await page.getByRole('button', { name: 'Get started' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Get started' })).toBeVisible();
-    await page.getByRole('button', { name: 'Capture a problem' }).click();
+    await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toBeFocused();
     const choices = page.getByRole('group', { name: 'How to bring in your problem' });
     await expect(choices.getByRole('button', { name: 'Upload a file' })).toBeVisible();
     await expect(choices.getByRole('button', { name: 'Take a photo' })).toBeVisible();
     await expect(choices.getByRole('button', { name: 'Live board' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Back to the start' }).click();
+    await expect(page.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
   });
 
   test('a problem survives a reload', async ({ page }) => {

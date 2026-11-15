@@ -12,7 +12,7 @@ const captured = {
 
 async function openCapture(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Capture a problem' }).click();
+  await page.getByRole('button', { name: 'Get started' }).click();
   await page.clock.install();
 }
 

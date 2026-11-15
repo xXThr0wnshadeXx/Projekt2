@@ -49,8 +49,11 @@ async function keyless(page: Page, validity: boolean | 'unreachable' = true) {
 }
 
 async function typeLine(page: Page, text: string) {
-  await page.getByLabel('Or type your line').fill(text);
-  await page.keyboard.press('Enter');
+  // Press on the box itself: S moves focus to the heading a moment later, which
+  // would otherwise take focus between the fill and a page-level Enter.
+  const box = page.getByLabel('Or type your line');
+  await box.fill(text);
+  await box.press('Enter');
 }
 
 test.describe('@smoke without a model', () => {
