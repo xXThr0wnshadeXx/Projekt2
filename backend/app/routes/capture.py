@@ -13,6 +13,7 @@ from .. import guards
 from ..errors import ApiError, error_response
 from ..openai_client import ModelClient, ModelError
 from ..capture_fidelity import tidy_capture
+from ..capture_guard import context_block, guard_capture_text
 from ..prompts import CAPTURE_PROMPT
 
 
@@ -95,8 +96,7 @@ def capture_router(
                         # report "Transcribe the uploaded image." back as the
                         # worksheet's instructions (#176).
                         "Image attached."
-                        + ("\nNotation context (not printed worksheet instructions):\n" + context
-                           if context else "")
+                        + context_block(context)
                     )},
                     {"type": "image_url", "image_url": {
                         "url": f"data:{kind};base64,{encoded}",
@@ -109,7 +109,7 @@ def capture_router(
                 "message": "I couldn't read that image. Try again.",
             }})
 
-        result = tidy_capture(result)
+        result = guard_capture_text(tidy_capture(result))
         lines = result["lines"]
         validity = await asyncio.gather(*(validate_latex(line["latex"]) for line in lines))
         for index, (line, valid) in enumerate(zip(lines, validity, strict=True), start=1):
