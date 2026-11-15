@@ -25,6 +25,7 @@ from .routes.diff import diff_router
 from .routes.pdf import pdf_router
 from .routes.spoken import spoken_router
 from .routes.transcribe import transcribe_router
+from .routes.speak import speak_router
 from .routes.validate import validate_router
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -51,6 +52,7 @@ def create_app(
             model_vision=settings.model_vision,
             model_text=settings.model_text,
             model_stt=settings.model_stt,
+            model_tts=settings.model_tts,
         ), quota=quota)
         # Every capture, spoken-line and transcription call adds its model,
         # tokens and cost to the request's log line and /api/stats (issue #44).
@@ -108,10 +110,14 @@ def create_app(
         app.include_router(capture_router(models, validate_latex, settings.max_image_bytes))
         app.include_router(spoken_router(models, validate_latex))
         app.include_router(transcribe_router(models, min(settings.max_audio_seconds, 30)))
+        if settings.model_tts:
+            app.include_router(speak_router(models))
 
     @app.get("/api/health")
     async def health() -> dict:
-        return {"ok": True}
+        # `voice` tells the browser whether the natural voice is available, so
+        # it never tries /api/speak on a server that has none (#182).
+        return {"ok": True, "voice": bool(models is not None and settings.model_tts)}
 
     @app.get("/api/stats")
     async def stats(x_stats_token: str | None = Header(default=None)) -> dict:

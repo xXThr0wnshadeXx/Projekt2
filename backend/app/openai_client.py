@@ -59,6 +59,15 @@ def _log_provider_failure(task: str, error: Exception) -> None:
         log.warning("model request failed task=%s category=%s", task, category)
 
 
+# How the voice should sound (#182): like a good human reader for a blind
+# student, not an assistant. It reads what it is given and adds nothing.
+SPEAK_STYLE = (
+    "Speak like a calm, warm human reader for a blind student. Clear and unhurried. "
+    "Read mathematics exactly as written, with a short pause between its parts. "
+    "Say only the given text."
+)
+
+
 class ModelError(RuntimeError):
     """The upstream response could not be used."""
 
@@ -72,6 +81,7 @@ class ModelSettings(BaseSettings):
     model_vision: ModelId
     model_text: ModelId
     model_stt: ModelId
+    model_tts: str = ""
 
     # The SDK defaults are a 600 s read timeout and 2 retries. One stalled
     # upstream call would then hold a capture for ten minutes while the student
@@ -157,6 +167,34 @@ class ModelClient:
         if not isinstance(payload, dict):
             raise ModelError("The model returned an unreadable result.")
         return payload
+
+    async def speak(self, text: str, voice: str, speed: float) -> bytes:
+        """Neural speech for the app's own voice (#182). Never logs the text.
+
+        Not counted against the shared model quota: the voice can speak many
+        times a minute, and it must never use up the budget a capture needs.
+        """
+        if not self.settings.model_tts:
+            raise ModelError("Speech is not configured.")
+        extra = {}
+        if self.settings.model_tts.startswith("gpt-4o"):
+            extra["instructions"] = SPEAK_STYLE
+        try:
+            result = await self._bounded(
+                self.settings.model_fast_timeout_seconds,
+                self.client.audio.speech.create(
+                    model=self.settings.model_tts,
+                    voice=voice,
+                    input=text,
+                    response_format="mp3",
+                    speed=speed,
+                    **extra,
+                ),
+            )
+        except (OpenAIError, TimeoutError) as error:
+            _log_provider_failure("speak", error)
+            raise ModelError("The speech service is unavailable.") from None
+        return result.content
 
     async def transcribe(self, filename: str, audio: bytes, content_type: str) -> str:
         if self.quota is not None:

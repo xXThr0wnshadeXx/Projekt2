@@ -6,6 +6,7 @@
 import { useEffect, useRef } from 'react';
 import { announce } from '../components/LiveRegion';
 import { ReadingControls } from '../components/ReadingControls';
+import { VoiceControls } from '../components/VoiceControls';
 import type { Mode, Settings as SettingsData } from '../state';
 
 export interface SettingsProps {
@@ -95,6 +96,7 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
         <div className="mt-3">
           <ReadingControls settings={settings} onChange={onChange} />
         </div>
+        <VoiceControls settings={settings} onChange={onChange} />
       </section>
 
       {/* "Back" alone says nothing when it is read out with no screen to look

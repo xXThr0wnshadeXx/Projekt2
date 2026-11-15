@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     model_vision: str = ""
     model_text: str = ""
     model_stt: str = ""
+    # Optional neural text-to-speech for the app's own voice (#182). Empty means
+    # the browser's built-in voice is used, as before.
+    model_tts: str = ""
 
     # Comma-separated list of exact origins. Never a wildcard.
     allowed_origin: str = "http://localhost:5173"
