@@ -201,6 +201,34 @@ test.describe('@smoke scratchpad', () => {
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
   });
 
+  test('the question still answers its keys when focus is not inside it', async ({ page }) => {
+    // #153: WebKit sometimes leaves focus behind the dialog, and a screen
+    // reader's cursor can be elsewhere too. Escape and 1 to 3 must still work.
+    await stubSpoken(page, AMBIGUOUS);
+    await openScratchpad(page);
+
+    const typing = page.getByLabel('Or type your line');
+    await typing.fill('x plus one over two');
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
+
+    await typing.fill('x plus one over two');
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press('2');
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await expect(page.getByRole('region', { name: 'Confirm your line' })).toContainText(
+      'x plus one half',
+    );
+  });
+
   test('a line can be deleted and put back', async ({ page }) => {
     await stubSpoken(page, CLEAR);
     await openScratchpad(page);

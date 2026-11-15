@@ -37,6 +37,7 @@ def create_app(
     explainer: Explainer | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
+    settings.check_production()
     quota = (
         ModelQuota(settings.model_call_limit, settings.model_call_window_seconds)
         if settings.model_call_limit else None

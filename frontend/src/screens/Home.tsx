@@ -18,6 +18,7 @@ export interface HomeProps {
   onSample: () => void;
   /** Present only when a problem from earlier in the session is still loaded. */
   onResume?: () => void;
+  takeRestoredAnnouncement: () => string;
   onSettings: () => void;
   settings: Settings;
   onSettingsChange: (next: Settings) => void;
@@ -31,6 +32,7 @@ export function Home({
   onCapture,
   onSample,
   onResume,
+  takeRestoredAnnouncement,
   onSettings,
   settings,
   onSettingsChange,
@@ -39,12 +41,14 @@ export function Home({
 
   useEffect(() => {
     heading.current?.focus();
-    announce(
-      onResume
-        ? `${WHAT} Capture a problem, try the sample, or go back to your problem.`
-        : `${WHAT} Capture a problem, or try the sample.`,
-    );
-  }, [onResume]);
+    const welcome = onResume
+      ? `${WHAT} Capture a problem, try the sample, or go back to your problem.`
+      : `${WHAT} Capture a problem, or try the sample.`;
+    // Announce after the live regions have mounted. StrictMode cancels the
+    // first timer before it can use the one-time restoration message.
+    const timer = window.setTimeout(() => announce(takeRestoredAnnouncement() || welcome), 0);
+    return () => window.clearTimeout(timer);
+  }, [onResume, takeRestoredAnnouncement]);
 
   useShortcuts({ u: onCapture, c: onCapture });
 
@@ -53,11 +57,11 @@ export function Home({
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="display focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Math for students who are blind or have low vision
       </h2>
-      <p className="mt-3 text-lg">
+      <p className="mt-6 max-w-2xl border-l-2 border-[--fg] pl-4 text-lg">
         Glance reads a math problem aloud, lets you explore it piece by piece,
         and writes down your own working as you say it or type it. No pencil,
         no paper, no need to see the page.

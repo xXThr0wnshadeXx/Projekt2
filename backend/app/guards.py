@@ -27,8 +27,15 @@ FORM_OVERHEAD = 64 * KB
 AUDIO_BYTES_PER_SECOND = 40 * KB  # generous for 320 kbps; real speech is far lower
 
 MODEL_PATHS = frozenset({
-    "/api/capture", "/api/transcribe", "/api/spoken-to-latex", "/api/command", "/api/summary",
-    "/api/diff", "/api/feedback",
+    "/api/capture",
+    "/api/transcribe",
+    "/api/spoken-to-latex",
+    "/api/command",
+    "/api/summary",
+    "/api/diff",
+    "/api/feedback",
+    "/api/pdf/pages",
+    "/api/pdf/page",
 })
 UNLIMITED_PATHS = frozenset({"/api/health"})
 

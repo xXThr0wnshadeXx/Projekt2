@@ -17,7 +17,7 @@ export function ModeBadge({ mode }: { mode: Mode }) {
   return (
     <p
       data-testid="mode-badge"
-      className="inline-flex min-h-[32px] items-center rounded-full border border-[--line] px-3 text-sm font-medium"
+      className="chip"
     >
       {LABEL[mode]}
     </p>
