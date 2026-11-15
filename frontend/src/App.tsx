@@ -17,7 +17,7 @@ import { Settings } from './screens/Settings';
 import { Export } from './screens/Export';
 import { helpText, useShortcuts } from './shortcuts';
 import { loadMathJax } from './math/mathjax';
-import { health, apiBase, ApiFailure } from './api';
+import { health, apiBase, ApiFailure, diagnoseUnreachable } from './api';
 import { Home } from './screens/Home';
 import { Capture } from './screens/Capture';
 import { Problem } from './screens/Problem';
@@ -105,8 +105,18 @@ export function App() {
         setBackEnd('up');
         setBackEndNote('');
       })
-      .catch((e: unknown) => {
+      .catch(async (e: unknown) => {
         setBackEnd('down');
+        // A server that is up but refusing this origin looks identical to one
+        // that is down, so find out which before telling anyone anything.
+        if (e instanceof ApiFailure && e.code === 'NETWORK') {
+          setBackEndNote(
+            (await diagnoseUnreachable()) === 'blocked'
+              ? `The server is running but is not accepting requests from ${window.location.origin}. Add that address to ALLOWED_ORIGIN on the server.`
+              : 'Nothing answered at the server address. Check that it is deployed and that you are online.',
+          );
+          return;
+        }
         setBackEndNote(e instanceof ApiFailure ? e.message : 'Unavailable.');
       });
   }, []);
@@ -272,20 +282,32 @@ export function App() {
         </main>
       )}
 
-      <footer className="mx-auto max-w-3xl px-6 pb-10 pt-4 text-sm text-[--muted]">
-        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
-          <dt>Back end</dt>
-          <dd data-testid="backend-status">
-            {backEnd === 'checking' && 'checking'}
-            {backEnd === 'up' && 'reachable'}
-            {backEnd === 'down' && `not reachable — ${backEndNote}`}
-          </dd>
-          <dt>API base</dt>
-          <dd>
-            <code>{apiBase}</code>
-          </dd>
-        </dl>
-      </footer>
+      {/* Nothing is said while everything works. A reachable server and the
+          address it lives at are facts for whoever deployed it, not for the
+          student — and read aloud on every screen they are just noise before
+          the content. When it breaks, this says what still works first, and
+          keeps the technical detail for whoever goes looking. */}
+      {backEnd === 'down' && (
+        <footer className="mx-auto max-w-3xl px-6 pb-10 pt-4">
+          <div
+            role="status"
+            data-testid="backend-status"
+            className="rounded-lg border border-[--warn] bg-[--surface] px-4 py-3 text-sm"
+          >
+            <p>
+              Reading new problems is unavailable right now. The sample problem still
+              works — you can explore it, glance at it, write your own work and hand it in.
+            </p>
+            <details className="mt-2 text-[--muted]">
+              <summary className="cursor-pointer">Why</summary>
+              <p className="mt-2">{backEndNote}</p>
+              <p className="mt-1">
+                Server address: <code>{apiBase}</code>
+              </p>
+            </details>
+          </div>
+        </footer>
+      )}
       </div>
     </>
   );

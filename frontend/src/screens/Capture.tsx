@@ -279,9 +279,16 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       </p>
 
       <div className="mt-6 flex flex-wrap gap-3">
+        {/* The real control is the button below, which this input backs. On
+            its own it is an unnamed tab stop — a screen reader announces it as
+            just "button" — so it is taken out of the tab order and out of the
+            accessibility tree. Both are needed: aria-hidden on something still
+            focusable is its own violation. `sr-only` alone does neither. */}
         <input
           ref={fileInput}
           type="file"
+          tabIndex={-1}
+          aria-hidden="true"
           accept={[...CAPTURE_TYPES, 'application/pdf'].join(',')}
           className="sr-only"
           onChange={(e) => {

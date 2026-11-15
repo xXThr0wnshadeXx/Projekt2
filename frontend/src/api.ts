@@ -63,6 +63,32 @@ export function health(): Promise<HealthResponse> {
   return request<HealthResponse>('/api/health');
 }
 
+/** Why the back end could not be reached, when it could not be. */
+export type Unreachable =
+  /** Nothing answered: wrong address, server down, or no connection. */
+  | 'offline'
+  /** The server answered, but will not accept requests from this site. */
+  | 'blocked';
+
+/**
+ * Tell a server that is down apart from one that is up but refusing this
+ * origin. The browser reports both to JavaScript as the same opaque network
+ * failure, so without this the app says "not reachable" when the real problem
+ * is one line of configuration — which is a miserable thing to debug on demo
+ * morning.
+ *
+ * A `no-cors` request is not blocked by the CORS policy: it returns an opaque
+ * response if something is listening and rejects if nothing is.
+ */
+export async function diagnoseUnreachable(): Promise<Unreachable> {
+  try {
+    await fetch(`${BASE}/api/health`, { mode: 'no-cors', cache: 'no-store' });
+    return 'blocked';
+  } catch {
+    return 'offline';
+  }
+}
+
 /** Capture response — DESIGN.md 9. `id` and `valid` are filled in server-side.
  *
  *  The back end checks the file signature, not the declared type, and allows

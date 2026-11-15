@@ -24,10 +24,22 @@ export function MathLine({ id, latex, label, unsure = false }: MathLineProps) {
     if (!el) return;
     // String.raw so the display delimiters survive as a literal backslash.
     el.textContent = String.raw`\[` + latex + String.raw`\]`;
+    // MathJax is fetched from a CDN, so on a slow connection there is a window
+    // where this shows the student raw TeX — which reads as a broken page to a
+    // sighted user and is meaningless read aloud. Keep it out of sight and out
+    // of the accessibility tree until it is real math; the line's own
+    // aria-label still names it, so nothing is lost to a screen reader.
+    el.setAttribute('aria-hidden', 'true');
+    el.style.visibility = 'hidden';
     let cancelled = false;
+    const reveal = () => {
+      el.style.visibility = '';
+      el.removeAttribute('aria-hidden');
+    };
     typeset(el)
       .then(() => {
         if (cancelled) return;
+        reveal();
         // MathJax attaches the explorer after typesetPromise resolves and sets
         // the container's tabindex then, so the config alone can lose the race
         // and leave every line as two tab stops. Enforce it per line.
@@ -35,9 +47,11 @@ export function MathLine({ id, latex, label, unsure = false }: MathLineProps) {
         if (container) container.tabIndex = -1;
       })
       .catch(() => {
-        if (!cancelled) {
-          el.textContent = latex;
-        }
+        if (cancelled) return;
+        // If MathJax never arrives, the LaTeX itself is still better than an
+        // empty box — a student can read it, and it is what we would export.
+        el.textContent = latex;
+        reveal();
       });
     return () => {
       cancelled = true;
