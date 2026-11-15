@@ -84,7 +84,9 @@ test.describe('@smoke reading controls', () => {
     for (let i = 0; i < 3; i += 1) await larger.click();
     await expect(page.getByTestId('text-scale')).toHaveText('200%');
 
-    await larger.click();
+    // Safari does not focus buttons on a pointer click. Activate by keyboard
+    // to check that reaching the limit keeps the keyboard user's focus.
+    await larger.press('Enter');
     await expect(polite(page)).toHaveText('This is the largest text size.');
     await expect(larger).toBeFocused();
   });
@@ -135,7 +137,9 @@ test.describe('@smoke reading controls', () => {
     await page.route('**/api/**', (route) => route.abort());
     await page.goto('/');
     await expect(page.getByTestId('backend-status')).toBeVisible();
-    await expect(page.getByText(/unavailable/i)).toHaveCount(1);
+    // Said once as a notice. The Capture button also names itself
+    // "unavailable right now" (#127); that is a control's name, not a notice.
+    await expect(page.getByText(/unavailable/i).and(page.locator(':not(button)'))).toHaveCount(1);
     await expect(page.getByText(/not reachable/i)).toHaveCount(0);
   });
 

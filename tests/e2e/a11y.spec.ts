@@ -7,6 +7,8 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { stubServerWithModels } from './server';
+
 
 const PROBLEM = {
   instructions: 'Solve for x.',
@@ -120,6 +122,7 @@ for (const scheme of ['dark', 'light'] as const) {
     });
 
     test('capture, including a refused camera', async ({ page }) => {
+      await stubServerWithModels(page); // capture needs the model (#127)
       await page.goto('/');
       await page.getByRole('button', { name: 'Capture a problem' }).click();
       await expectNoSeriousViolations(page, 'capture');
@@ -132,6 +135,7 @@ for (const scheme of ['dark', 'light'] as const) {
       await page.route('**/api/pdf/pages', (r) =>
         r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ pages: 3 }) }),
       );
+      await stubServerWithModels(page); // capture needs the model (#127)
       await page.goto('/');
       await page.getByRole('button', { name: 'Capture a problem' }).click();
       await page.locator('input[type=file]').setInputFiles({

@@ -3,7 +3,7 @@
 ## Is it up?
 
 ```bash
-curl -s "$API/api/health"          # {"ok":true}
+curl -s "$API/api/health"          # {"ok":true,"models":true}  (models false = no key: typing and step checks only)
 bash scripts/preflight.sh          # every check the demo depends on
 ```
 

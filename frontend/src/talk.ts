@@ -15,6 +15,7 @@
 // a line the student wrote. It never says what to do next.
 
 import { asksToSolve } from './commands';
+import type { Part } from './math/parts';
 
 export type Talk =
   | { kind: 'filler' }
@@ -27,7 +28,8 @@ export type Talk =
   | { kind: 'readProblem' }
   | { kind: 'status' }
   | { kind: 'define'; term: string; meaning: string }
-  | { kind: 'unknownTerm'; term: string };
+  | { kind: 'unknownTerm'; term: string }
+  | { kind: 'part'; part: Part; line?: number };
 
 // Sounds and phrases that carry no content. A line made only of these is
 // someone thinking; at the start of a line they are dropped.
@@ -82,7 +84,7 @@ export const GLOSSARY: [RegExp, string, string][] = [
   [/\bmonomials?\b/, 'monomial', 'A monomial is a polynomial with one term.'],
   [/\bbinomials?\b/, 'binomial', 'A binomial is a polynomial with two terms.'],
   [/\btrinomials?\b/, 'trinomial', 'A trinomial is a polynomial with three terms.'],
-  [/\bdegrees?\b/, 'degree', 'The degree of a polynomial is the largest exponent on a variable in any one of its terms.'],
+  [/\bdegrees?\b/, 'degree', 'A degree is the unit angles are measured in. A full turn is three hundred and sixty degrees. The degree of a polynomial is its largest exponent on a variable in any one term.'],
   [/\broots?\b/, 'root', 'A root of an equation is a value that makes the equation true.'],
   [/\bsolutions?\b/, 'solution', 'A solution is a value that makes an equation or inequality true.'],
   [/\bidentit(?:y|ies)\b/, 'identity', 'An identity is an equation that is true for every allowed value of its variables.'],
@@ -129,7 +131,7 @@ export const GLOSSARY: [RegExp, string, string][] = [
   [/\breciprocals?\b/, 'reciprocal', 'The reciprocal of a number is one divided by that number.'],
   [/\babsolute values?\b/, 'absolute value', 'The absolute value of a number is its size, ignoring whether it is negative.'],
   [/\b(?:parenthes[ie]s|brackets?)\b/, 'parentheses', 'Parentheses group part of a line so it is treated as one thing.'],
-  [/\bsolve\b/, 'solve', 'To solve for a letter means to find the value of the letter that makes the equation true. That part is yours to do.'],
+  [/\bsolve\b/, 'solve', 'Solving for a letter means working out which value of the letter makes the equation true. That part is yours to do.'],
   [/\bsimplify\b/, 'simplify', 'To simplify means to rewrite something in a shorter form that has the same value.'],
   // What this app itself says.
   [/\b(?:could ?n[o']t|can ?n[o']t|not) confirm(?:ed)?\b/, 'could not confirm', 'It means I could not verify that your line follows from the one before. It does not mean your line is wrong.'],
@@ -165,6 +167,43 @@ const ASKS_REPEAT =
 const DESCRIBES_A_STEP =
   /\b(?:both sides|each side)\b|^(?:(?:next|now|then|first|i|we|you|let me|let's|i'll|i will|i'm going to|i am going to|going to|i want to|want to|i need to|need to|i have to|have to|should|can|just|gonna) )*(?:add|subtract|multiply|divide|factor|expand|distribute|simplify|cancel|combine|isolate|move|take|get rid of)\b/i;
 
+// Questions about one part of a line (#199): "what's on top", "read the
+// bottom", "what's under the root", "how many terms on the left". Each has to
+// be phrased as a question or a request, so a dictated line such as "x to the
+// power two" is still written down as maths. "What is an exponent" and "what
+// does base mean" stay with the glossary: these need "the".
+const ASKS = String.raw`^(?:and |so |ok |okay )?(?:what(?:'s| is| are|s)?|which|how|read(?: me)?|tell me|say|give me|spell|describe|show me|break)\b`;
+const PART_QUESTIONS: [RegExp, Part][] = [
+  [/\b(?:spell (?:it|that|this|line \w+)(?: out)?|letter by letter|symbol by symbol)\b/, 'spell'],
+  [/\b(?:how many terms|count the terms)\b/, 'terms'],
+  [/\b(?:describe (?:it|this|that|the line|line \w+)|what does (?:it|this|the line|line \w+) look like|the shape|break (?:it|this|line \w+) down)\b/, 'shape'],
+  [/\b(?:on top|the top|the numerator|above the line)\b/, 'top'],
+  [/\b(?:on the bottom|at the bottom|the bottom|the denominator|underneath|below the line)\b/, 'bottom'],
+  [/\b(?:under|inside|in) the (?:square |cube )?root\b/, 'root'],
+  [/\bthe (?:power|exponent)\b/, 'power'],
+  [/\bthe base\b/, 'base'],
+  [/\b(?:left)(?: hand)?(?: side)?\b/, 'left'],
+  [/\b(?:right)(?: hand)?(?: side)?\b/, 'right'],
+];
+const LINE_NUMBER = /\bline (\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/;
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+};
+
+/** "What's on top of line two?" as a part and an optional line number. */
+export function asksAboutPart(text: string): { part: Part; line?: number } | null {
+  const said = text.toLowerCase().trim().replace(/[?.!]+$/, '');
+  if (!new RegExp(ASKS).test(said)) return null;
+  if (/\b(?:mean|means|meaning|define)\b/.test(said)) return null;
+  const found = PART_QUESTIONS.find(([pattern]) => pattern.test(said));
+  if (!found) return null;
+  // "Read the left side" is a part; "what's left" or "turn left" is not.
+  if ((found[1] === 'left' || found[1] === 'right') && !/\bside\b/.test(said)) return null;
+  const n = LINE_NUMBER.exec(said)?.[1];
+  const line = n ? (NUMBER_WORDS[n] ?? Number(n)) : undefined;
+  return line ? { part: found[1], line } : { part: found[1] };
+}
+
 /** What the student meant, when it was neither math nor a command. */
 export function understandTalk(text: string): Talk | null {
   const said = text.trim().replace(/[.!?]+$/, '');
@@ -176,6 +215,10 @@ export function understandTalk(text: string): Talk | null {
   if (GREETS.test(lower)) return { kind: 'greeting' };
   if (THANKS.test(lower)) return { kind: 'thanks' };
   if (ASKS_REPEAT.test(lower)) return { kind: 'repeat' };
+  // Before the glossary: "what is on top" is a question about this line, not
+  // a word to define.
+  const part = asksAboutPart(lower);
+  if (part) return { kind: 'part', ...part };
   let unknownTerm: string | undefined;
   if (ASKS_MEANING.test(lower)) {
     // Match the requested word, not the whole question. Otherwise the entry
@@ -189,7 +232,7 @@ export function understandTalk(text: string): Talk | null {
       unknownTerm = requestedTerm;
     }
   }
-  if (asksToSolve(said)) return { kind: 'refuse' };
+  if (lower === 'just tell me' || asksToSolve(said)) return { kind: 'refuse' };
   if (DESCRIBES_A_STEP.test(lower)) return { kind: 'describes' };
   if (ASKS_CAPABILITIES.test(lower)) return { kind: 'capabilities' };
   if (ASKS_FOR_PROBLEM.test(lower)) return { kind: 'readProblem' };
@@ -211,7 +254,7 @@ export const SAYS = {
   refuse:
     'I cannot solve it, give the answer, or say what to do next. The work is yours. I can read the problem again, explain a math word, or check a line once you have written it.',
   capabilities:
-    'I read math aloud and write down what you say. Say or type a line and I read it back before saving it. You can also say: read the problem, where am I, what does numerator mean, check this step, delete line two, undo, or hand in. I never solve the problem or give hints.',
+    'I read math aloud and write down what you say. Say or type a line and I read it back before saving it. You can also say: read the problem, describe it, what is on top, what is under the root, where am I, what does numerator mean, check this step, delete line two, undo, or hand in. I never solve the problem or give hints.',
   examNoMeanings: 'Explaining words is off in exam mode.',
   unknownTerm: (term: string) =>
     `I do not have a meaning for ${term}. I can read the problem again, or explain words like fraction, numerator, exponent or coefficient.`,

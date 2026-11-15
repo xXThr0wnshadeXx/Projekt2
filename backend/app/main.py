@@ -37,6 +37,7 @@ def create_app(
     explainer: Explainer | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
+    settings.check_production()
     quota = (
         ModelQuota(settings.model_call_limit, settings.model_call_window_seconds)
         if settings.model_call_limit else None
@@ -113,7 +114,9 @@ def create_app(
 
     @app.get("/api/health")
     async def health() -> dict:
-        return {"ok": True}
+        # `models` lets the front end stop offering recording and capture on a
+        # server that cannot do them, instead of letting each one fail (#127).
+        return {"ok": True, "models": models is not None}
 
     @app.get("/api/stats")
     async def stats(x_stats_token: str | None = Header(default=None)) -> dict:

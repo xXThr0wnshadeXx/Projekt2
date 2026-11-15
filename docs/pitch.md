@@ -1,140 +1,43 @@
 # Pitch
 
-Four-minute structure from `BUSINESS.md` §11. Issue #36.
+Glance lets blind and low-vision students understand any page of maths by voice, on their own. It reads the page, helps them grasp its shape and parts, and writes down their work. It never does the work for them.
 
-**Every number on a slide is either sourced or from our own ledger.** Blanks
-below are blanks on purpose — fill them from `proof-log.md` and the eval
-reports, and if a blank is still empty on Sunday morning, **cut the line**. Do
-not round up, do not estimate, do not say "about a dozen" when the ledger says
-four. `BUSINESS.md` §0 rule 6 is the one that matters most here: judges forgive
-small numbers and remember invented ones.
+The first audience is blind and low-vision students doing algebra-level maths, and the disability-services offices and teachers of students with visual impairments who support them. Independence and understanding are the headline. The integrity contract answers the question about cheating.
 
----
+## Two-minute presentation
 
-## The one-liner
+**0:00–0:15, why.** Hold up the printed worksheet. “A paper equation shouldn't mean waiting for someone else to read it. Stanford asks for materials four to five business days before they're needed for accessible-format conversion. I want a student to understand this page by voice, on their own.” This is a submission lead time at one institution, not a universal turnaround estimate. [Stanford guidance](https://oae.stanford.edu/faculty-staff/accessible-format-remediation-alternate-format/accessible-format-remediation).
 
-> Bring in any math problem — a photo, a screenshot, a scan. Hear its shape,
-> work it out loud, hand in typed work. Glance never solves it for you.
+**0:15–1:45, show it.** Run the [single unbroken take](demo-script.md): Screen Curtain on, voice-guided photo, shape first, questions about the fraction, the student's own dictated line, then typed hand-in. Let the participant and the app speak. Do not narrate over them or add a feature tour. This is the rehearsal target; its release gates must pass before we present it as a working demonstration.
 
-## Opening (0:00–0:25)
+**1:45–1:50, proof.** TODO: insert one consented result from [the evidence ledger](proof-log.md), with the task, participant role, date and outcome. The ledger currently has no recorded sessions. Until that changes, say: “We haven't recorded a real student trial yet.” A teammate demo must be labelled as a teammate demo.
 
-Lead with the person, not the technology.
+**1:50–2:00, trust and close.** “Glance is built to describe the maths and write down your work. It doesn't tell you what to do next. Schools decide whether a particular configuration meets their accommodation rules.” Do not promise that permission for a human reader automatically authorizes this software.
 
-> "Math assumes you can see it and write it. A screen reader reads an equation
-> one symbol at a time, left to right — so a blind student has to hold the whole
-> thing in working memory while a sighted classmate just glances and knows its
-> shape. That is a barrier of access, not ability."
+## What we can compare today
 
-If you have a quote with permission, use it here instead of the second
-sentence. One real sentence from a real student beats any framing we write.
+These are documented capabilities and open questions, not a measured ranking. “Exam-safe” means institutionally approved for a specific assessment; no product gets that label from this table alone.
 
-## The cost of the status quo (0:25–0:45)
+| Option | Time | Cost | Works on photos | Two-way reading and writing | Exam permission |
+|---|---|---|---|---|---|
+| Glance | TODO: timed real-user trials | TODO: measured cost per page and spoken line | Capture route and mocked browser tests; real-photo accuracy TODO | Reading and confirmed dictation exist; complete hands-free flow TODO | Approval and deployed instructor-lock validation TODO |
+| Human reader/scribe | TODO: local availability and scheduling | TODO: local service quote | TODO: assess the actual material with the service | Depends on the approved reader/scribe role; local policy TODO | Institution's accommodation decision; obtain the policy |
+| Alternate-format conversion | Stanford asks for 4–5 business days' advance submission [1] | TODO: local quote; no worksheet-price estimate | Source-format requirements vary; local service check TODO | Produces accessible material; independent writing workflow must be assessed | Institution's decision; local policy TODO |
+| Equatio | TODO: timed shared-worksheet trial | TODO: current institutional quote | Mobile image input and Screenshot Reader documented [2] | Speech input and reading documented [2, 3] | Exam Mode is documented [4]; local approval still TODO |
+| Screen reader alone | TODO: same worksheet and device trial | TODO: specify product and licence | TODO: test the chosen reader's image/OCR support | Depends on the reader, maths format and editor; no blanket limitation claimed | Institution's decision; local policy TODO |
 
-| Fact | Say it as |
-|---|---|
-| Up to **$12,000** for one braille math textbook | sourced, older article — say "historically" |
-| Up to **$15,000** for five chapters of a science book | Marketplace, 2017 — say the year |
-| **4–5 business days** at Stanford, a well-resourced programme | "even a top programme targets" |
-| **75%** of K–12 blind/low-vision students a grade behind in math | **always say "K–12"** |
+[1] [Stanford accessible-format remediation](https://oae.stanford.edu/faculty-staff/accessible-format-remediation-alternate-format/accessible-format-remediation): submission lead time, not evidence of a student's actual delay.
 
-> "Converting one STEM worksheet has cost thousands and taken weeks. The
-> student falls behind while they wait."
+[2] [Everway's Equatio feature tour](https://help.everway.com/equatio/tours/equatio-feature-tour/): overlapping image, reading and writing features.
 
-## Demo (0:45–2:30)
+[3] [Everway's speech-input guide](https://academy.everway.com/equatio/howtos/using-speech-input-in-equatio/): spoken maths input.
 
-Runs from `demo-script.md`. One user, one flow, one wow moment.
+[4] [Everway's student quickstart](https://help.everway.com/equatio/pathways/student/quickstart/): Exam Mode documentation, not an institution's approval of Glance or Equatio.
 
-The wow is the clarifying question. Do not rush it, and do not explain it
-before it happens — let the app ask, pause, then explain why asking matters.
+For a fair comparison, use the same image-only worksheet, device, browser and screen reader. Record capture actions, the first announcement, exploration of the nested fraction, ambiguous dictation and accessible export. Keep the full recording and failures. TODO: run this comparison before claiming Glance is faster, cheaper or more accessible than any alternative.
 
-## What we learned (2:30–3:10)
+## Evidence and the ask
 
-The scoreboard. Fill from the ledger; leave out any line you cannot evidence.
+The planned buyer is a disability-services office or school; pricing, willingness to pay and a free-to-student funding model are hypotheses, not signed commitments. The ask is a supervised evaluation with permission to record anonymized outcomes, not a claim of an existing pilot. TODO: record buyer interviews and written pilot interest in the ledger.
 
-| | |
-|---|---|
-| Interviews completed | ___ (students ___, staff ___, instructors/TVIs ___) |
-| Real usage sessions | ___ |
-| Sign-ups by role | ___ |
-| Follow-ups booked / intros given | ___ |
-| Pilot interest in writing | ___ |
-| Concierge test | ___ pages in ___ minutes, against ___ days reported |
-| Capture accuracy | ___% equivalent-match on slides/typed |
-| Ambiguity asked rather than guessed | ___% |
-| Cost per page | $___ |
-
-**Say what failed.** If H1–H6 in `BUSINESS.md` §3 did not all pass, name the one
-that did not and what we changed because of it. A team that reports a failed
-hypothesis is more credible than one that reports six wins.
-
-## Who pays (3:10–3:45)
-
-- Students: **free**, always.
-- Buyer: university disability services and alternate-format offices, who
-  already pay for conversion in staff time and contractor fees and already miss
-  turnaround targets.
-- Beachhead: Cal Poly → CSU's 22 campuses → other public universities → K–12
-  districts.
-- Pricing: **under validation.** Show the formula and the interview data so far.
-  Do not quote a number no buyer has reacted to.
-- Tailwind: ADA Title II digital accessibility, large institutions' deadline
-  April 2027.
-
-## Close (3:45–4:00)
-
-> "Same-day math access, without anyone solving it for them."
-
----
-
-## Equatio comparison
-
-Texthelp documents that Equatio’s Screenshot Reader can capture inaccessible
-math, read it aloud, and copy LaTeX or MathML. Its toolbar also supports spoken
-math input and preview. These are overlapping capabilities. [Screenshot Reader demo](https://academy.texthelp.com/equatio/howtos/using-the-screenshot-reader-on-a-website/) · [Equatio tool guide](https://mautic.texthelp.com/asset/603%3Adsa-eq-chrome-ref-guide)
-
-In Glance, the keyboard workflow under test is whole-page capture, focus on
-the first recognized line, and numbered confirmation of the student’s own
-work. The scratchpad asks which grouping the student intended before saving
-ambiguous input. Local browser tests verify focus and confirmation with
-mocked model responses. [Capture tests](../tests/e2e/flow.spec.ts) · [Scratchpad tests](../tests/e2e/scratchpad.spec.ts)
-
-### Shared worksheet test
-
-Create one image-only worksheet with the lines `2x + 3 = 11` and
-`\frac{\sqrt{x + 1}}{2} = 5`. Use the same image, browser, Mac, and VoiceOver
-settings in each trial. Start from a fresh page each time.
-
-1. Capture the worksheet with the keyboard. Record the actions required, the
-   first announcement, and whether focus goes to the recognized math.
-2. Read and navigate the nested fraction. Record what VoiceOver announces and
-   which keys can move between parts.
-3. Dictate “x plus one over two”. Record whether the app asks, offers an edit,
-   or inserts a specific grouping, and when the line becomes saved work.
-4. Save or export the confirmed work in each available format. Record the
-   format, any pointer-only step, and elapsed time for the same end point.
-
-The hands-on VoiceOver comparison is pending. Use the documented overlap in
-the pitch and reserve comparative claims about speed, keyboard access,
-and ambiguity handling until the shared worksheet test is recorded.
-
-## Answers we should have ready
-
-| Question | Answer |
-|---|---|
-| "Isn't this Equatio?" | See the comparison section above. Lead with the overlap we can source, then the workflow difference. **Until the shared worksheet test is recorded, do not claim an advantage in speed, keyboard access or ambiguity handling** — say we have not tested it yet. A judge who uses Equatio will know if we are guessing. |
-| "Why not just use a chatbot?" | They solve the problem, which is not allowed in coursework, and their output is prose — not navigable, verifiable math. We never solve, in any mode. |
-| "Isn't this cheating?" | No solve, no hints, no next step, in any mode. Exam mode is transcription only. The student does every line and confirms it. |
-| "What if the AI is wrong?" | Low-confidence lines are flagged, every line is read back and confirmed by the student, and a computer algebra system checks what it can. When it cannot, it says so — it never says "wrong", it says it could not confirm. Accuracy numbers from the evals. |
-| "How big is this?" | Bottom-up only: named campuses × a price under validation. Never a percentage of a large market. |
-| "What does it cost to run?" | **Not measured yet** — there is no API credit (#88). We log tokens and cost per request (#44, #76), so `/api/stats` gives cost per page and per spoken line the moment a key is live. Say "we log it per request; numbers once the pilot key is live." |
-| "Braille?" | Nemeth output comes from MathJax's Speech Rule Engine. **We have not had it checked by a braille reader yet** — the screen-reader pass is #32. Say that. Speech and large print are the primary story. |
-| "Privacy?" | No accounts, no database, nothing stored on our server. Images and audio are **sent to OpenAI to be read**, never stored by us — the Home screen says so. Do not imply they go nowhere. |
-| "What changed your plan this weekend?" | Have a real answer from the ledger. |
-
-## Rules for the room
-
-1. One user story, one wow moment.
-2. Personas are "for example" — never implied to be a real person we met.
-3. If asked something we did not test, say we did not test it. Then say what we
-   would measure in a pilot.
-4. Do not oversell the braille. It works, it is verified, it is not the pitch.
+Use the [Q&A sheet](qa-sheet.md) for costs, privacy, braille and integrity. The [leave-behind](leave-behind.md) is the short version for judges and disability-services staff. No market-size, accuracy, interview-count or runtime-cost number belongs in this pitch until its source and measurement conditions are recorded.

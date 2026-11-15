@@ -25,7 +25,7 @@ const RELATIONS: Record<string, string> = {
 };
 
 /** Convert LaTeX to a MathML document, or null if MathJax cannot. */
-async function toMathML(latex: string): Promise<Element | null> {
+export async function toMathML(latex: string): Promise<Element | null> {
   await loadMathJax();
   const mj = window.MathJax;
   try {
@@ -74,10 +74,13 @@ function topLevelRelation(root: Element): string | null {
   // enrichment on, `2x + 3 = 11` comes back as <math><mrow>2x+3</mrow><mo>=</mo>
   // <mn>11</mn></math> — the `=` is a child of <math> itself, and the first
   // <mrow> is just the left side. Stepping into that first child reported every
-  // such equation as "an expression". Step in only when it is the sole child.
-  const only = root.children.length === 1 ? root.firstElementChild : null;
-  const scan = root.localName === 'math' && only?.localName === 'mrow' ? only : root;
-  for (const child of Array.from(scan.children)) {
+  // such equation as "an expression". Step in only while a row is the sole
+  // child, which unwraps a whole line however deeply it is wrapped.
+  let row = root;
+  while (row.childElementCount === 1 && row.firstElementChild?.localName === 'mrow') {
+    row = row.firstElementChild;
+  }
+  for (const child of Array.from(row.children)) {
     if (child.localName === 'mo') {
       const op = (child.textContent ?? '').trim();
       if (op in RELATIONS) return op;

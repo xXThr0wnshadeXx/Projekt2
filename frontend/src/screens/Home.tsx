@@ -18,7 +18,10 @@ export interface HomeProps {
   onSample: () => void;
   /** Present only when a problem from earlier in the session is still loaded. */
   onResume?: () => void;
+  takeRestoredAnnouncement: () => string;
   onSettings: () => void;
+  /** Why capture cannot work right now, or undefined when it can (#127). */
+  captureUnavailable?: string;
   settings: Settings;
   onSettingsChange: (next: Settings) => void;
 }
@@ -31,7 +34,9 @@ export function Home({
   onCapture,
   onSample,
   onResume,
+  takeRestoredAnnouncement,
   onSettings,
+  captureUnavailable,
   settings,
   onSettingsChange,
 }: HomeProps) {
@@ -39,25 +44,38 @@ export function Home({
 
   useEffect(() => {
     heading.current?.focus();
-    announce(
-      onResume
-        ? `${WHAT} Capture a problem, try the sample, or go back to your problem.`
-        : `${WHAT} Capture a problem, or try the sample.`,
-    );
-  }, [onResume]);
+    const welcome = onResume
+      ? `${WHAT} Capture a problem, try the sample, or go back to your problem.`
+      : `${WHAT} Capture a problem, or try the sample.`;
+    // Announce after the live regions have mounted. StrictMode cancels the
+    // first timer before it can use the one-time restoration message.
+    const timer = window.setTimeout(() => announce(takeRestoredAnnouncement() || welcome), 0);
+    return () => window.clearTimeout(timer);
+  }, [onResume, takeRestoredAnnouncement]);
 
-  useShortcuts({ u: onCapture, c: onCapture });
+  // The button stays in the tab order when capture cannot work, so a student
+  // moving by Tab is told why instead of landing on a screen where every
+  // upload fails. `disabled` would drop it from the tab order and say nothing.
+  function capture() {
+    if (captureUnavailable) {
+      announce(`Capture is unavailable right now. ${captureUnavailable} Try the sample problem instead.`);
+      return;
+    }
+    onCapture();
+  }
+
+  useShortcuts({ u: capture, c: capture });
 
   return (
     <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
       <h2
         ref={heading}
         tabIndex={-1}
-        className="text-2xl font-semibold tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="display focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Math for students who are blind or have low vision
       </h2>
-      <p className="mt-3 text-lg">
+      <p className="mt-6 max-w-2xl border-l-2 border-[--fg] pl-4 text-lg">
         Glance reads a math problem aloud, lets you explore it piece by piece,
         and writes down your own working as you say it or type it. No pencil,
         no paper, no need to see the page.
@@ -79,8 +97,13 @@ export function Home({
       </ol>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button type="button" className="btn-primary" onClick={onCapture}>
-          Capture a problem
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={capture}
+          aria-disabled={captureUnavailable ? 'true' : undefined}
+        >
+          {captureUnavailable ? 'Capture a problem - unavailable right now' : 'Capture a problem'}
         </button>
         <button type="button" className="btn" onClick={onSample}>
           Try a sample problem

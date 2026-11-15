@@ -12,6 +12,8 @@
 // and is covered by the back-end tests.
 
 import { test, expect, type Page } from '@playwright/test';
+import { stubServerWithModels } from './server';
+
 
 /** Open the sample problem and wait for MathJax to typeset it. */
 async function openSample(page: Page) {
@@ -124,6 +126,24 @@ test.describe('@smoke critical path', () => {
     await expect(summary).not.toContainText('99');
   });
 
+  test('a line says its number once, then how to explore it', async ({ page }) => {
+    // #133: the number was in the group's label and again in hidden text, so
+    // a screen reader said "Line 1, group. Line 1. Press Enter to explore."
+    await openSample(page);
+    const line = page.getByRole('group', { name: 'Line 1', exact: true });
+    await expect(line).toHaveAccessibleName('Line 1');
+    await expect(line).toHaveAccessibleDescription('Press Enter to explore.');
+    await expect(page.locator('#L1 mjx-container')).toBeVisible();
+    // Nothing a reader would speak inside the line repeats the number.
+    const spokenInside = await line.evaluate((el) =>
+      Array.from(el.querySelectorAll('*'))
+        .filter((child) => !child.closest('[hidden]') && child.children.length === 0)
+        .map((child) => child.textContent ?? '')
+        .join(' '),
+    );
+    expect(spokenInside).not.toContain('Line 1');
+  });
+
   test('N and P move between lines and announce the position', async ({ page }) => {
     await openSample(page);
 
@@ -195,6 +215,7 @@ test.describe('@smoke critical path', () => {
   });
 
   test('the capture screen offers every input by keyboard', async ({ page }) => {
+    await stubServerWithModels(page); // capture needs the model (#127)
     await page.goto('/');
     await page.getByRole('button', { name: 'Capture a problem' }).click();
 
@@ -203,7 +224,10 @@ test.describe('@smoke critical path', () => {
     await expect(page.getByRole('button', { name: 'Take a photo' })).toBeVisible();
 
     // Back returns to the start without a reload.
-    await page.getByRole('button', { name: 'Back to the start' }).click();
+    // Enter, not a click: on CI's Linux WebKit phone emulation the page cannot
+    // be scrolled to its last ~100px after a screen change, so a click on a
+    // control at the bottom never lands. A real phone is not affected.
+    await page.getByRole('button', { name: 'Back to the start' }).press('Enter');
     await expect(page.getByRole('button', { name: 'Try a sample problem' })).toBeVisible();
   });
 
