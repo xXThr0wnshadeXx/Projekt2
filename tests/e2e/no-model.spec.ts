@@ -113,7 +113,10 @@ test.describe('@smoke health is asked again', () => {
 
     models = true;
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Back to the start' }).click();
+    // Enter, not a click: on CI's Linux WebKit phone emulation the page cannot
+    // be scrolled to its last ~100px after a screen change, so a click on a
+    // control at the bottom never lands. A real phone is not affected.
+    await page.getByRole('button', { name: 'Back to the start' }).press('Enter');
     await expect(page.getByRole('button', { name: 'Capture a problem', exact: true })).toBeVisible();
   });
 
@@ -125,6 +128,10 @@ test.describe('@smoke health is asked again', () => {
 
     models = true;
     await openScratchpad(page);
-    await expect(page.getByTestId('record-button')).toBeVisible();
+    // Speech is offered again. Not checked through the record button itself:
+    // Linux WebKit has no MediaRecorder, so there it says the browser cannot
+    // record, whatever the server says.
+    await expect(page.getByTestId('speech-unavailable')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Hands-free/ })).toBeVisible();
   });
 });
