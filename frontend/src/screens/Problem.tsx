@@ -15,7 +15,6 @@ import { announce, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
 import { spokenMath, structureSummary } from '../math/sre';
 import { useShortcuts } from '../shortcuts';
-import { readAloud, useLineKeys } from '../lineKeys';
 import { checksOffMessage, stepChecksAllowed } from '../stepCheck';
 import type { Mode, Problem as ProblemData } from '../state';
 
@@ -130,17 +129,6 @@ export function Problem({
         : checksOffMessage(mode),
     );
   }
-
-  // Arrows and Space (#236): the easiest keys to find without looking.
-  useLineKeys({
-    previous: () => goTo(index - 1, 'previous'),
-    next: () => goTo(index + 1, 'next'),
-    read: () => {
-      if (!current) return;
-      const spoken = spokenMath(document.getElementById(current.id));
-      readAloud(spoken ? `Line ${index + 1}. ${spoken}` : `Line ${index + 1} is not ready to read yet.`);
-    },
-  });
 
   useShortcuts({
     g: glance,
