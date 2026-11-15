@@ -39,12 +39,28 @@ jobs:
           if [ "$code" -eq 5 ]; then echo "No back-end tests collected yet."; exit 0; fi
           exit "$code"
 
-  frontend:
-    name: Front-end smoke (Playwright)
+  smoke:
+    name: Front-end smoke (${{ matrix.project }})
+    # One job per browser, in parallel. Run as one job, all three no longer
+    # fitted the time limit reliably once Firefox was added (#214), and every
+    # PR waited the full 8 minutes for its check.
     # Pinned: Playwright 1.49 installs WebKit's system libraries by their
     # Ubuntu 24.04 names, which ubuntu-latest (26.04) no longer has.
     runs-on: ubuntu-24.04
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: chromium
+            browser: chromium
+          # WebKit for iPhone Safari (Flow B). Safari's keyboard behaviour
+          # differs (Tab skips buttons by default), and a bug that only
+          # showed there was what added it.
+          - project: mobile-safari
+            browser: webkit
+          - project: firefox
+            browser: firefox
     steps:
       - uses: actions/checkout@v4
 
@@ -63,13 +79,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package.json') }}
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('frontend/package.json') }}
 
-      # Chromium for desktop, WebKit for iPhone Safari (Flow B). Safari's
-      # keyboard behaviour differs (Tab skips buttons by default), and a bug
-      # that only showed there was what added it.
-      - name: Install Chromium and WebKit
-        run: npx playwright install --with-deps chromium webkit
+      - name: Install ${{ matrix.browser }}
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Start dev server
         working-directory: frontend
@@ -85,12 +98,26 @@ jobs:
         env:
           CI: "true"
           BASE_URL: http://localhost:5173
-        run: npx playwright test --grep @smoke --project=chromium --project=mobile-safari --pass-with-no-tests --reporter=line
+        run: npx playwright test --grep @smoke --project=${{ matrix.project }} --pass-with-no-tests --reporter=line
 
       - name: Upload report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.project }}
           path: playwright-report/
           retention-days: 3
+
+  frontend:
+    # Keeps the check name the branch rules and the team already use, and
+    # passes only when every browser passed.
+    name: Front-end smoke (Playwright)
+    needs: smoke
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Every browser passed
+        run: |
+          echo "smoke: ${{ needs.smoke.result }}"
+          test "${{ needs.smoke.result }}" = "success"

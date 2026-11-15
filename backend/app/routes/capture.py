@@ -12,7 +12,9 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 from .. import guards
 from ..errors import ApiError, error_response
 from ..openai_client import ModelClient, ModelError
+from ..capture_fidelity import tidy_capture
 from ..prompts import CAPTURE_PROMPT
+
 
 
 def capture_router(
@@ -88,7 +90,14 @@ def capture_router(
             result = await models.interpret("capture", [
                 {"role": "system", "content": CAPTURE_PROMPT},
                 {"role": "user", "content": [
-                    {"type": "text", "text": context or "Transcribe the uploaded image."},
+                    {"type": "text", "text": (
+                        # No wording that reads like a task: the model used to
+                        # report "Transcribe the uploaded image." back as the
+                        # worksheet's instructions (#176).
+                        "Image attached."
+                        + ("\nNotation context (not printed worksheet instructions):\n" + context
+                           if context else "")
+                    )},
                     {"type": "image_url", "image_url": {
                         "url": f"data:{kind};base64,{encoded}",
                     }},
@@ -100,6 +109,7 @@ def capture_router(
                 "message": "I couldn't read that image. Try again.",
             }})
 
+        result = tidy_capture(result)
         lines = result["lines"]
         validity = await asyncio.gather(*(validate_latex(line["latex"]) for line in lines))
         for index, (line, valid) in enumerate(zip(lines, validity, strict=True), start=1):
