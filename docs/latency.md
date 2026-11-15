@@ -18,6 +18,16 @@ Step check, capture and spoken-line API timings all met the p50 and hard limits 
 
 The first attempt is shown separately and excluded from p50, p95 and max. The p95 uses the script’s nearest-rank method on the same samples used for its p90. Transcription is timed inside each spoken-line attempt, so this row adds no requests. Times are reported to the nearest millisecond.
 
+## First load
+
+Measured separately on 2026-11-15 with `--frontend https://glance-shreev2703.vercel.app` and no image, audio or text, so no model calls were made. The same machine and Wi-Fi as above.
+
+| Step | Runs | p50 (ms) | p90 (ms) | Max (ms) | First (ms) | Target p50 (ms) | Result |
+|---|---:|---:|---:|---:|---:|---:|---|
+| First load (`GET /` on Vercel) | 5 | 53 | 150 | 150 | 94 | 2,000 | Met |
+
+This times fetching the HTML page only, with `Cache-Control: no-cache`. It does not include downloading the JavaScript, loading MathJax from its CDN or rendering the first equation, so it is a lower bound on what a student waits for. A browser-measured time to the first readable equation is still open (#55).
+
 ## Raw output
 
 ```text
