@@ -72,7 +72,7 @@ test.describe('@smoke scratchpad', () => {
     await page.addInitScript(() => window.localStorage.clear());
   });
 
-  test('S opens the scratchpad from the problem', async ({ page }) => {
+  test('S moves focus to your work from the worksheet', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Try a sample problem' }).click();
     await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
@@ -95,11 +95,11 @@ test.describe('@smoke scratchpad', () => {
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
 
     // Focus is on Save, so Enter confirms without hunting for anything.
-    await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
 
     await expect(page.getByTestId('live-polite')).toHaveText('Saved as line 1.');
-    await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
     await expect(readback).toBeHidden();
   });
 
@@ -111,7 +111,7 @@ test.describe('@smoke scratchpad', () => {
     await page.getByRole('button', { name: 'Add line' }).click();
     await expect(page.getByRole('region', { name: 'Confirm your line' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Discard' }).click();
+    await page.getByTestId('readback-bar').getByRole('button', { name: 'Discard' }).click();
     await expect(page.getByTestId('live-polite')).toHaveText('Discarded.');
     await expect(page.getByRole('region', { name: 'Your lines' })).toContainText('Nothing yet');
   });
@@ -126,7 +126,7 @@ test.describe('@smoke scratchpad', () => {
       'I heard: 2 x equals 8. Enter to save, E to edit.',
     );
 
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect.poll(() => page.evaluate(() =>
       JSON.parse(localStorage.getItem('glance.work.v1') ?? '[]'),
     )).toEqual([expect.objectContaining({ latex: '2x = 8', readback: '2 x equals 8' })]);
@@ -220,7 +220,7 @@ test.describe('@smoke scratchpad', () => {
     await expect(readback).toContainText('x right arrow 2');
     await expect(readback).toContainText('I could not check this line');
 
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByTestId('live-polite')).toHaveText(
       'Saved as line 1. I could not check it.',
     );
@@ -233,6 +233,8 @@ test.describe('@smoke scratchpad', () => {
     await page.getByLabel('Or type your line').fill('x plus one over two');
     await page.getByRole('button', { name: 'Add line' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
+    // Its key handler binds with its focus; an Escape sent sooner lands nowhere.
+    await expect(page.getByRole('dialog').getByRole('button').first()).toBeFocused();
 
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toBeHidden();
@@ -273,8 +275,8 @@ test.describe('@smoke scratchpad', () => {
 
     await page.getByLabel('Or type your line').fill('two x equals eight');
     await page.getByRole('button', { name: 'Add line' }).click();
-    await page.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Delete your line 1' }).click();
     await expect(page.getByTestId('live-polite')).toContainText('Deleted line 1');
@@ -283,23 +285,22 @@ test.describe('@smoke scratchpad', () => {
     // U undoes the delete.
     await page.keyboard.press('u');
     await expect(page.getByTestId('live-polite')).toHaveText('Put line 1 back.');
-    await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
   });
 
-  test('work survives leaving the scratchpad and coming back', async ({ page }) => {
+  test('work stays on the page beside the worksheet', async ({ page }) => {
     await stubSpoken(page, CLEAR);
     await openScratchpad(page);
 
     await page.getByLabel('Or type your line').fill('two x equals eight');
     await page.getByRole('button', { name: 'Add line' }).click();
-    await page.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Leave and read the problem again' }).click();
-    await expect(page.getByRole('heading', { name: 'Your problem' })).toBeVisible();
-    await page.getByRole('button', { name: 'Start working' }).click();
+    // No leaving and coming back: the worksheet and the work are on one page.
+    await expect(page.getByRole('heading', { name: 'Your worksheet' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
 
-    await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
   });
 
   test('no control in the scratchpad offers to solve', async ({ page }) => {
@@ -308,10 +309,10 @@ test.describe('@smoke scratchpad', () => {
 
     // The hard rule in AGENTS.md. Asserted against the *controls*, not the page
     // text: the problem's own instruction is legitimately "Solve for x.", so
-    // scanning all the text would both miss the point and break the moment a
-    // student expands the problem.
-    await page.getByRole('button', { name: 'Show the problem' }).click();
-    await expect(page.getByRole('region', { name: 'The problem' })).toContainText('Solve for x.');
+    // scanning all the text would both miss the point and break with the
+    // worksheet and the hand-in preview on the same page.
+    // The worksheet is on the page too, so this covers every button on it.
+    await expect(page.locator('#L1 mjx-container')).toBeVisible();
 
     const names = await page.getByRole('button').evaluateAll((els) =>
       els.map((el) => (el.textContent ?? '').toLowerCase()),
@@ -336,12 +337,12 @@ test.describe('@smoke scratchpad context', () => {
     // line is checked against the line S was pressed on, so a student who does
     // not know which line that is gets "I couldn't confirm this step" for a
     // correct step and no way to work out why.
-    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.getByRole('group', { name: 'Line 2', exact: true }).focus();
     await page.keyboard.press('s');
 
-    await expect(page.getByRole('heading', { name: 'Your work' })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
     await expect(page.getByTestId('live-polite')).toContainText(
-      'Following line 2 of the problem',
+      'following line 2 of the worksheet',
     );
     // And on screen, for a low-vision student not running a screen reader.
     // Scoped to main: the same sentence is also in the live region, which is

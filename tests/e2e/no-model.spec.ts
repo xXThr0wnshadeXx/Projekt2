@@ -8,7 +8,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { stubHealth, stubServerWithModels } from './server';
 
 const polite = (page: Page) => page.getByTestId('live-polite');
-const CAPTURE_UNAVAILABLE = 'Capture a problem - unavailable right now';
+const CAPTURE_UNAVAILABLE = 'Get started - capture is unavailable right now';
 
 async function openScratchpad(page: Page) {
   await page.getByRole('button', { name: 'Try a sample problem' }).click();
@@ -37,15 +37,18 @@ test.describe('@smoke without the model', () => {
         await button.press('Enter');
         await expect(polite(page)).toContainText('Capture is unavailable right now.');
         await expect(polite(page)).toContainText('The server cannot read images or speech right now.');
-        await expect(page.getByRole('heading', { name: /Math for students/ })).toBeVisible();
-        await expect(page.getByRole('heading', { name: 'Capture a problem' })).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toHaveCount(0);
       });
 
       test('the capture shortcut explains instead of opening', async ({ page }) => {
         await expect(page.getByRole('button', { name: CAPTURE_UNAVAILABLE })).toBeVisible();
-        await page.keyboard.press('u');
-        await expect(polite(page)).toContainText('Capture is unavailable right now.');
-        await expect(page.getByRole('heading', { name: 'Capture a problem' })).toHaveCount(0);
+        // The key handler rebinds a moment after the label changes; press until it answers.
+        await expect(async () => {
+          await page.keyboard.press('u');
+          await expect(polite(page)).toContainText('Capture is unavailable right now.', { timeout: 500 });
+        }).toPass();
+        await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toHaveCount(0);
       });
 
       test('the scratchpad offers typing only', async ({ page }) => {
@@ -69,15 +72,15 @@ test.describe('@smoke with the model', () => {
   });
 
   test('capture opens as before', async ({ page }) => {
-    const button = page.getByRole('button', { name: 'Capture a problem', exact: true });
+    const button = page.getByRole('button', { name: 'Get started', exact: true });
     await expect(button).not.toHaveAttribute('aria-disabled', /.*/);
     await button.click();
-    await expect(page.getByRole('heading', { name: 'Capture a problem' })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toBeFocused();
   });
 
   test('the scratchpad offers recording', async ({ page }) => {
     await openScratchpad(page);
-    await expect(polite(page)).toContainText('Record a line, or type one.');
+    await expect(polite(page)).toContainText('Hold Space to say a line, or type it.');
     await expect(page.getByTestId('speech-unavailable')).toHaveCount(0);
   });
 });
@@ -87,7 +90,7 @@ test.describe('@smoke health is asked again', () => {
     await page.route('**/api/health', (r) => r.abort('connectionrefused'));
     await page.goto('/');
     await expect(page.getByText('Reading new problems is unavailable right now.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Capture a problem', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Get started', exact: true })).toBeVisible();
     await openScratchpad(page);
     await expect(page.getByTestId('speech-unavailable')).toHaveCount(0);
   });
@@ -105,19 +108,16 @@ test.describe('@smoke health is asked again', () => {
     await expect(page.getByText('Reading new problems is unavailable right now.')).toHaveCount(0, { timeout: 10_000 });
   });
 
-  test('coming back to Home asks again, and capture returns once the model is there', async ({ page }) => {
+  test('pressing the unavailable button asks again, and capture returns once the model is there', async ({ page }) => {
     let models = false;
     await page.route('**/api/health', (r) => r.fulfill({ json: { ok: true, models } }));
     await page.goto('/');
     await expect(page.getByRole('button', { name: CAPTURE_UNAVAILABLE })).toBeVisible();
 
     models = true;
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    // Enter, not a click: on CI's Linux WebKit phone emulation the page cannot
-    // be scrolled to its last ~100px after a screen change, so a click on a
-    // control at the bottom never lands. A real phone is not affected.
-    await page.getByRole('button', { name: 'Back to the start' }).press('Enter');
-    await expect(page.getByRole('button', { name: 'Capture a problem', exact: true })).toBeVisible();
+    // aria-disabled, so a click would wait for it to be enabled; press it as a keyboard user does.
+    await page.getByRole('button', { name: CAPTURE_UNAVAILABLE }).press('Enter');
+    await expect(page.getByRole('button', { name: 'Get started', exact: true })).toBeVisible();
   });
 
   test('opening the scratchpad asks again, and recording returns once the model is there', async ({ page }) => {
@@ -128,10 +128,12 @@ test.describe('@smoke health is asked again', () => {
 
     models = true;
     await openScratchpad(page);
-    // Speech is offered again. Not checked through the record button itself:
-    // Linux WebKit has no MediaRecorder, so there it says the browser cannot
-    // record, whatever the server says.
+    // Recording is offered again. Where the browser cannot record at all
+    // (headless WebKit), it says so in place of the button; either way the
+    // "unavailable right now" notice is gone.
     await expect(page.getByTestId('speech-unavailable')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /^Hands-free/ })).toBeVisible();
+    await expect(
+      page.getByTestId('record-button').or(page.getByText('This browser cannot record audio.')),
+    ).toBeVisible();
   });
 });

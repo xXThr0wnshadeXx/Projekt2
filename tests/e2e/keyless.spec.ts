@@ -49,8 +49,11 @@ async function keyless(page: Page, validity: boolean | 'unreachable' = true) {
 }
 
 async function typeLine(page: Page, text: string) {
-  await page.getByLabel('Or type your line').fill(text);
-  await page.keyboard.press('Enter');
+  // Press on the box itself: S moves focus to the heading a moment later, which
+  // would otherwise take focus between the fill and a page-level Enter.
+  const box = page.getByLabel('Or type your line');
+  await box.fill(text);
+  await box.press('Enter');
 }
 
 test.describe('@smoke without a model', () => {
@@ -91,7 +94,7 @@ test.describe('@smoke without a model', () => {
 
     await typeLine(page, 'x plus one over two');
     await expect(assertive(page)).toContainText('Type it with symbols');
-    await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
   });
 
   test('a line the checker cannot read is saved as unsure, not dropped', async ({ page }) => {
@@ -101,6 +104,7 @@ test.describe('@smoke without a model', () => {
 
     await typeLine(page, 'x = 3 = y');
     await expect(polite(page)).toContainText('I read:');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(polite(page)).toHaveText('Saved as line 1. I could not check it.');
     await expect(page.getByRole('group', { name: 'Your line 1, unsure' })).toBeVisible();
@@ -113,6 +117,7 @@ test.describe('@smoke without a model', () => {
 
     await typeLine(page, '2x = 8');
     await expect(polite(page)).toContainText('I read:');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(polite(page)).toHaveText('Saved as line 1.');
     await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
@@ -133,7 +138,7 @@ test.describe('@smoke without a model', () => {
     }
     expect(sent).toEqual([]);
     // The answers to the sample's two lines never appear.
-    await expect(page.getByRole('main')).not.toContainText(/x\s*=\s*4|99/);
+    await expect(page.getByRole('main')).not.toContainText(/x\s*=\s*4|99/);
   });
 
   test('two deletes can both be undone', async ({ page }) => {
@@ -143,6 +148,7 @@ test.describe('@smoke without a model', () => {
     for (const line of ['2x = 8', 'x = 4']) {
       await typeLine(page, line);
       await expect(polite(page)).toContainText('I read:');
+      await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(polite(page)).toContainText('Saved as line');
     }
@@ -156,7 +162,7 @@ test.describe('@smoke without a model', () => {
     await expect(polite(page)).toHaveText('Put line 1 back. Press U again to put back another.');
     await page.getByRole('button', { name: 'Undo delete' }).click();
     await expect(polite(page)).toHaveText('Put line 2 back.');
-    await expect(page.getByRole('group', { name: 'Your line 2' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Your line 2', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Undo delete' })).toHaveCount(0);
   });
 
@@ -176,7 +182,7 @@ test.describe('@smoke without a model', () => {
 test.describe('@smoke reading the problem', () => {
   test('the glance calls an equation an equation', async ({ page }) => {
     await openSample(page);
-    await page.getByRole('group', { name: 'Line 1' }).focus();
+    await page.getByRole('group', { name: 'Line 1', exact: true }).focus();
     await page.keyboard.press('g');
     await expect(polite(page)).toHaveText(
       'This is an equation, with a left side and a right side. It has no fractions, roots or exponents.',
@@ -185,7 +191,7 @@ test.describe('@smoke reading the problem', () => {
 
   test('R and Shift+R speak the math, never the LaTeX', async ({ page }) => {
     await openSample(page);
-    await page.getByRole('group', { name: 'Line 2' }).focus();
+    await page.getByRole('group', { name: 'Line 2', exact: true }).focus();
     // Speech is attached a moment after the line is typeset.
     await expect(page.locator('#L2 mjx-container')).toHaveAttribute(
       'data-semantic-speech-none',
@@ -204,7 +210,7 @@ test.describe('@smoke reading the problem', () => {
 
   test('Escape leaves the explorer and the shortcuts work again', async ({ page }) => {
     await openSample(page);
-    const line = page.getByRole('group', { name: 'Line 1' });
+    const line = page.getByRole('group', { name: 'Line 1', exact: true });
     await line.focus();
     await expect(page.locator('#L1 mjx-container')).toHaveAttribute(
       'data-semantic-speech-none',

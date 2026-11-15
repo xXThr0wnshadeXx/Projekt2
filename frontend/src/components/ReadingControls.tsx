@@ -33,7 +33,7 @@ export function ReadingControls({ settings, onChange }: ReadingControlsProps) {
 
   function toggleVoice() {
     const on = !settings.selfVoicing;
-    onChange({ ...settings, selfVoicing: on });
+    onChange({ ...settings, selfVoicing: on, voiceChosen: true });
     announce(
       on
         ? 'Reading aloud is on. Glance will speak everything it tells you.'
@@ -42,7 +42,7 @@ export function ReadingControls({ settings, onChange }: ReadingControlsProps) {
   }
 
   return (
-    <section aria-label="Reading controls" className="flex flex-wrap items-center gap-3">
+    <div role="toolbar" aria-label="Reading controls" className="reading-toolbar">
       <button
         type="button"
         className="btn"
@@ -52,24 +52,26 @@ export function ReadingControls({ settings, onChange }: ReadingControlsProps) {
       >
         Read aloud: {settings.selfVoicing ? 'on' : 'off'}
       </button>
-      <div role="group" aria-label="Text size" className="flex items-center gap-2">
+      <div role="group" aria-label="Text size" className="reading-size">
         {/* Never disabled: a disabled button drops out of the tab order, and
             the student who pressed it would land nowhere. At the limit it
             says so instead. */}
         <button type="button" className="btn" aria-label="Smaller text" onClick={() => resize(-1)}>
           A−
         </button>
-        <span className="min-w-[4rem] text-center" data-testid="text-scale">
+        <span className="reading-scale" data-testid="text-scale">
           {settings.textScale}%
         </span>
         <button type="button" className="btn" aria-label="Larger text" onClick={() => resize(1)}>
           A+
         </button>
       </div>
-      <p id="read-aloud-note" className="basis-full text-sm text-[--muted]">
-        Leave reading aloud off if you use a screen reader. It already reads
+      {/* Read with the toggle by a screen reader; kept off screen so the top
+          bar stays one clean row. */}
+      <p id="read-aloud-note" className="sr-only">
+        Turn reading aloud off if you use a screen reader. It already reads
         everything, and two voices at once is hard to follow.
       </p>
-    </section>
+    </div>
   );
 }

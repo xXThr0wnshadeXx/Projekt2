@@ -31,23 +31,25 @@ test.describe('@smoke keyboard help', () => {
     await expect(page.locator('#L1')).toBeFocused();
   });
 
-  test('the help changes with the screen', async ({ page }) => {
+  test('the help follows the part of the page that is in use', async ({ page }) => {
     await stubServerWithModels(page); // capture needs the model (#127)
+    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     // Let the welcome announcement land first, as it would for a person.
     await expect(polite(page)).toContainText('Glance.');
     await page.keyboard.press('Shift+Slash');
-    await expect(polite(page)).toHaveText(helpText('home'));
-
-    await page.getByRole('button', { name: 'Capture a problem' }).click();
-    await expect(page.getByRole('region', { name: 'Keyboard shortcuts on this screen' })).toHaveCount(0);
-    await page.keyboard.press('Shift+Slash');
     await expect(polite(page)).toHaveText(helpText('capture'));
+    await expect(page.getByRole('region', { name: 'Keyboard shortcuts on this screen' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Try a sample problem' }).click();
+    await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('Shift+Slash');
+    await expect(polite(page)).toHaveText(helpText('problem'));
   });
 
   test('the button opens the list and moves focus to it, and Close shuts it', async ({ page }) => {
     await page.goto('/');
-    const button = page.getByRole('button', { name: 'Keyboard shortcuts' });
+    const button = page.getByRole('button', { name: 'Keys' });
     await expect(button).toHaveAttribute('aria-expanded', 'false');
     await button.click();
     await expect(button).toHaveAttribute('aria-expanded', 'true');
@@ -61,6 +63,7 @@ test.describe('@smoke keyboard help', () => {
   test('shortcuts never fire while typing in a box', async ({ page }) => {
     await openSample(page);
     await page.getByRole('button', { name: 'Start working' }).click();
+    await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
     const box = page.getByLabel('Or type your line');
     await box.click();
     await box.pressSequentially('? p u x');
@@ -75,11 +78,12 @@ test.describe('@smoke keyboard help', () => {
     await expect(polite(page)).not.toContainText('structure');
   });
 
-  test('U on the capture screen opens the file picker', async ({ page }) => {
+  test('U in the capture section opens the file picker', async ({ page }) => {
     await stubServerWithModels(page); // capture needs the model (#127)
+    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
-    await page.getByRole('button', { name: 'Capture a problem' }).click();
-    await expect(page.getByRole('heading', { name: 'Capture a problem' })).toBeFocused();
+    await page.getByRole('button', { name: 'Get started' }).click();
+    await expect(page.locator('#capture-heading')).toBeFocused();
     // Headless Chromium doesn't raise a file-chooser event for a key-driven
     // click, so assert the thing that opens it: the file input being clicked.
     await page.evaluate(() => {

@@ -9,7 +9,7 @@
 // Nothing here solves, hints, or checks the student's answer, in any mode.
 
 import { useEffect, useRef, useState } from 'react';
-import { announce, focusFirst } from '../components/LiveRegion';
+import { announce, announceMove, focusFirst } from '../components/LiveRegion';
 import { MathLine } from '../components/MathLine';
 import { spokenMath, structureSummary } from '../math/sre';
 import { useShortcuts } from '../shortcuts';
@@ -47,6 +47,7 @@ export function Problem({
   );
   const [summary, setSummary] = useState('');
   const announced = useRef(false);
+  const section = useRef<HTMLElement>(null);
 
   const lines = problem.lines;
   const current = lines[index];
@@ -57,20 +58,25 @@ export function Problem({
   useEffect(() => {
     if (announced.current || lines.length === 0) return;
     announced.current = true;
-    window.setTimeout(() => focusFirst(`#${(lines[index] ?? lines[0]).id}`), 80);
+    window.setTimeout(() => {
+      // A part of the page that failed has put focus on its recovery message;
+      // that matters more than landing on line 1.
+      if (document.activeElement?.closest('[aria-labelledby="recovery-title"]')) return;
+      focusFirst(`#${(lines[index] ?? lines[0]).id}`);
+    }, 80);
   }, [lines]);
 
   function goTo(next: number, label: string) {
     if (lines.length === 0) return;
     const clamped = Math.max(0, Math.min(lines.length - 1, next));
     if (clamped === index && label !== 'same') {
-      announce(next < 0 ? 'This is the first line.' : 'This is the last line.');
+      announceMove(next < 0 ? 'This is the first line.' : 'This is the last line.');
       return;
     }
     setIndex(clamped);
     setSummary('');
     focusFirst(`#${lines[clamped].id}`);
-    announce(`Line ${clamped + 1} of ${lines.length}.`);
+    announceMove(`Line ${clamped + 1} of ${lines.length}.`);
   }
 
   /** The glance. Structure only — never the contents, never a solution. */
@@ -155,16 +161,17 @@ export function Problem({
     w: () => void whatChanged(),
     x: onExport,
     u: onNewCapture,
-  });
+  }, true, section);
 
   const unsure = lines.filter((l) => !l.valid).length;
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
-      <h2 className="text-4xl font-medium tracking-tight">Your problem</h2>
+    <section ref={section} id="step-worksheet" aria-labelledby="problem-heading" className="step">
+      <p className="step-number" aria-hidden="true">01</p>
+      <h2 id="problem-heading" tabIndex={-1} className="step-title">Your worksheet</h2>
 
       {problem.instructions && (
-        <p className="mt-2 text-lg">
+        <p className="mt-3 text-2xl font-medium">
           <span className="sr-only">Instructions: </span>
           {problem.instructions}
         </p>
@@ -176,18 +183,9 @@ export function Problem({
           behind "?" where they can be asked for. The full list stays on screen
           for a sighted keyboard user, but is hidden from screen readers so it
           is not recited — "?" announces it properly. */}
-      <p className="mt-2 text-sm text-[--muted]">
+      <p className="mt-3 text-xl text-[--muted]">
         {lines.length} {lines.length === 1 ? 'line' : 'lines'}
-        {unsure > 0 && `, ${unsure} unsure`}. Use the{' '}
-        <kbd className="kbd">arrow keys</kbd> to move between lines and{' '}
-        <kbd className="kbd">Space</kbd> to hear one. Press{' '}
-        <kbd className="kbd">Enter</kbd> on a line to explore it,{' '}
-        <kbd className="kbd">S</kbd> to start working.
-        <span aria-hidden="true">
-          {' '}
-          <kbd className="kbd">G</kbd> structure, <kbd className="kbd">L</kbd>{' '}
-          large print, <kbd className="kbd">?</kbd> for all shortcuts.
-        </span>
+        {unsure > 0 && `, ${unsure} unsure`}. Use the up and down arrows to move, and Space to hear a line.
       </p>
 
       {problem.warnings.length > 0 && (
@@ -211,6 +209,7 @@ export function Problem({
                 className="btn absolute right-3 top-3 min-w-[48px] justify-center px-0 text-2xl leading-none"
                 onClick={() => discardLine(i)}
                 aria-label={`Discard problem line ${i + 1}`}
+                data-walk="skip"
                 title="Discard this line"
               >
                 <span aria-hidden="true">×</span>
@@ -263,7 +262,7 @@ export function Problem({
         </button>
 
         <section aria-label="Ways to read this problem" className="mt-6">
-          <h3 className="text-sm font-medium uppercase tracking-wide text-[--muted]">
+          <h3 className="text-xl font-semibold">
             Ways to read this
           </h3>
           <div className="mt-3 flex flex-wrap gap-3">
@@ -287,10 +286,10 @@ export function Problem({
 
         <div className="mt-6 border-t border-[--line] pt-4">
           <button type="button" className="btn-quiet" onClick={onNewCapture}>
-            Capture another problem
+            Bring in a different worksheet
           </button>
         </div>
       </div>
-    </main>
+    </section>
   );
 }

@@ -42,7 +42,6 @@ import { loadWork, saveWork, type Mode, type Problem, type WorkLine } from '../s
 
 export interface ScratchpadProps {
   problem: Problem;
-  onBack: () => void;
   /** Decides whether and how a saved step is checked (DESIGN.md 14). */
   mode: Mode;
   /** The problem line the student was on; their first step follows from it. */
@@ -72,7 +71,6 @@ function newId(): string {
 
 export function Scratchpad({
   problem,
-  onBack,
   mode,
   startLine,
   onExport,
@@ -89,7 +87,6 @@ export function Scratchpad({
   const listener = useRef<HandsFree | null>(null);
   const onUtterance = useRef<(r: Recording) => void>(() => {});
   const [error, setError] = useState('');
-  const [showProblem, setShowProblem] = useState(false);
   // The answer to something the student asked, kept on screen. The live
   // region is heard, not seen, and a low-vision student with no screen reader
   // would otherwise ask a question and watch nothing happen.
@@ -115,24 +112,11 @@ export function Scratchpad({
   // tell whether it is still the news.
   const lastAction = useRef<string>('');
   const heading = useRef<HTMLHeadingElement>(null);
+  const section = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    heading.current?.focus();
-    // Say which problem line the work follows from. The first step saved here
-    // is checked against the line the student pressed S on, so without this
-    // they can get "I couldn't confirm this step" for a correct step and have
-    // no way to tell why — they were working from a line they had forgotten
-    // they were on. Nobody can see which line is pinned; it has to be said.
-    const following =
-      problem.lines.length > 1 ? ` Following line ${startLine + 1} of the problem.` : '';
-    announce(
-      lines.length
-        ? `Your work.${following} ${lines.length} ${lines.length === 1 ? 'line' : 'lines'} so far.`
-        : speechAvailable
-          ? `Your work.${following} Record a line, or type one.`
-          : `Your work.${following} Type a line.`,
-    );
-  }, []);
+  // Nothing is announced on mount. Your work is always on the page now, so
+  // saying so when it appeared would talk over the capture result or the
+  // welcome. Pressing S says which line the work follows from (App.startWorking).
 
   useEffect(() => {
     saveWork(lines);
@@ -358,6 +342,11 @@ export function Scratchpad({
     setCanUndo(true);
     setLines((prev) => prev.filter((l) => l.id !== line.id));
     announce(`Deleted line ${index + 1}. Press U to undo.`);
+    // The button that was pressed is gone. Without somewhere to land, focus
+    // drops to the page and U, which the announcement just promised, would
+    // not work because its keys only fire inside this section.
+    const next = lines[index + 1] ?? lines[index - 1];
+    window.setTimeout(() => focusFirst(next ? `#${next.id}` : '#work-heading'), 80);
   }
 
   function undo() {
@@ -609,20 +598,19 @@ export function Scratchpad({
       h: () => void toggleHandsFree(),
       'shift+r': readAll,
       x: onExport,
-      p: () => {
-        setShowProblem((v) => !v);
-        announce(showProblem ? 'Problem hidden.' : 'Problem shown.');
-      },
     },
     !clarify && !pending,
+    section,
   );
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
+    <section ref={section} id="step-work" aria-labelledby="work-heading" className="step">
+      <p className="step-number" aria-hidden="true">02</p>
       <h2
         ref={heading}
+        id="work-heading"
         tabIndex={-1}
-        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="step-title focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Your work
       </h2>
@@ -636,32 +624,6 @@ export function Scratchpad({
         <p className="mt-4 text-sm text-[--muted]">
           Following line {startLine + 1} of the problem.
         </p>
-      )}
-
-      <div className="mt-2">
-        <button
-          type="button"
-          className="btn"
-          aria-expanded={showProblem}
-          onClick={() => setShowProblem((v) => !v)}
-        >
-          {showProblem ? 'Hide the problem' : 'Show the problem'}
-        </button>
-      </div>
-
-      {showProblem && (
-        <section aria-label="The problem" className="mt-4 space-y-3">
-          {problem.instructions && <p className="text-[--muted]">{problem.instructions}</p>}
-          {problem.lines.map((l, i) => (
-            <MathLine
-              key={l.id}
-              id={`p-${l.id}`}
-              latex={l.latex}
-              label={`Problem line ${i + 1}`}
-              unsure={!l.valid}
-            />
-          ))}
-        </section>
       )}
 
       <section aria-label="Your lines" className="mt-8">
@@ -694,6 +656,7 @@ export function Scratchpad({
                   className="btn mt-1"
                   onClick={() => remove(l, i)}
                   aria-label={`Delete your line ${i + 1}`}
+                  data-walk="skip"
                 >
                   Delete
                 </button>
@@ -840,8 +803,12 @@ export function Scratchpad({
           {/* Named for where it goes, not "back" — "Show the problem" above
               opens it here beside the work, and two controls that both read as
               "the problem" is a guess the student should not have to make. */}
-          <button type="button" className="btn-quiet" onClick={onBack}>
-            Leave and read the problem again
+          <button
+            type="button"
+            className="btn-quiet"
+            onClick={() => focusFirst('#problem-heading')}
+          >
+            Go up to the worksheet
           </button>
         </div>
       </div>
@@ -875,6 +842,6 @@ export function Scratchpad({
           }}
         />
       )}
-    </main>
+    </section>
   );
 }

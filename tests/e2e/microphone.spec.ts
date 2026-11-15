@@ -61,7 +61,8 @@ test.describe('@smoke microphone', () => {
     await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
     await page.keyboard.press('s');
     await page.getByTestId('record-button').click();
-    await expect(page.getByText(/turn the microphone on, and try again/)).toBeVisible();
+    // Said in the live region as well as shown, so look for the one on screen.
+    await expect(page.locator('text=/turn the microphone on, and try again/ >> visible=true').first()).toBeVisible();
   });
 
   test('after a successful start the explanation is not repeated', async ({ page }) => {
@@ -76,8 +77,9 @@ test.describe('@smoke microphone', () => {
     await expect(assertive(page)).not.toContainText(MIC_EXPLAINED);
     // And it is remembered across a reload, where Safari cannot be asked.
     await page.reload();
-    await page.getByRole('button', { name: 'Try a sample problem' }).click();
+    // The sample is still loaded after a reload, on the same page.
     await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+    await page.locator('#L1').focus();
     await page.keyboard.press('s');
     await page.getByTestId('record-button').click();
     await expect(assertive(page)).toContainText('Recording. Speak your line.');

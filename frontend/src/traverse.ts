@@ -11,7 +11,7 @@
 // equation explorer, radio groups, and any open dialog.
 
 import { useEffect } from 'react';
-import { announce } from './components/LiveRegion';
+import { announceMove } from './components/LiveRegion';
 import { readAloud } from './lineKeys';
 import { spokenMath } from './math/sre';
 
@@ -21,7 +21,11 @@ const HEADING = 'h1, h2, h3, h4, h5, h6';
 const CURRENT = 'glance-current';
 /** Never stops, and never read: hidden, visually hidden, live regions, the
  *  skip link (the keys make it unnecessary), and MathJax's own internals. */
-const SKIP = '[hidden], [aria-hidden="true"], .sr-only, .skip-link, [data-testid^="live-"], script, style, noscript';
+// Destructive per-line buttons (discard, delete) are skipped too: walking onto
+// one and pressing Space removed the line, and the next press landed on the
+// next one, so a student could empty the page while hearing the same words.
+// They stay reachable by Tab and by mouse, and by voice ("delete line two").
+const SKIP = '[hidden], [aria-hidden="true"], .sr-only, .skip-link, [data-testid^="live-"], [data-walk="skip"], script, style, noscript';
 
 let current: Element | null = null;
 /** Set when the last move ran past the top or the end of the page. From the
@@ -136,10 +140,15 @@ function highlight(el: Element | null): void {
   el?.classList.add(CURRENT);
 }
 
-/** The line containing `node`, if any. */
+/** The line containing `node`, if any. Lines can nest (a label holds its radio
+ *  button and its description), and the list is in document order with the
+ *  container first, so the last match is the innermost. Taking the first would
+ *  send Down from a nested line back to the container's next line, forever. */
 function lineOf(node: Element | null, list: Element[]): Element | null {
   if (!node) return null;
-  return list.find((l) => l === node || l.contains(node)) ?? null;
+  let found: Element | null = null;
+  for (const l of list) if (l === node || l.contains(node)) found = l;
+  return found;
 }
 
 function go(el: Element): void {
@@ -149,7 +158,7 @@ function go(el: Element): void {
   // The app scrolls, never the student.
   el.scrollIntoView({ block: 'center' });
   highlight(el);
-  announce(describe(el));
+  announceMove(describe(el));
 }
 
 /** Move `delta` lines through the page, saying the line arrived at. */
@@ -163,12 +172,12 @@ export function move(delta: number): void {
   const to = from + delta;
   if (to < 0) {
     edge = 'top';
-    announce('Top of the page.');
+    announceMove('Top of the page.');
     return;
   }
   if (to >= list.length) {
     edge = 'end';
-    announce('End of the page.');
+    announceMove('End of the page.');
     return;
   }
   go(list[to]);
@@ -210,7 +219,15 @@ export function useTraversal(enabled = true): void {
       if (document.querySelector('[role="dialog"]')) return;
       if (target?.closest('textarea, select, [contenteditable]')) return;
       const input = target instanceof HTMLInputElement ? target : null;
-      if (input && !TEXT_INPUT.test(input.type)) return; // radios and the like keep their arrows
+      // A radio group keeps Left and Right to choose within it, but Up and
+      // Down walk on, or the arrows could never leave the group.
+      const tickable = input && (input.type === 'radio' || input.type === 'checkbox');
+      if (tickable && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        move(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+      if (input && !TEXT_INPUT.test(input.type)) return;
       switch (e.key) {
         case 'ArrowDown':
         case 'ArrowUp':

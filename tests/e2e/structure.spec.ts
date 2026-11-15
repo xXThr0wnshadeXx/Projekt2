@@ -15,7 +15,6 @@ for (const { latex, summary } of cases) {
       }));
     }, latex);
     await page.goto('/');
-    await page.getByRole('button', { name: 'Back to your problem' }).click();
     await page.locator('#L1').press('g');
     await expect(page.getByRole('region', { name: 'Structure summary' })).toContainText(summary, { timeout: 15000 });
     await expect(page.getByTestId('live-polite')).toContainText(summary);

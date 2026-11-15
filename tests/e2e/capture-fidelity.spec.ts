@@ -27,7 +27,7 @@ for (const fixture of cases) {
     await page.route('**/api/health', (route) => route.fulfill({ json: { ok: true } }));
     await page.route('**/api/capture', (route) => route.fulfill({ json: captured }));
     await page.goto('/');
-    await page.getByRole('button', { name: 'Capture a problem', exact: true }).click();
+    await page.getByRole('button', { name: 'Get started' }).click();
     await page.locator('input[type=file]').setInputFiles(path.join(fixtures, fixture.file));
 
     await expect(page.locator('[data-testid^="math-line-L"]')).toHaveCount(fixture.lines.length);

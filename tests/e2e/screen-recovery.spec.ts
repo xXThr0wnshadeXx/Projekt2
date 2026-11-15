@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { sampleProblem, type WorkLine } from '../../frontend/src/state';
 
 const restored = (count: number) =>
-  `I restored your work from earlier: ${count} ${count === 1 ? 'line' : 'lines'}.`;
+  `Glance. I restored your work from earlier: ${count} ${count === 1 ? 'line' : 'lines'}. Use the Down arrow to move through the page and Space to press or hear what you are on.`;
 const recovery = 'Something went wrong on this screen. Your work is saved.';
 const assertive = (page: Page) => page.getByTestId('live-assertive');
 const polite = (page: Page) => page.getByTestId('live-polite');
@@ -27,9 +27,8 @@ test.describe('@smoke screen recovery', () => {
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text());
     });
-    await page.goto('/?crash=scratchpad');
-    await page.getByRole('button', { name: 'Back to your problem' }).click();
-    await page.getByRole('button', { name: 'Start working' }).click();
+    // Your work is on the page from the start, so it fails on arrival.
+    await page.goto('/?crash=work');
 
     const main = page.getByRole('main');
     await expect(main.getByRole('heading', { name: 'Screen unavailable' })).toBeFocused();
@@ -37,7 +36,10 @@ test.describe('@smoke screen recovery', () => {
     await expect(assertive(page)).toHaveText(recovery);
     await expect(page.getByRole('heading', { name: 'Glance', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#main');
-    expect(errors.filter((message) => message.includes('scratchpad'))).toEqual(['TypeError scratchpad']);
+    // Only that part failed: the worksheet is still on the page, and there is still one main landmark.
+    await expect(page.getByRole('heading', { name: 'Your worksheet' })).toBeVisible();
+    await expect(page.getByRole('main')).toHaveCount(1);
+    expect(errors.filter((message) => message.includes('work'))).toEqual(['TypeError work']);
     expect(errors.join('\n')).not.toContain('Synthetic screen failure');
     expect(await page.evaluate(() => [
       JSON.parse(localStorage.getItem('glance.problem.v1')!),
@@ -54,23 +56,23 @@ test.describe('@smoke screen recovery', () => {
   test('back to the start leaves the problem available', async ({ page }) => {
     await seed(page, problem);
     await page.goto('/?crash=lowvision');
-    await page.getByRole('button', { name: 'Back to your problem' }).click();
     await page.getByRole('button', { name: 'Low-vision mode' }).click();
 
     await expect(page.getByRole('heading', { name: 'Glance', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Screen unavailable' })).toBeFocused();
     await page.getByRole('button', { name: 'Back to the start' }).click();
-    await expect(page.getByRole('button', { name: 'Back to your problem' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your worksheet' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Low-vision mode' })).toBeVisible();
   });
 
   test('announces two restored work lines once at startup', async ({ page }) => {
     await seed(page, problem, work);
     await page.goto('/');
     await expect(polite(page)).toHaveText(restored(2));
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('button', { name: 'Back to the start', exact: true }).click();
-    // A first visit asks Y or N first, then names capture as "press C".
-    await expect(polite(page)).toContainText(/Capture a problem|press C to point your camera/);
+    // Moving around the page says what is there, not the greeting again.
+    await page.getByText('More settings').click();
+    await page.getByRole('radio', { name: /^Study/ }).check();
+    await expect(polite(page)).toContainText('Study mode');
     await expect(polite(page)).not.toContainText('I restored your work');
   });
 
@@ -82,8 +84,7 @@ test.describe('@smoke screen recovery', () => {
 
   test('does not announce restoration in a fresh session', async ({ page }) => {
     await page.goto('/');
-    // A first visit asks Y or N first, then names capture as "press C".
-    await expect(polite(page)).toContainText(/Capture a problem|press C to point your camera/);
+    await expect(polite(page)).toContainText('Glance. It reads your maths worksheet aloud');
     await expect(polite(page)).not.toContainText('I restored your work');
   });
 });

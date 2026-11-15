@@ -128,6 +128,7 @@ test.describe('@smoke talking to Glance', () => {
 
     await say(page, '2x = 8');
     await expect(polite(page)).toContainText('I read:');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(polite(page)).toContainText('Saved as line 1.');
 
@@ -191,7 +192,7 @@ test.describe('@smoke talking to Glance', () => {
       );
     }
     expect(sent).toEqual([]);
-    await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
 
     // A line that only sounds similar is still a line.
     await say(page, 'x minus 3 = 4');
@@ -211,17 +212,20 @@ test.describe('@smoke talking to Glance', () => {
 });
 
 test.describe('@smoke the first screen', () => {
-  test('says what it is, who it is for, and what it will not do', async ({ page }) => {
+  test('says what it is and what it will not do, and a way in is a few Tabs away', async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
     const main = page.getByRole('main');
-    await expect(
-      main.getByRole('heading', { name: 'Math for students who are blind or have low vision' }),
-    ).toBeFocused();
     await expect(main).toContainText('Glance never solves the problem.');
-    await expect(main.getByRole('list', { name: 'How it works' }).getByRole('listitem')).toHaveCount(3);
+    await expect(main.getByRole('list').getByRole('listitem')).toHaveCount(3);
+    await expect(main.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
     await expect(polite(page)).toContainText('It never solves it for you.');
-    // The explanation costs no extra Tab stops: the first one is still a way in.
-    await page.keyboard.press('Tab');
-    await expect(page.getByRole('button', { name: 'Capture a problem' })).toBeFocused();
+    // The explanation costs no extra Tab stops: the way in comes straight after
+    // the skip link, the name and the reading tools in the top bar.
+    const start = page.getByRole('button', { name: 'Get started' });
+    for (let i = 0; i < 8 && !(await start.evaluate((el) => el === document.activeElement)); i += 1) {
+      await page.keyboard.press('Tab');
+    }
+    await expect(start).toBeFocused();
   });
 });

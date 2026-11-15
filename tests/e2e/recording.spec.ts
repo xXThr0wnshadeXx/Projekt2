@@ -110,7 +110,10 @@ test.describe('@smoke voice recording lifecycle', () => {
     await expect(page.getByRole('button', { name: 'Record a line' })).toBeVisible();
   });
 
-  test('leaving the scratchpad releases a microphone granted after navigation', async ({ page }) => {
+  // The one page (#240) has no way to leave the scratchpad, so this case
+  // cannot happen; a grant that arrives after recording stopped is covered by
+  // the test above.
+  test.skip('leaving the scratchpad releases a microphone granted after navigation', async ({ page }) => {
     await mockMicrophone(page, true);
     await openScratchpad(page);
 

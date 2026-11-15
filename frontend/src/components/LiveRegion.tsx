@@ -8,7 +8,7 @@
 // reads these regions, and two voices at once is unusable (DESIGN.md 13).
 
 import { useEffect, useRef, useState } from 'react';
-import { say } from '../audio/tts';
+import { cancel, say } from '../audio/tts';
 
 type Urgency = 'polite' | 'assertive';
 
@@ -17,6 +17,14 @@ let announceImpl: (message: string, urgency?: Urgency) => void = () => {};
 let last = '';
 
 /** Announce a message to screen readers. Safe to call before mount. */
+/** Announce where the student has just moved to. Whatever was still being
+ *  read about the line they left is cut off first: pressing the arrows
+ *  quickly must never stack up a queue of old lines. */
+export function announceMove(message: string): void {
+  cancel();
+  announce(message);
+}
+
 export function announce(message: string, urgency: Urgency = 'polite'): void {
   last = message;
   announceImpl(message, urgency);
@@ -50,9 +58,6 @@ export function LiveRegion() {
   useEffect(() => {
     announceImpl = (message, urgency = 'polite') => {
       const set = urgency === 'assertive' ? setAssertive : setPolite;
-      // The app's own voice, for a student with no screen reader. Silent
-      // unless they have switched it on.
-      say(message, urgency === 'assertive');
       // Clearing first guarantees the same message announces twice if repeated;
       // without this, an identical string is silently ignored.
       set('');
@@ -64,6 +69,15 @@ export function LiveRegion() {
       if (urgency === 'polite') setAssertive('');
       const t = window.setTimeout(() => set(message), 50);
       timers.current.push(t);
+      // The app's own voice, for a student with no screen reader. Said after
+      // the live region is updated, and never allowed to throw: a speech
+      // engine that fails (some headless and locked-down browsers do) must
+      // never stop a screen reader from getting the same words.
+      try {
+        say(message, urgency === 'assertive');
+      } catch {
+        // The live region above still carries the message.
+      }
     };
     return () => {
       announceImpl = () => {};

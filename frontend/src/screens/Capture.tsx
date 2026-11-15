@@ -29,7 +29,14 @@ interface PendingPdf {
 
 export interface CaptureProps {
   onCaptured: (problem: Problem) => void;
-  onBack: () => void;
+  /** Opens the built-in sample problem. */
+  onSample: () => void;
+  /** Leave without bringing anything in. */
+  onCancel: () => void;
+  /** What leaving is called: back to the start, or keep the current problem. */
+  keepLabel: string;
+  /** Start the camera on arrival (the C key on the landing, #211). */
+  autoCamera?: boolean;
 }
 
 /** Turn capture warnings into one spoken, actionable instruction (issue #14).
@@ -45,7 +52,7 @@ export function retakeGuidance(warnings: string[]): string | null {
   return `${first}${ends} Try again when you are ready.`;
 }
 
-export function Capture({ onCaptured, onBack }: CaptureProps) {
+export function Capture({ onCaptured, onSample, onCancel, keepLabel, autoCamera }: CaptureProps) {
   const [busy, setBusy] = useState<Busy>('idle');
   const [error, setError] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -60,11 +67,19 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const section = useRef<HTMLElement>(null);
 
-  // Land on the heading so a screen reader reads where it is, not mid-page.
+  // Its own page: land on the heading and say what is here.
   useEffect(() => {
     heading.current?.focus();
-    announce('Capture. Upload a file, paste a screenshot, or take a photo.');
+    announce(
+      'Bring in your problem. Three choices: upload a file you already have, take a photo, or follow a live board. Use the Down arrow to hear each one, and Space to choose.',
+    );
+    // C on the landing means "point my camera at a worksheet". The timer is
+    // cleared by StrictMode's first pass, so the camera starts once.
+    if (!autoCamera) return;
+    const timer = window.setTimeout(() => void startCamera(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function stopCamera() {
@@ -308,6 +323,7 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
       c: () => void startCamera(),
     },
     !working && !liveBoard && !cameraStarting,
+    section,
   );
 
   if (liveBoard) {
@@ -319,66 +335,96 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
   }
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
+    <section ref={section} id="step-worksheet" aria-labelledby="capture-heading" className="step capture-page">
       <h2
         ref={heading}
+        id="capture-heading"
         tabIndex={-1}
-        className="text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="step-title text-center focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
-        Capture a problem
+        Bring in your problem
       </h2>
-      <p className="mt-2 text-[--muted]">
-        Upload a file, press <kbd className="kbd">Ctrl</kbd> or{' '}
-        <kbd className="kbd">Cmd</kbd> + <kbd className="kbd">V</kbd> to paste a
-        screenshot, or take a photo. Nothing is stored on the server.
+      <p className="get-started-lead text-center">
+        Choose how to bring in your maths. Glance reads it and puts it on the page for you.
       </p>
 
-      <div className="mt-6 flex flex-wrap gap-3">
-        {/* The "Upload a file" button below opens this. It has its own name for
-            anything that still reaches it, but stays out of the tab order so
-            keyboard users don't meet a second, unexplained stop (axe, #31). */}
-        <input
-          ref={fileInput}
-          type="file"
-          accept={[...CAPTURE_TYPES, 'application/pdf'].join(',')}
-          aria-label="Choose an image or PDF file"
-          tabIndex={-1}
-          className="sr-only"
-          onChange={(e) => {
-            acceptFile(e.target.files?.[0], 'upload');
-            // Clear, so choosing the same file twice fires change again.
-            e.target.value = '';
-          }}
-        />
-        {/* Upload leads. It is the path that works on every machine, needs no
-            permission prompt, and is how a student actually receives course
-            material — a PDF or a screenshot, not a photo they took. A camera
-            also asks a blind user to aim it, which is the hardest thing on
-            this screen, so it should not read as the obvious first choice. */}
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={working}
-          onClick={() => fileInput.current?.click()}
+      {/* The file input the "Upload a file" choice opens. It stays mounted so
+          U and paste work before the choices are shown, and out of the tab
+          order so keyboard users don't meet a second, unexplained stop (#31). */}
+      <input
+        ref={fileInput}
+        type="file"
+        accept={[...CAPTURE_TYPES, 'application/pdf'].join(',')}
+        aria-label="Choose an image or PDF file"
+        tabIndex={-1}
+        className="sr-only"
+        onChange={(e) => {
+          acceptFile(e.target.files?.[0], 'upload');
+          // Clear, so choosing the same file twice fires change again.
+          e.target.value = '';
+        }}
+      />
+
+        <div
+          id="capture-choices"
+          role="group"
+          aria-label="How to bring in your problem"
+          className="capture-choices"
         >
-          Upload a file
-        </button>
-        <button type="button" className="btn" disabled={working || cameraStarting} onClick={startCamera}>
-          {cameraOn ? 'Restart camera' : 'Take a photo'}
-        </button>
-        <button
-          type="button"
-          className="btn"
-          disabled={working || cameraOn || cameraStarting || Boolean(pdf)}
-          onClick={() => setLiveBoard(true)}
-        >
-          Live board
+          {/* Upload leads: it works on every machine, needs no permission
+              prompt, and is how students actually receive course material. A
+              camera asks a blind user to aim it, the hardest thing here. */}
+          <button
+            type="button"
+            className="choice"
+            disabled={working}
+            aria-describedby="choice-upload-desc"
+            onClick={() => fileInput.current?.click()}
+          >
+            <span className="choice-title">Upload a file</span>
+            <span id="choice-upload-desc" className="choice-desc">
+              A photo, screenshot or PDF you already have.
+            </span>
+          </button>
+          <button
+            type="button"
+            className="choice"
+            disabled={working || cameraStarting}
+            aria-describedby="choice-photo-desc"
+            onClick={startCamera}
+          >
+            <span className="choice-title">{cameraOn ? 'Restart camera' : 'Take a photo'}</span>
+            <span id="choice-photo-desc" className="choice-desc">
+              Point your camera at the page. Glance tells you how to move it.
+            </span>
+          </button>
+          <button
+            type="button"
+            className="choice"
+            disabled={working || cameraOn || cameraStarting || Boolean(pdf)}
+            aria-describedby="choice-board-desc"
+            onClick={() => setLiveBoard(true)}
+          >
+            <span className="choice-title">Live board</span>
+            <span id="choice-board-desc" className="choice-desc">
+              Follow what a teacher writes on the board, as they write it.
+            </span>
+          </button>
+        </div>
+
+      <p className="mt-6 text-center text-sm text-[--muted]">
+        You can also paste a screenshot with <kbd className="kbd">Ctrl</kbd> or{' '}
+        <kbd className="kbd">Cmd</kbd> + <kbd className="kbd">V</kbd>. Nothing is stored on the server.
+      </p>
+      <div className="mt-2 text-center">
+        <button type="button" className="btn-quiet" disabled={working} onClick={onSample}>
+          Try a sample problem
         </button>
       </div>
 
-      <div className="mt-6">
-        <button type="button" className="btn-quiet" disabled={working} onClick={onBack}>
-          Back to the start
+      <div className="mt-6 text-center">
+        <button type="button" className="btn-quiet" disabled={working} onClick={onCancel}>
+          {keepLabel}
         </button>
       </div>
 
@@ -487,6 +533,6 @@ export function Capture({ onCaptured, onBack }: CaptureProps) {
           </ul>
         </section>
       )}
-    </main>
+    </section>
   );
 }

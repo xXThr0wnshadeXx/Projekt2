@@ -22,9 +22,8 @@ async function openHandIn(page: Page, mode: 'homework' | 'study' | 'exam', work 
     localStorage.setItem('glance.settings.v1', JSON.stringify({ mode, selfVoicing: false, textScale: 125 }));
   }, { problem: PROBLEM, work, mode });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Back to your problem' }).click();
-  await page.keyboard.press('x');
-  await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeFocused();
+  // One page: with a worksheet saved, the hand-in section is already there.
+  await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeVisible();
 }
 
 const polite = (page: Page) => page.getByTestId('live-polite');
@@ -67,8 +66,6 @@ test.describe('@smoke one look over the work', () => {
     await expect(polite(page)).toContainText("I can't review this problem again.");
 
     await page.reload();
-    await page.getByRole('button', { name: 'Back to your problem' }).click();
-    await page.keyboard.press('x');
     await page.getByRole('button', { name: 'Reviewed' }).press('Enter');
     await expect(polite(page)).toContainText("I can't review this problem again.");
     expect(calls).toBe(1);

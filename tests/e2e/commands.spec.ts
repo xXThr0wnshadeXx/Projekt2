@@ -53,8 +53,8 @@ async function open(page: Page, reply: Reply, spoken?: unknown) {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ verified: true, method: 'ratio_constant', message: 'This step checks out.' }) }),
   );
   await page.goto('/');
-  await page.getByRole('button', { name: 'Back to your problem' }).click();
   await expect(page.locator('#L1 mjx-container')).toBeVisible({ timeout: 15000 });
+  await page.locator('#L1').focus();
   await page.keyboard.press('s');
   await expect(page.getByRole('heading', { name: 'Your work', exact: true })).toBeFocused();
   return calls;
@@ -126,10 +126,10 @@ test.describe('@smoke commands', () => {
     await expect(box).toHaveValue('4x = 9');
     await expect(polite(page)).toHaveText('Line 1 is in the edit box with that change. Press Add line to hear it back.');
     // Nothing changed yet: the student has not confirmed.
-    await expect(page.getByRole('group', { name: 'Your line 1' })).toContainText('3');
+    await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toContainText('3');
 
     await page.getByRole('button', { name: 'Add line' }).click();
-    await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(polite(page)).toHaveText('Updated line 1.');
     await expect(workLines(page)).toHaveCount(3);
@@ -142,7 +142,7 @@ test.describe('@smoke commands', () => {
 
   test('check is off in exam mode', async ({ page }) => {
     await page.addInitScript(() =>
-      localStorage.setItem('glance.settings.v1', JSON.stringify({ mode: 'exam', selfVoicing: false })),
+      localStorage.setItem('glance.settings.v1', JSON.stringify({ mode: 'exam', selfVoicing: false, voiceChosen: true })),
     );
     await open(page, { intent: 'check', target_line: 'W1', instruction: null });
     await say(page, 'check this step');
@@ -155,7 +155,7 @@ test.describe('@smoke commands', () => {
     await expect(polite(page)).toHaveText('Line 1. This step checks out.');
   });
 
-  test('"hand in" opens the hand-in screen', async ({ page }) => {
+  test('"hand in" moves to the hand-in section', async ({ page }) => {
     await open(page, { intent: 'export', target_line: null, instruction: null });
     await say(page, 'hand in my work');
     await expect(page.getByRole('heading', { name: 'Hand in your work' })).toBeFocused();

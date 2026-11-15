@@ -52,11 +52,9 @@ async function stubSpoken(page: Page) {
 
 async function setMode(page: Page, mode: 'Study' | 'Homework' | 'Exam') {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Settings' }).click();
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeFocused();
+  await page.getByText('More settings').click();
   await page.getByRole('radio', { name: new RegExp(`^${mode}`) }).check();
   await expect(page.getByTestId('mode-badge')).toHaveText(`${mode} mode`);
-  await page.getByRole('button', { name: 'Back to the start' }).click();
 }
 
 async function openSample(page: Page) {
@@ -68,9 +66,9 @@ async function openSample(page: Page) {
 async function saveTypedLine(page: Page) {
   await page.getByLabel('Or type your line').fill('two x equals eight');
   await page.getByRole('button', { name: 'Add line' }).click();
-  await expect(page.getByRole('button', { name: 'Save' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('group', { name: 'Your line 1' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Your line 1', exact: true })).toBeVisible();
 }
 
 const polite = (page: Page) => page.getByTestId('live-polite');
@@ -92,7 +90,7 @@ test.describe('@smoke modes', () => {
 
   test('settings: modes are a labelled radio group, changes are announced and remembered', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByText('More settings').click();
     const group = page.getByRole('group', { name: 'Mode' });
     await expect(group.getByRole('radio')).toHaveCount(3);
     await expect(page.getByRole('radio', { name: /^Homework/ })).toBeChecked();

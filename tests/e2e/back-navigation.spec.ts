@@ -1,18 +1,27 @@
+// Going back (#257), on the one page. There is no screen stack to return
+// through: the capture page is the only other place, and it has "Back to the
+// start" (or "Keep my current problem") and the browser's Back button. Low-vision
+// mode keeps a visible Back button for anyone who cannot press Escape.
+
 import { test, expect } from '@playwright/test';
 
-test.describe('top-left Back navigation', () => {
-  test('returns through the Glance screens without leaving the app', async ({ page }) => {
+test.describe('going back', () => {
+  test('the capture page is left by its Back button and by the browser Back', async ({ page }) => {
+    await page.addInitScript(() => localStorage.clear());
     await page.goto('/');
 
-    const homeBack = page.getByRole('button', { name: 'Back (no previous page)' });
-    await expect(homeBack).toBeDisabled();
+    await page.getByRole('button', { name: 'Get started' }).click();
+    await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toBeFocused();
+    await expect(page).toHaveURL(/#capture$/);
 
-    await page.getByRole('button', { name: 'Try a sample problem' }).click();
-    await expect(page.getByRole('button', { name: 'Back to previous page' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Back to the start' }).click();
+    await expect(page.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
+    await expect(page).not.toHaveURL(/#capture/);
 
-    await page.getByRole('button', { name: 'Back to previous page' }).click();
-    await expect(page.getByRole('heading', { name: 'Math for students who are blind or have low vision' })).toBeVisible();
-    await expect(page).toHaveURL(/\/$/);
+    await page.getByRole('button', { name: 'Get started' }).click();
+    await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
   });
 
   test('keeps Back in the top-left of low-vision mode', async ({ page }) => {

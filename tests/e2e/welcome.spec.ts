@@ -27,7 +27,7 @@ async function recordSpeech(page: Page) {
 /** Open Glance and wait until it is ready for a key, as a student would. */
 async function open(page: Page) {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Math for students who are blind or have low vision' })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
 }
 
 const said = (page: Page) => page.evaluate(() => (window as unknown as SpeechWindow).said);
@@ -38,12 +38,18 @@ test.describe('@smoke a first visit with no one helping', () => {
     await expect(page.getByTestId('welcome')).toContainText('Press Y to hear Glance speak to you');
     await expect(polite(page)).toContainText('Press Y to hear Glance speak to you, or N if you use a screen reader.');
     // No Tab stop was added: talk.spec.ts "the first screen" checks that Tab
-    // still goes straight to Capture a problem.
+    // still goes straight to Get started.
     await expect(page.getByTestId('welcome').locator('button, a, [tabindex]')).toHaveCount(0);
   });
 
   test('the first tap says the question aloud, once, even with reading aloud off', async ({ page }) => {
     await recordSpeech(page);
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('seeded')) {
+        sessionStorage.setItem('seeded', '1');
+        localStorage.setItem('glance.settings.v1', JSON.stringify({ selfVoicing: false, voiceChosen: true }));
+      }
+    });
     await open(page);
     // Moving around with Tab, as a screen-reader user does, says nothing.
     await page.keyboard.press('Tab');
@@ -69,6 +75,7 @@ test.describe('@smoke a first visit with no one helping', () => {
     );
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('glance.settings.v1') ?? '{}'));
     expect(stored.selfVoicing).toBe(true);
+    expect(stored.voiceChosen).toBe(true);
   });
 
   test('N leaves the talking to the screen reader, and the question is not asked again', async ({ page }) => {
@@ -80,26 +87,40 @@ test.describe('@smoke a first visit with no one helping', () => {
       'Okay, your screen reader will do the talking. Then press C to point your camera at a worksheet, or S to try a sample problem.',
     );
     await expect(page.getByRole('button', { name: 'Read aloud: off' })).toBeVisible();
-    expect(await said(page)).toEqual([]);
+    // Reading aloud is on by default, so the arrival greeting may have been
+    // spoken already; what matters is that the answer to N is not.
+    expect(await said(page)).not.toContain('Okay, your screen reader will do the talking.');
 
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Math for students who are blind or have low vision' })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Maths you can hear, explore and write' })).toBeVisible();
     await expect(page.getByTestId('welcome')).toHaveCount(0);
     await expect(polite(page)).not.toContainText('Press Y');
   });
 
-  test('S opens the sample, and a returning student can go back with B', async ({ page }) => {
+  test('S opens the sample, and a reload brings the worksheet straight back', async ({ page }) => {
     await open(page);
     await page.keyboard.press('n');
     await page.keyboard.press('s');
-    await expect(page.getByRole('heading', { name: 'Your problem' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your worksheet' })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Math for students who are blind or have low vision' })).toBeFocused();
-    // The reload restores the problem, and that message carries the way back.
+    // The reload restores the worksheet; there is no landing to go back from.
+    await expect(page.getByRole('heading', { name: 'Your worksheet' })).toBeVisible();
     await expect(polite(page)).toContainText('I restored your work');
-    await expect(polite(page)).toContainText('Press B to go back to your problem');
-    await page.keyboard.press('b');
-    await expect(page.getByRole('heading', { name: 'Your problem' })).toBeVisible();
+  });
+
+  test('C opens the capture page and starts the camera', async ({ page }) => {
+    await page.addInitScript(() => {
+      (window as unknown as { cams: number }).cams = 0;
+      Object.defineProperty(navigator, 'mediaDevices', {
+        value: { getUserMedia: () => { (window as unknown as { cams: number }).cams += 1; return new Promise(() => {}); } },
+        configurable: true,
+      });
+    });
+    await open(page);
+    await page.keyboard.press('n');
+    await page.keyboard.press('c');
+    await expect(page.getByRole('heading', { name: 'Bring in your problem' })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { cams: number }).cams)).toBe(1);
   });
 });

@@ -11,13 +11,12 @@ import { ExportPreview } from '../components/ExportPreview';
 import { buildExportHtml, downloadFile } from '../export';
 import { useShortcuts } from '../shortcuts';
 import { reviewWork, ApiFailure } from '../api';
-import { loadWork, reviewSpent, spendReview, type Mode, type Problem } from '../state';
+import { loadWork, reviewSpent, spendReview, WORK_CHANGED, type Mode, type Problem } from '../state';
 import { stepChecksAllowed } from '../stepCheck';
 
 export interface ExportProps {
   problem: Problem;
   mode: Mode;
-  onBack: () => void;
 }
 
 /** "math-work-2026-11-15.html", or with the student's name if they gave one. */
@@ -35,8 +34,15 @@ export function exportFilename(name: string, date: Date): string {
   return slug ? `math-work-${slug}-${day}.html` : `math-work-${day}.html`;
 }
 
-export function Export({ problem, mode, onBack }: ExportProps) {
-  const work = useMemo(() => loadWork(), []);
+export function Export({ problem, mode }: ExportProps) {
+  // The work grows on the same page, so this follows every save.
+  const [work, setWork] = useState(() => loadWork());
+  useEffect(() => {
+    const refresh = () => setWork(loadWork());
+    window.addEventListener(WORK_CHANGED, refresh);
+    return () => window.removeEventListener(WORK_CHANGED, refresh);
+  }, []);
+  const section = useRef<HTMLElement>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   // One review per problem, allowed where step checks are (DESIGN.md 14).
@@ -47,11 +53,6 @@ export function Export({ problem, mode, onBack }: ExportProps) {
   const date = useMemo(() => new Date(), []);
   const heading = useRef<HTMLHeadingElement>(null);
 
-  useEffect(() => {
-    heading.current?.focus();
-    const count = `${work.length} ${work.length === 1 ? 'line' : 'lines'} of your work`;
-    announce(`Hand in your work. ${count}. Download a file, or print it.`);
-  }, [work.length]);
 
   /** The spoken form of each problem line, taken from the rendered preview. */
   function spokenFor(id: string, fallback: string): string {
@@ -117,14 +118,17 @@ export function Export({ problem, mode, onBack }: ExportProps) {
     }
   }
 
-  useShortcuts({ d: () => void downloadHtml() }, !busy);
+
+  useShortcuts({ d: () => void downloadHtml() }, !busy, section);
 
   return (
-    <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-6 py-8">
+    <section ref={section} id="step-handin" aria-labelledby="handin-heading" className="step">
+      <p className="step-number no-print" aria-hidden="true">03</p>
       <h2
         ref={heading}
+        id="handin-heading"
         tabIndex={-1}
-        className="no-print text-4xl font-medium tracking-tight focus-visible:ring-4 focus-visible:ring-[--accent]"
+        className="no-print step-title focus-visible:ring-4 focus-visible:ring-[--accent]"
       >
         Hand in your work
       </h2>
@@ -154,9 +158,6 @@ export function Export({ problem, mode, onBack }: ExportProps) {
         </button>
         <button type="button" className="btn" onClick={print}>
           Print or save as PDF
-        </button>
-        <button type="button" className="btn" onClick={onBack}>
-          Back
         </button>
       </div>
 
@@ -194,6 +195,6 @@ export function Export({ problem, mode, onBack }: ExportProps) {
       </p>
 
       <ExportPreview name={name} problem={problem} work={work} date={date} />
-    </main>
+    </section>
   );
 }
