@@ -308,6 +308,8 @@ export interface CommandResponse {
   intent: CommandIntent;
   target_line: string | null;
   instruction: string | null;
+  /** A fixed sentence from the server when a request was refused. */
+  message?: string;
 }
 
 export function command(
