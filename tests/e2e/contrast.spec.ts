@@ -50,8 +50,8 @@ test.describe('@smoke low-vision contrast', () => {
 test.describe('@smoke primary action contrast', () => {
   const AA = 4.5;
   const THEMES = [
-    { name: 'dark', accent: '#7cc4ff', accentFg: '#06121d' },
-    { name: 'light', accent: '#0b5fa5', accentFg: '#ffffff' },
+    { name: 'ink (dark)', accent: '#8fe3d3', accentFg: '#0d1212' },
+    { name: 'sage (light)', accent: '#141616', accentFg: '#c8f1e8' },
   ];
 
   for (const t of THEMES) {
@@ -70,6 +70,45 @@ test.describe('@smoke primary action contrast', () => {
     for (const t of THEMES) {
       expect(css, `${t.accent} is no longer in index.css`).toContain(t.accent);
       expect(css, `${t.accentFg} is no longer in index.css`).toContain(t.accentFg);
+    }
+  });
+});
+
+
+// The page palette (#181). AA for text and warnings, on the page and on the
+// card surface; 3:1 for the edge of every control against the page (WCAG
+// 1.4.11). Values are read from index.css below, so a change there that
+// isn't reflected here fails.
+test.describe('@smoke page palette contrast', () => {
+  const PALETTES = [
+    { name: 'sage (light)', bg: '#abbab9', surface: '#c4d0cf', block: '#f3f6f5', fg: '#141616', muted: '#2f3635', line: '#3f4746', warn: '#5c3200' },
+    { name: 'ink (dark)', bg: '#141818', surface: '#1d2323', block: '#232b2b', fg: '#e7eeec', muted: '#aebcba', line: '#74827f', warn: '#ffc46b' },
+  ];
+
+  for (const p of PALETTES) {
+    test(`${p.name}: text, warnings and edges are readable`, () => {
+      for (const [role, colour, on, min] of [
+        ['text', p.fg, p.bg, 4.5],
+        ['muted text', p.muted, p.bg, 4.5],
+        ['warning', p.warn, p.bg, 4.5],
+        ['text on a card', p.fg, p.surface, 4.5],
+        ['muted text on a card', p.muted, p.surface, 4.5],
+        ['text on a button', p.fg, p.block, 4.5],
+        ['control edge', p.line, p.bg, 3],
+      ] as const) {
+        const ratio = contrastRatio(colour, on);
+        expect(ratio, `${p.name} ${role} (${colour} on ${on}) is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(min);
+      }
+    });
+  }
+
+  test('the palette in index.css still matches what is asserted here', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const css = await readFile('frontend/src/index.css', 'utf8');
+    for (const p of PALETTES) {
+      for (const colour of [p.bg, p.surface, p.block, p.fg, p.muted, p.line, p.warn]) {
+        expect(css, `${colour} (${p.name}) is no longer in index.css`).toContain(colour);
+      }
     }
   });
 });
