@@ -627,7 +627,7 @@ export function Scratchpad({ problem, onBack, mode, startLine, onExport }: Scrat
                 value={typed}
                 aria-describedby="typed-line-help"
                 onChange={(e) => setTyped(e.target.value)}
-                className="min-h-[48px] flex-1 rounded-lg border border-[--line] bg-[--surface] px-4 text-[--fg]"
+                className="min-h-[48px] min-w-0 flex-[1_1_12rem] rounded-lg border border-[--line] bg-[--surface] px-4 text-[--fg]"
               />
               <button type="submit" className="btn" disabled={busy || !typed.trim()}>
                 Add line
