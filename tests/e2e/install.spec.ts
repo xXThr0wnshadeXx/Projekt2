@@ -70,14 +70,12 @@ test.describe('@smoke installing Glance', () => {
 
 test.describe('@smoke the service worker', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'Service workers are exercised in Chromium.');
+  // The suite blocks service workers (playwright.config.ts); this test is about one.
+  test.use({ serviceWorkers: 'allow' });
 
   test('never answers or keeps a request to /api', async ({ page }) => {
     await page.goto('/');
-    // The app registers it in production builds only, so register it here.
-    await page.evaluate(async () => {
-      await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
-    });
+    await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload();
     await expect
       .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
