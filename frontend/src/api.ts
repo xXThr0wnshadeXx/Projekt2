@@ -101,9 +101,53 @@ export function capture(image: Blob, context = ''): Promise<CaptureResponse> {
   return request<CaptureResponse>('/api/capture', { method: 'POST', body: form });
 }
 
+export interface TranscribeResponse {
+  text: string;
+}
+
+/** Send a recording for speech-to-text. `contentType` must be the bare type. */
+export function transcribe(audio: Blob, contentType: string): Promise<TranscribeResponse> {
+  const form = new FormData();
+  // The extension has to agree with the content type or the server's demuxer
+  // is chosen wrongly and the file is rejected as invalid.
+  const extension = contentType === 'audio/mp4' ? 'mp4' : 'webm';
+  form.append('audio', new File([audio], `recording.${extension}`, { type: contentType }));
+  return request<TranscribeResponse>('/api/transcribe', { method: 'POST', body: form });
+}
+
+export interface SpokenAlternative {
+  latex: string;
+  readback: string;
+}
+
+/** Spoken math turned into LaTeX — DESIGN.md 9.
+ *
+ *  When `ambiguous` is true, `latex` and `readback` are null and the student is
+ *  asked which grouping they meant. That asking, rather than guessing, is the
+ *  behaviour the product is pitched on (DESIGN.md 3).
+ */
+export interface SpokenResponse {
+  latex: string | null;
+  ambiguous: boolean;
+  clarifying_question: string | null;
+  alternatives: SpokenAlternative[];
+  readback: string | null;
+  valid: boolean;
+}
+
+export function spokenToLatex(
+  text: string,
+  contextLines: string[] = [],
+): Promise<SpokenResponse> {
+  return request<SpokenResponse>('/api/spoken-to-latex', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    // Prior lines supply variable names only; the server treats them as data.
+    body: JSON.stringify({ text, context_lines: contextLines }),
+  });
+}
+
 // The remaining endpoints are implemented with their own issues:
-//   /api/transcribe       issue #15
-//   /api/spoken-to-latex  issue #17
 //   /api/command          issue #24
 //   /api/diff             issue #20
 //   /api/summary          issue #11
